@@ -97,6 +97,7 @@ python demo/server.py
 | `editor` | `'text'` \| `'number'` \| `'select'` (+ `editorOptions`) 또는 `{ init, getValue, destroy }` 커스텀 객체 |
 | `validator(value, row)` | `true` 또는 오류 메시지 반환 — 거부 시 커밋 차단 + 빨간 표시 |
 | `suppressCopy` | 클립보드 복사에서 제외 (CSV에는 영향 없음) |
+| `exportFormatter(value, row)` | CSV/Excel 내보내기 전용 포맷 (화면과 분리) |
 | `valueGetter(row)` | 파생 값 계산 — 정렬·필터·내보내기에도 반영 |
 | `suppressMove` | 드래그 순서 변경에서 제외 |
 | `valueFormatter(value, row)` | 표시 문자열 (기본 HTML 이스케이프) |
@@ -129,7 +130,8 @@ cellRenderer: DataGrid.renderers.progress()   // 0–100 진행 바
 `setColumnVisible(colId, visible)` · `autoSizeColumn(colId)` ·
 `focusCell(rowIndex, field)` / `ensureRowVisible(row)` / `ensureColumnVisible(colId)` ·
 `getState()` / `setState(state)` / `resetState(parts?)` (컬럼·정렬·필터·그룹·페이지 상태 저장/복원) ·
-`getCsv()` / `exportCsv(filename)` / `getJson()` · `showLoadingOverlay()` / `hideLoadingOverlay()` ·
+`getCsv()` / `exportCsv(filename)` / `exportExcel(filename, sheetName)` / `getJson()` ·
+`showLoadingOverlay()` / `hideLoadingOverlay()` ·
 `setTheme('light'|'dark')` · `refresh()` · `refreshCell(row, field)` / `refreshRow(row)` / `refreshColumn(colId)` ·
 `setOptions(patch)` · `expandRow(row)` / `collapseRow(row)` / `toggleRowDetail(row)` · `reloadData()` · `destroy()`
 
@@ -148,6 +150,7 @@ grid.on('sortChanged' | 'filterChanged' | 'paginationChanged' | 'groupChanged' |
 grid.on('beforeCellSave', function (e) { if (e.newValue < 0) e.cancel = true; });
 grid.on('beforeSort', function (e) { if (locked) e.cancel = true; });
 grid.on('beforeSelectionChange', function (e) { if (frozen) e.cancel = true; });
+grid.on('beforeExport', function (e) { e.filename = 'report-' + Date.now() + '.' + e.format; });
 ```
 
 ## 테마 커스터마이징

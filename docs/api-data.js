@@ -20,7 +20,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '1.1.0',
+  version: '1.2.0',
   updated: '2026-07-31',
 
   sections: [
@@ -503,6 +503,18 @@ window.ApiDocs = {
             '  },\n' +
             '  getValue: function () { return Number(this._input.value); },\n' +
             '}',
+        },
+        {
+          name: 'exportFormatter',
+          type: '(value, row) => any',
+          since: '1.2.0',
+          description:
+            'CSV/Excel 내보내기에서 <code>valueFormatter</code> 대신 사용할 포맷 함수. ' +
+            '화면 표시와 내보내기 포맷을 분리할 때 씁니다(예: 화면은 <code>$1,234</code>, ' +
+            '엑셀은 원시 숫자). 숫자를 반환하면 xlsx에서 숫자 셀로 나갑니다.',
+          example:
+            "{ field: 'total', format: '$#,##0',            // 화면\n" +
+            '  exportFormatter: function (v) { return v; } } // 내보내기는 원시 값',
         },
         {
           name: 'valueGetter',
@@ -1162,6 +1174,19 @@ window.ApiDocs = {
             '<code>getCsv()</code> 결과를 UTF-8(BOM 포함) 파일로 다운로드합니다. 기본 파일명은 <code>export.csv</code>.',
         },
         {
+          name: 'exportExcel',
+          group: 'Export',
+          signature: "exportExcel(filename?: string, sheetName?: string): void",
+          since: '1.2.0',
+          description:
+            '필터·정렬이 적용된 현재 뷰를 <strong>.xlsx</strong> 파일로 다운로드합니다 — ' +
+            '의존성 없이 무압축 ZIP + SpreadsheetML로 생성합니다. ' +
+            '<code>valueFormatter</code>/<code>exportFormatter</code>가 없는 숫자는 숫자 셀로 나가 ' +
+            '엑셀에서 바로 계산할 수 있습니다. <code>beforeExport</code>로 취소/가공 가능. ' +
+            '기본 파일명 <code>export.xlsx</code>, 시트명 <code>Data</code>.',
+          example: "grid.exportExcel('orders.xlsx', 'Orders');",
+        },
+        {
           name: 'getJson',
           group: 'Export',
           signature: 'getJson(): string',
@@ -1408,6 +1433,20 @@ window.ApiDocs = {
           since: '1.2.0',
           description:
             '셀에 포커스가 있는 상태의 키 입력(편집 중 제외). 그리드 자체 키 처리(화살표·Enter 등)보다 먼저 발생합니다.',
+        },
+        {
+          name: 'beforeExport',
+          payload: '{ format, filename, rows, columns, cancel }',
+          since: '1.2.0',
+          description:
+            '<code>exportCsv()</code>/<code>exportExcel()</code>이 파일을 만들기 직전. ' +
+            '<code>e.cancel = true</code>로 취소하거나 <code>e.rows</code>/<code>e.columns</code>/' +
+            '<code>e.filename</code>을 바꿔 내보낼 내용을 가공할 수 있습니다. ' +
+            '<code>format</code>은 <code>\'csv\'</code> 또는 <code>\'xlsx\'</code>.',
+          example:
+            "grid.on('beforeExport', function (e) {\n" +
+            "  e.rows = e.rows.filter(function (r) { return r.active; });\n" +
+            '});',
         },
         {
           name: 'rowExpanded',

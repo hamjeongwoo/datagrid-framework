@@ -684,6 +684,175 @@
   }
 
   /* ---------------------------------------------------------------------------
+   * XLSX export (dependency-free: 무압축 ZIP + SpreadsheetML)
+   * ------------------------------------------------------------------------- */
+
+  var CRC_TABLE = (function () {
+    var table = new Array(256);
+    for (var n = 0; n < 256; n++) {
+      var c = n;
+      for (var k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      table[n] = c >>> 0;
+    }
+    return table;
+  })();
+
+  function crc32(bytes) {
+    var crc = 0xffffffff;
+    for (var i = 0; i < bytes.length; i++) {
+      crc = CRC_TABLE[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
+    }
+    return (crc ^ 0xffffffff) >>> 0;
+  }
+
+  /**
+   * 파일 목록 → ZIP 바이트(Uint8Array). 압축 없이 STORE 방식으로 담는다
+   * (xlsx는 컨테이너만 ZIP이면 되므로 의존성 없이 충분).
+   * files: [{ name: 'xl/workbook.xml', data: string }]
+   */
+  function makeZip(files) {
+    var encoder = new TextEncoder();
+    var chunks = [];
+    var central = [];
+    var offset = 0;
+    var totalSize = 0;
+
+    function u16(v) { return [v & 0xff, (v >> 8) & 0xff]; }
+    function u32(v) { return [v & 0xff, (v >>> 8) & 0xff, (v >>> 16) & 0xff, (v >>> 24) & 0xff]; }
+    function push(arr) {
+      var u8 = arr instanceof Uint8Array ? arr : Uint8Array.from(arr);
+      chunks.push(u8);
+      totalSize += u8.length;
+    }
+
+    files.forEach(function (f) {
+      var nameBytes = encoder.encode(f.name);
+      var dataBytes = typeof f.data === 'string' ? encoder.encode(f.data) : f.data;
+      var crc = crc32(dataBytes);
+      var headerStart = totalSize;
+      push(u32(0x04034b50));            /* local file header signature */
+      push(u16(20)); push(u16(0));      /* version, flags */
+      push(u16(0));                     /* method: STORE */
+      push(u16(0)); push(u16(0));       /* time, date */
+      push(u32(crc));
+      push(u32(dataBytes.length));      /* compressed size */
+      push(u32(dataBytes.length));      /* uncompressed size */
+      push(u16(nameBytes.length)); push(u16(0));
+      push(nameBytes);
+      push(dataBytes);
+      central.push({ name: nameBytes, crc: crc, size: dataBytes.length, offset: headerStart });
+    });
+
+    var cdStart = totalSize;
+    central.forEach(function (e) {
+      push(u32(0x02014b50));            /* central directory signature */
+      push(u16(20)); push(u16(20));     /* version made / needed */
+      push(u16(0)); push(u16(0));       /* flags, method */
+      push(u16(0)); push(u16(0));       /* time, date */
+      push(u32(e.crc));
+      push(u32(e.size)); push(u32(e.size));
+      push(u16(e.name.length)); push(u16(0)); push(u16(0));
+      push(u16(0)); push(u16(0));       /* disk, internal attrs */
+      push(u32(0));                     /* external attrs */
+      push(u32(e.offset));
+      push(e.name);
+    });
+    var cdSize = totalSize - cdStart;
+    push(u32(0x06054b50));              /* end of central directory */
+    push(u16(0)); push(u16(0));
+    push(u16(central.length)); push(u16(central.length));
+    push(u32(cdSize)); push(u32(cdStart));
+    push(u16(0));
+
+    var out = new Uint8Array(totalSize);
+    offset = 0;
+    chunks.forEach(function (c) { out.set(c, offset); offset += c.length; });
+    return out;
+  }
+
+  function xmlEscape(value) {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  /**
+   * 시트 XML: 1행은 headerName, 이후 데이터 행. 포매터가 없으면 숫자는
+   * 숫자 셀(t="n")로 내보내 엑셀에서 바로 계산 가능하게 한다.
+   */
+  function buildWorksheetXml(rows, columns) {
+    var out = [
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>',
+    ];
+    function strCell(v) {
+      return '<c t="inlineStr"><is><t xml:space="preserve">' + xmlEscape(v) + '</t></is></c>';
+    }
+    out.push('<row>' + columns.map(function (c) { return strCell(c.headerName); }).join('') + '</row>');
+    rows.forEach(function (row) {
+      var cells = columns.map(function (c) {
+        var v = row[c.field];
+        if (c.valueFormatter) {
+          try { v = c.valueFormatter(v, row); }
+          catch (e) { /* 포매터 실패 시 원시 값 */ }
+        }
+        if (v === null || v === undefined) return '<c/>';
+        if (typeof v === 'number' && isFinite(v)) return '<c t="n"><v>' + v + '</v></c>';
+        if (typeof v === 'boolean') return '<c t="b"><v>' + (v ? 1 : 0) + '</v></c>';
+        return strCell(v);
+      });
+      out.push('<row>' + cells.join('') + '</row>');
+    });
+    out.push('</sheetData></worksheet>');
+    return out.join('');
+  }
+
+  /** xlsx 컨테이너를 구성하는 최소 파트 목록. */
+  function buildXlsxParts(rows, columns, sheetName) {
+    var name = xmlEscape(sheetName || 'Data');
+    return [
+      {
+        name: '[Content_Types].xml',
+        data:
+          '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+          '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+          '<Default Extension="xml" ContentType="application/xml"/>' +
+          '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+          '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+          '</Types>',
+      },
+      {
+        name: '_rels/.rels',
+        data:
+          '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+          '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
+          '</Relationships>',
+      },
+      {
+        name: 'xl/workbook.xml',
+        data:
+          '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
+          'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+          '<sheets><sheet name="' + name + '" sheetId="1" r:id="rId1"/></sheets></workbook>',
+      },
+      {
+        name: 'xl/_rels/workbook.xml.rels',
+        data:
+          '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+          '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
+          '</Relationships>',
+      },
+      { name: 'xl/worksheets/sheet1.xml', data: buildWorksheetXml(rows, columns) },
+    ];
+  }
+
+  /* ---------------------------------------------------------------------------
    * Column normalization
    * ------------------------------------------------------------------------- */
 
@@ -3648,11 +3817,46 @@
     this._emitter.emit('stateChanged', { state: this.getState() });
   };
 
-  /* ---- CSV export ---- */
+  /* ---- CSV / Excel export ---- */
+
+  /** 내보내기 대상 컬럼: exportFormatter가 있으면 valueFormatter를 대체한 사본. */
+  DataGrid.prototype._exportColumns = function () {
+    return this._visibleColumns()
+      .filter(function (c) { return c.field !== undefined; })
+      .map(function (c) {
+        if (!c.exportFormatter) return c;
+        var copy = {};
+        for (var k in c) copy[k] = c[k];
+        copy.valueFormatter = c.exportFormatter;
+        return copy;
+      });
+  };
+
+  /** beforeExport(취소 가능·rows/columns/filename 가공 가능)를 거친 내보내기 준비. */
+  DataGrid.prototype._prepareExport = function (format, filename) {
+    var evt = {
+      format: format,
+      filename: filename,
+      rows: this._viewRows.slice(),
+      columns: this._exportColumns(),
+      cancel: false,
+    };
+    this._emitter.emit('beforeExport', evt);
+    return evt.cancel ? null : evt;
+  };
+
+  DataGrid.prototype._downloadBlob = function (blob, filename) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  };
 
   DataGrid.prototype.getCsv = function () {
-    var cols = this._visibleColumns().filter(function (c) { return c.field !== undefined; });
-    return buildCsv(this._viewRows, cols);
+    return buildCsv(this._viewRows, this._exportColumns());
   };
 
   /**
@@ -3665,15 +3869,27 @@
   };
 
   DataGrid.prototype.exportCsv = function (filename) {
-    var csv = this.getCsv();
-    var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename || 'export.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(a.href);
+    var prep = this._prepareExport('csv', filename || 'export.csv');
+    if (!prep) return;
+    var csv = buildCsv(prep.rows, prep.columns);
+    this._downloadBlob(
+      new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' }),
+      prep.filename
+    );
+  };
+
+  /**
+   * 현재 뷰를 .xlsx 파일로 다운로드한다 (의존성 없는 무압축 ZIP +
+   * SpreadsheetML — 포매터가 없는 숫자는 숫자 셀로 나가 엑셀에서 바로 계산 가능).
+   */
+  DataGrid.prototype.exportExcel = function (filename, sheetName) {
+    var prep = this._prepareExport('xlsx', filename || 'export.xlsx');
+    if (!prep) return;
+    var zip = makeZip(buildXlsxParts(prep.rows, prep.columns, sheetName));
+    this._downloadBlob(
+      new Blob([zip], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+      prep.filename
+    );
   };
 
   /* ---- teardown ---- */
@@ -3729,7 +3945,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '1.1.0';
+  DataGrid.version = '1.2.0';
 
   /* Internals exposed for headless unit tests (not part of the public API). */
   DataGrid._test = {
@@ -3761,6 +3977,10 @@
     parseDataSourceResponse: parseDataSourceResponse,
     computeRowTops: computeRowTops,
     findRowAtOffset: findRowAtOffset,
+    crc32: crc32,
+    makeZip: makeZip,
+    buildWorksheetXml: buildWorksheetXml,
+    buildXlsxParts: buildXlsxParts,
     normalizeColumns: normalizeColumns,
     applyColumnState: applyColumnState,
     computeColumnWidths: computeColumnWidths,

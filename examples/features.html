@@ -1321,6 +1321,58 @@
     </script>
   </div>
 
+  <!-- ======================================================== Excel 내보내기 & beforeExport -->
+  <h2 class="section">Excel Export &amp; beforeExport</h2>
+  <p class="section-desc">
+    <code class="inline">exportExcel(filename, sheetName)</code>은 의존성 없이 진짜 .xlsx 파일을 만듭니다
+    (무압축 ZIP + SpreadsheetML — 포매터 없는 숫자는 숫자 셀로 나가 엑셀에서 바로 계산 가능).
+    <code class="inline">beforeExport</code> 이벤트로 내보내기를 취소하거나 rows/columns/filename을 가공하고,
+    <code class="inline">column.exportFormatter</code>는 화면 표시와 다른 내보내기 전용 포맷을 지정합니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn" id="xlsxBtn" type="button">exportExcel()</button>
+        <button class="tb-btn" id="csvBtn2" type="button">exportCsv()</button>
+        <label class="tb-check"><input type="checkbox" id="blockExport"> beforeExport 취소</label>
+      </div>
+      <div id="gridExcel" class="grid-wrap-sm"></div>
+      <div class="status-line" id="excelStatus">
+        Salary는 화면에선 $ 포맷, 엑셀로는 숫자 그대로(exportFormatter) 나갑니다.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridExcel'), {
+        rowData: DemoData.makeOrders(50, 73),
+        columnDefs: [
+          { field: 'orderId', headerName: 'Order ID', width: 130 },
+          { field: 'product', headerName: 'Product', width: 170 },
+          { field: 'quantity', headerName: 'Qty', dataType: 'number', width: 90 },
+          { field: 'total', headerName: 'Total', dataType: 'number', width: 130,
+            format: '$#,##0',                                    // 화면 표시용
+            exportFormatter: function (v) { return v; } },       // 내보내기는 원시 숫자
+          { field: 'paid', headerName: 'Paid', width: 90, align: 'center',
+            cellRenderer: DataGrid.renderers.check(),
+            exportFormatter: function (v) { return v ? 'Y' : 'N'; } },
+        ],
+      });
+
+      var status = document.getElementById('excelStatus');
+      grid.on('beforeExport', function (e) {
+        if (document.getElementById('blockExport').checked) {
+          e.cancel = true;
+          status.textContent = 'beforeExport 취소됨 — ' + e.format + ' 파일이 생성되지 않았습니다.';
+          return;
+        }
+        e.filename = 'orders-' + e.rows.length + 'rows.' + (e.format === 'xlsx' ? 'xlsx' : 'csv');
+        status.textContent = e.format + ' 내보내기: ' + e.rows.length + '행 → ' + e.filename;
+      });
+
+      document.getElementById('xlsxBtn').addEventListener('click', function () { grid.exportExcel(); });
+      document.getElementById('csvBtn2').addEventListener('click', function () { grid.exportCsv(); });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

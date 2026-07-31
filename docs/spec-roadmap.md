@@ -80,8 +80,8 @@
 | [x] | **`copy()` / `paste()` / `pasteModel` / `column > copy`** (엑셀 호환 TSV 클립보드) | 선택 행 <kbd>Ctrl+C</kbd> 복사(원시 값, `copy()` 메서드), 포커스 셀에 <kbd>Ctrl+V</kbd> 붙여넣기(`pasteTsv(text)`, editable+validator+beforeCellSave 통과 셀만), `column.suppressCopy` — v1.1.0 | **P1** |
 | [x] | **`saveState()` / `loadState()`** (컬럼 폭·순서·정렬·필터·페이지 저장/복원) | `getState()` / `setState(state)` — JSON 직렬화 가능, `stateChanged` 이벤트 — v1.1.0 | **P1** |
 | [x] | `exportData({format:'json'\|'html'})` | `getJson()` — 뷰 데이터 JSON 문자열 내보내기 (원시 값) — v1.1.0 | **P1** (쉬움) |
-| [ ] | `exportExcel` / `exportData({format:'xlsx'})` | `exportExcel()` — 의존성 없이 가능한 SpreadsheetML/xlsx 최소 구현 검토 | **P2** |
-| [ ] | `beforeExport` 이벤트, `column > exportRender` | `beforeExport`(취소·가공 가능), `column.exportFormatter` | **P2** |
+| [x] | `exportExcel` / `exportData({format:'xlsx'})` | `exportExcel(filename, sheetName)` — 의존성 없는 무압축 ZIP + SpreadsheetML, 숫자는 숫자 셀 — v1.2.0 | **P2** |
+| [x] | `beforeExport` 이벤트, `column > exportRender` | `beforeExport`(취소·rows/columns/filename 가공), `column.exportFormatter` — v1.2.0 | **P2** |
 
 ### 2.4 컬럼 · 레이아웃
 

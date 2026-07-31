@@ -363,6 +363,50 @@ suite('applyValueGetters', function () {
   assertEq(same, [{ x: 1 }], 'no field or no getter → untouched');
 });
 
+/* ---------------- xlsx export (crc32 / makeZip / worksheet) ---------------- */
+suite('xlsx export', function () {
+  var enc = new TextEncoder();
+  assertEq(T.crc32(enc.encode('')), 0, 'crc32 of empty');
+  assertEq(T.crc32(enc.encode('abc')).toString(16), '352441c2', 'crc32 known value');
+  assertEq(T.crc32(enc.encode('123456789')).toString(16), 'cbf43926', 'crc32 check value');
+
+  var zip = T.makeZip([{ name: 'a.txt', data: 'hello' }, { name: 'dir/b.xml', data: '<x/>' }]);
+  function u32At(off) {
+    return (zip[off] | (zip[off + 1] << 8) | (zip[off + 2] << 16) | (zip[off + 3] << 24)) >>> 0;
+  }
+  assertEq(u32At(0).toString(16), '4034b50', 'local file header signature');
+  assertEq(u32At(zip.length - 22).toString(16), '6054b50', 'end of central directory signature');
+  var entryCount = zip[zip.length - 22 + 10] | (zip[zip.length - 22 + 11] << 8);
+  assertEq(entryCount, 2, 'EOCD entry count');
+  /* 첫 파일 데이터가 STORE로 그대로 들어간다: 헤더 30바이트 + 이름 5바이트 뒤 */
+  var text = String.fromCharCode.apply(null, zip.slice(35, 40));
+  assertEq(text, 'hello', 'stored data intact');
+
+  var xml = T.buildWorksheetXml(
+    [{ n: 42.5, s: 'a<b', b: true, x: null }],
+    [{ field: 'n', headerName: 'Num' }, { field: 's', headerName: 'Str' },
+     { field: 'b', headerName: 'Bool' }, { field: 'x', headerName: 'Nil' }]
+  );
+  assert(xml.indexOf('<c t="n"><v>42.5</v></c>') !== -1, 'number as numeric cell');
+  assert(xml.indexOf('a&lt;b') !== -1, 'string xml-escaped');
+  assert(xml.indexOf('<c t="b"><v>1</v></c>') !== -1, 'boolean cell');
+  assert(xml.indexOf('<c/>') !== -1, 'null → empty cell');
+  assert(xml.indexOf('<t xml:space="preserve">Num</t>') !== -1, 'header row present');
+
+  var fmtXml = T.buildWorksheetXml(
+    [{ n: 5 }],
+    [{ field: 'n', headerName: 'N', valueFormatter: function (v) { return '$' + v; } }]
+  );
+  assert(fmtXml.indexOf('$5') !== -1 && fmtXml.indexOf('<c t="n">') === -1, 'formatter output as string cell');
+
+  var parts = T.buildXlsxParts([], [{ field: 'a', headerName: 'A' }], 'My "Sheet"');
+  assertEq(parts.map(function (p) { return p.name; }), [
+    '[Content_Types].xml', '_rels/.rels', 'xl/workbook.xml',
+    'xl/_rels/workbook.xml.rels', 'xl/worksheets/sheet1.xml',
+  ], 'xlsx part names');
+  assert(parts[2].data.indexOf('name="My &quot;Sheet&quot;"') !== -1, 'sheet name escaped');
+});
+
 /* ---------------- computeRowTops / findRowAtOffset ---------------- */
 suite('computeRowTops / findRowAtOffset', function () {
   var items = [
