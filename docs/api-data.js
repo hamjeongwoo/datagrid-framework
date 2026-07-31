@@ -20,7 +20,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.1.0',
+  version: '2.2.0',
   updated: '2026-07-31',
 
   sections: [
@@ -715,8 +715,19 @@ window.ApiDocs = {
         },
         {
           name: 'editorOptions',
-          type: 'string[]',
-          description: "<code>editor: 'select'</code>일 때의 선택지 목록.",
+          type: 'Array<string | { label, value }>',
+          description:
+            "<code>editor: 'select'</code>일 때의 선택지 목록. 문자열 배열이면 표시와 저장에 같은 값을 쓰고, " +
+            '<code>{ label, value }</code> 객체 배열이면 드롭다운에는 <code>label</code>이 표시되고 ' +
+            '선택 시 <code>value</code>가 데이터에 저장됩니다 (셀에는 저장된 value가 보입니다). ' +
+            '<code>value</code>의 원본 타입은 보존됩니다 — 숫자 value를 고르면 숫자로 커밋됩니다. ' +
+            '객체 형식은 v2.2.0부터 지원.',
+          example:
+            "{ field: 'country', editor: 'select',\n" +
+            "  editorOptions: [\n" +
+            "    { label: '한국', value: 'kr' },\n" +
+            "    { label: '일본', value: 'jp' },\n" +
+            '  ] }',
         },
         {
           name: 'suppressCopy',

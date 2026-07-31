@@ -344,6 +344,30 @@
   }
 
   /**
+   * select 에디터의 editorOptions 정규화 → [{ label, value }].
+   * - 'kr' 같은 원시값: label = value = 그 값.
+   * - { label: '한국', value: 'kr' } 객체: 그대로. label이 없으면 value로 대체.
+   *   value가 없으면(undefined) label을 value로 사용.
+   * - null/undefined 항목은 건너뛴다. value의 원본 타입(숫자 등)은 보존한다.
+   */
+  function normalizeEditorOptions(options) {
+    if (!Array.isArray(options)) return [];
+    var out = [];
+    options.forEach(function (opt) {
+      if (opt === null || opt === undefined) return;
+      if (typeof opt === 'object') {
+        var value = opt.value !== undefined ? opt.value : opt.label;
+        if (value === undefined) return;
+        var label = opt.label !== undefined && opt.label !== null ? opt.label : value;
+        out.push({ label: String(label), value: value });
+      } else {
+        out.push({ label: String(opt), value: opt });
+      }
+    });
+    return out;
+  }
+
+  /**
    * 헤더 필터 행(floatingFilter)의 입력값 → 컬럼 필터 모델.
    * - raw가 null/undefined이거나 (set 제외) 공백뿐이면 null(필터 해제).
    * - 이미 적용된 모델의 연산자는 유지하되, 단일 입력으로 표현할 수 없는
@@ -4044,23 +4068,32 @@
     } else {
       if (editorType === 'select') {
         input = document.createElement('select');
-        (col.editorOptions || []).forEach(function (v) {
+        var selectOptions = normalizeEditorOptions(col.editorOptions);
+        selectOptions.forEach(function (o) {
           var opt = document.createElement('option');
-          opt.value = v;
-          opt.textContent = v;
+          opt.value = String(o.value);
+          opt.textContent = o.label;
           input.appendChild(opt);
         });
         input.value = value === null || value === undefined ? '' : String(value);
+        /* select.value는 항상 문자열 — 원본 옵션에서 찾아 value의 타입을 보존한다 */
+        getValue = function () {
+          var picked = input.value;
+          for (var i = 0; i < selectOptions.length; i++) {
+            if (String(selectOptions[i].value) === picked) return selectOptions[i].value;
+          }
+          return picked;
+        };
       } else {
         input = document.createElement('input');
         input.type = editorType === 'number' ? 'number' : 'text';
         input.value = value === null || value === undefined ? '' : String(value);
+        getValue = function () { return input.value; };
       }
       input.className = 'dg-cell-editor';
       cellEl.appendChild(input);
       input.focus();
       if (input.select) input.select();
-      getValue = function () { return input.value; };
       invalidEl = input;
     }
 
@@ -5137,7 +5170,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.1.0';
+  DataGrid.version = '2.2.0';
 
   /* Internals exposed for headless unit tests (not part of the public API). */
   DataGrid._test = {
@@ -5152,6 +5185,7 @@
     quickFilterRows: quickFilterRows,
     buildFloatingFilterModel: buildFloatingFilterModel,
     validationMessage: validationMessage,
+    normalizeEditorOptions: normalizeEditorOptions,
     buildTsv: buildTsv,
     parseTsv: parseTsv,
     aggregateValues: aggregateValues,

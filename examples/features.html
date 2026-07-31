@@ -1866,6 +1866,58 @@
     </script>
   </div>
 
+  <!-- ======================================================== select 에디터 label/value -->
+  <h2 class="section">Select Editor — label/value Options</h2>
+  <p class="section-desc">
+    <code class="inline">editorOptions</code>는 문자열 배열 외에
+    <code class="inline">{ label: '한국', value: 'kr' }</code> 객체 배열도 받습니다 —
+    드롭다운에는 <code class="inline">label</code>이 표시되고, 선택하면 <code class="inline">value</code>가
+    데이터에 저장되어 셀에 표시됩니다 (숫자 value는 타입이 보존됩니다).
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div id="gridSelectLV" class="grid-wrap-sm"></div>
+      <div class="status-line" id="selectLVStatus">
+        Country 셀을 클릭해 드롭다운에서 나라 이름(label)을 고르면 셀에는 코드(value)가 저장됩니다.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var rows = DemoData.makeEmployees(30, 41).map(function (r, i) {
+        r.country = ['kr', 'jp', 'us', 'de'][i % 4];   // 저장값은 코드
+        r.grade = (i % 3) + 1;                          // 숫자 value 예시
+        return r;
+      });
+
+      var grid = new DataGrid(document.getElementById('gridSelectLV'), {
+        rowData: rows,
+        columnDefs: [
+          { field: 'name', headerName: 'Name', flex: 1 },
+          { field: 'country', headerName: 'Country', width: 120, editable: true, editor: 'select',
+            editorOptions: [                    // label = 표시, value = 저장
+              { label: '한국', value: 'kr' },
+              { label: '일본', value: 'jp' },
+              { label: '미국', value: 'us' },
+              { label: '독일', value: 'de' },
+            ] },
+          { field: 'grade', headerName: 'Grade', width: 110, editable: true, editor: 'select',
+            editorOptions: [                    // 숫자 value는 숫자로 커밋된다
+              { label: 'Junior (1)', value: 1 },
+              { label: 'Middle (2)', value: 2 },
+              { label: 'Senior (3)', value: 3 },
+            ] },
+          { field: 'department', headerName: 'Department', width: 140, editable: true, editor: 'select',
+            editorOptions: ['Engineering', 'Design', 'Sales'] },  // 문자열 배열도 그대로 지원
+        ],
+      });
+
+      grid.on('cellValueChanged', function (e) {
+        document.getElementById('selectLVStatus').textContent =
+          e.colDef.field + ': ' + JSON.stringify(e.oldValue) + ' → ' + JSON.stringify(e.newValue) +
+          ' (typeof ' + typeof e.newValue + ')';
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

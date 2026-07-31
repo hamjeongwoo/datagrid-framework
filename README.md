@@ -103,6 +103,7 @@ python demo/server.py
 | `filter` | `'text'` \| `'number'` \| `'set'` (`true` = text) |
 | `editable` | 더블클릭/Enter로 인라인 편집 |
 | `editor` | `'text'` \| `'number'` \| `'select'` (+ `editorOptions`) 또는 `{ init, getValue, destroy }` 커스텀 객체 |
+| `editorOptions` | select 선택지 — `['a', 'b']` 또는 `[{ label: '한국', value: 'kr' }]` (label 표시, value 저장·타입 보존) |
 | `validator(value, row)` | `true` 또는 오류 메시지 반환 — 거부 시 커밋 차단 + 빨간 표시 |
 | `suppressCopy` | 클립보드 복사에서 제외 (CSV에는 영향 없음) |
 | `exportFormatter(value, row)` | CSV/Excel 내보내기 전용 포맷 (화면과 분리) |

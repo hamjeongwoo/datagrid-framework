@@ -189,6 +189,28 @@ suite('validationMessage', function () {
   assertEq(v(0), 'Invalid value', 'other falsy values reject with default message');
 });
 
+suite('normalizeEditorOptions', function () {
+  var n = T.normalizeEditorOptions;
+  assertEq(n(undefined), [], 'undefined → empty');
+  assertEq(n(null), [], 'null → empty');
+  assertEq(n('kr'), [], 'non-array → empty');
+  assertEq(n(['kr', 'jp']), [
+    { label: 'kr', value: 'kr' }, { label: 'jp', value: 'jp' },
+  ], 'string entries: label = value');
+  assertEq(n([{ label: '한국', value: 'kr' }, { label: '일본', value: 'jp' }]), [
+    { label: '한국', value: 'kr' }, { label: '일본', value: 'jp' },
+  ], 'object entries keep label/value');
+  assertEq(n([{ value: 'kr' }]), [{ label: 'kr', value: 'kr' }], 'missing label falls back to value');
+  assertEq(n([{ label: '한국' }]), [{ label: '한국', value: '한국' }], 'missing value falls back to label');
+  assertEq(n([{ label: '열', value: 10 }]), [{ label: '열', value: 10 }], 'value keeps its original type');
+  assertEq(n(['kr', null, undefined, { label: '일본', value: 'jp' }, {}]), [
+    { label: 'kr', value: 'kr' }, { label: '일본', value: 'jp' },
+  ], 'null/undefined/empty-object entries are skipped');
+  assertEq(n([0, '']), [
+    { label: '0', value: 0 }, { label: '', value: '' },
+  ], 'falsy primitives (0, empty string) are kept');
+});
+
 /* ---------------- floating filter model ---------------- */
 suite('buildFloatingFilterModel', function () {
   var f = T.buildFloatingFilterModel;
