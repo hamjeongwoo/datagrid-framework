@@ -155,41 +155,8 @@
     word-break: break-all;
   }
 
-  .api-example {
-    position: relative;
-    background: #14181a;
-    border-radius: 8px;
-    padding: 12px 14px;
-    margin: 12px 0 2px;
-    overflow-x: auto;
-    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
-    font-size: 12.5px;
-    line-height: 1.6;
-    color: #e6edf3;
-  }
-  .api-example code { background: none; padding: 0; color: inherit; font-size: inherit; }
-  .hl-kw { color: #ff7b72; }
-  .hl-str { color: #a5d6ff; }
-  .hl-num { color: #79c0ff; }
-  .hl-com { color: #8b949e; font-style: italic; }
-  .hl-fn { color: #d2a8ff; }
-  .copy-btn {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    padding: 3px 10px;
-    font-size: 11.5px;
-    font-family: inherit;
-    color: #e6edf3;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    border-radius: 6px;
-    cursor: pointer;
-    opacity: 0;
-    transition: opacity 0.12s;
-  }
-  .api-example:hover .copy-btn { opacity: 1; }
-  .copy-btn:hover { background: rgba(255, 255, 255, 0.2); }
+  /* .api-example / .copy-btn / .hl-* 스타일은 demo/demo.css(공용)에 있습니다 */
+  .api-entry .api-example { margin: 12px 0 2px; }
 
   .api-table { border-collapse: collapse; margin: 12px 0; width: 100%; max-width: 640px; }
   .api-table th, .api-table td {
@@ -249,6 +216,7 @@
 
 </div>
 
+<script src="../demo/highlight.js"></script>
 <script src="api-data.js"></script>
 <script>
 (function () {
@@ -256,29 +224,10 @@
   var DATA = window.ApiDocs;
 
   /* ------------------------------------------------------------------
-   * Helpers
+   * Helpers (구문 강조는 demo/highlight.js 공용 모듈 사용)
    * ---------------------------------------------------------------- */
-  function esc(s) {
-    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
-
-  /* 가벼운 JS 하이라이터: 이스케이프 후 토큰 순서대로 한 번에 치환 */
-  function highlight(code) {
-    var out = '';
-    var src = code;
-    var token = /(\/\*[\s\S]*?\*\/|\/\/[^\n]*)|('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")|\b(var|let|const|function|return|new|if|else|for|while|typeof|true|false|null|undefined|this)\b|\b(\d+(?:\.\d+)?)\b|([A-Za-z_$][\w$]*)(?=\s*\()/g;
-    var last = 0, m;
-    while ((m = token.exec(src))) {
-      out += esc(src.slice(last, m.index));
-      if (m[1]) out += '<span class="hl-com">' + esc(m[1]) + '</span>';
-      else if (m[2]) out += '<span class="hl-str">' + esc(m[2]) + '</span>';
-      else if (m[3]) out += '<span class="hl-kw">' + esc(m[3]) + '</span>';
-      else if (m[4]) out += '<span class="hl-num">' + esc(m[4]) + '</span>';
-      else if (m[5]) out += '<span class="hl-fn">' + esc(m[5]) + '</span>';
-      last = m.index + m[0].length;
-    }
-    return out + esc(src.slice(last));
-  }
+  var esc = Highlight.escapeHtml;
+  var highlight = Highlight.js;
 
   function entryId(section, entry) {
     return section.id + '-' + entry.name.replace(/[^\w-]+/g, '-').replace(/^-|-$/g, '');

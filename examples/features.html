@@ -23,250 +23,344 @@
   </header>
 
   <h1>Features</h1>
-  <p class="subtitle">기능별 데모 — 각 그리드는 독립된 <code class="inline">new DataGrid(el, options)</code> 인스턴스입니다.</p>
+  <p class="subtitle">
+    기능별 데모 — 각 예제의 <strong>View Source</strong> 탭에 표시되는 코드가 그대로 실행됩니다.
+    복사해서 바로 사용할 수 있는 완결된 예제입니다.
+  </p>
 
-  <!-- Sorting -->
+  <!-- ======================================================== Sorting -->
   <h2 class="section">Sorting</h2>
   <p class="section-desc">
     헤더 클릭으로 오름차순 → 내림차순 → 해제 순환. <strong>Shift+클릭</strong>으로 다중 정렬(정렬 순서 배지 표시).
-    <code class="inline">comparator</code>로 커스텀 비교도 가능합니다.
+    <code class="inline">sortModel</code>로 초기 정렬을 지정할 수 있습니다.
   </p>
-  <div class="card grid-wrap-sm" id="gridSort"></div>
+  <div class="example-card">
+    <div class="example-html">
+      <div id="gridSort" class="grid-wrap-sm"></div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridSort'), {
+        rowData: DemoData.makeEmployees(30),
+        sortModel: [
+          { field: 'department', dir: 'asc' },
+          { field: 'salary', dir: 'desc' },
+        ],
+        columnDefs: [
+          { field: 'name', headerName: 'Name', width: 160 },
+          { field: 'department', headerName: 'Department', width: 140 },
+          { field: 'city', headerName: 'City', width: 130 },
+          { field: 'salary', headerName: 'Salary', width: 120, align: 'right',
+            valueFormatter: function (v) { return '$' + v.toLocaleString(); } },
+          { field: 'hireDate', headerName: 'Hire Date', width: 130 },
+        ],
+      });
+    </script>
+  </div>
 
-  <!-- Filtering -->
+  <!-- ======================================================== Filters -->
   <h2 class="section">Column Filters</h2>
   <p class="section-desc">
     헤더에 마우스를 올리면 나타나는 메뉴 버튼으로 컬럼별 필터를 엽니다.
-    <code class="inline">filter: 'text'</code>(연산자 6종) · <code class="inline">'number'</code>(범위 포함 7종) ·
-    <code class="inline">'set'</code>(체크박스 목록). 여러 컬럼 필터는 AND로 결합됩니다.
+    <code class="inline">filter: 'text'</code> · <code class="inline">'number'</code> ·
+    <code class="inline">'set'</code>. 여러 컬럼 필터는 AND로 결합됩니다.
   </p>
-  <div class="card grid-wrap-sm" id="gridFilter"></div>
+  <div class="example-card">
+    <div class="example-html">
+      <div id="gridFilter" class="grid-wrap-sm"></div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridFilter'), {
+        rowData: DemoData.makeEmployees(60),
+        columnDefs: [
+          { field: 'name', headerName: 'Name (text)', width: 180, filter: 'text' },
+          { field: 'department', headerName: 'Department (set)', width: 170, filter: 'set' },
+          { field: 'city', headerName: 'City (set)', width: 150, filter: 'set' },
+          { field: 'salary', headerName: 'Salary (number)', width: 150, align: 'right',
+            filter: 'number',
+            valueFormatter: function (v) { return '$' + v.toLocaleString(); } },
+        ],
+      });
 
-  <!-- Quick filter -->
-  <h2 class="section">Quick Filter</h2>
-  <p class="section-desc">모든 컬럼을 대상으로 한 전역 검색 — 공백으로 구분된 모든 단어가 일치해야 합니다.</p>
-  <div class="card">
-    <div class="toolbar"><input class="tb-input" id="qfInput" type="text" placeholder="예: seoul engineering"></div>
-    <div class="grid-wrap-sm" id="gridQuick"></div>
+      // 코드로 필터를 적용할 수도 있습니다:
+      // grid.applyColumnFilter('salary', { type: 'number', op: 'greaterThan', value: 100000 });
+    </script>
   </div>
 
-  <!-- Selection -->
+  <!-- ======================================================== Quick filter -->
+  <h2 class="section">Quick Filter</h2>
+  <p class="section-desc">모든 컬럼을 대상으로 한 전역 검색 — 공백으로 구분된 모든 단어가 일치해야 합니다.</p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <input class="tb-input" id="qfInput" type="text" placeholder="예: seoul engineering">
+      </div>
+      <div id="gridQuick" class="grid-wrap-sm"></div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridQuick'), {
+        rowData: DemoData.makeEmployees(60),
+        columnDefs: [
+          { field: 'name', headerName: 'Name', width: 160 },
+          { field: 'department', headerName: 'Department', width: 140 },
+          { field: 'city', headerName: 'City', width: 130 },
+          { field: 'salary', headerName: 'Salary', width: 120, align: 'right',
+            valueFormatter: function (v) { return '$' + v.toLocaleString(); } },
+          { field: 'hireDate', headerName: 'Hire Date', width: 130 },
+        ],
+      });
+
+      document.getElementById('qfInput').addEventListener('input', function () {
+        grid.setQuickFilter(this.value);
+      });
+    </script>
+  </div>
+
+  <!-- ======================================================== Selection -->
   <h2 class="section">Row Selection</h2>
   <p class="section-desc">
     <code class="inline">rowSelection: 'multiple'</code> — 체크박스, 헤더 전체 선택(부분 선택 시 indeterminate),
     Ctrl/⌘+클릭 토글, Shift+클릭 범위 선택.
   </p>
-  <div class="card">
-    <div class="grid-wrap-sm" id="gridSelect"></div>
-    <div class="status-line" id="selStatus">선택된 행 없음</div>
+  <div class="example-card">
+    <div class="example-html">
+      <div id="gridSelect" class="grid-wrap-sm"></div>
+      <div class="status-line" id="selStatus">선택된 행 없음</div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridSelect'), {
+        rowData: DemoData.makeEmployees(30),
+        rowSelection: 'multiple',
+        columnDefs: [
+          { colId: 'sel', headerName: '', width: 48, minWidth: 48,
+            checkboxSelection: true, headerCheckboxSelection: true,
+            sortable: false, resizable: false },
+          { field: 'name', headerName: 'Name', width: 160 },
+          { field: 'department', headerName: 'Department', width: 140 },
+          { field: 'city', headerName: 'City', width: 130 },
+          { field: 'salary', headerName: 'Salary', width: 120, align: 'right',
+            valueFormatter: function (v) { return '$' + v.toLocaleString(); } },
+        ],
+      });
+
+      grid.on('selectionChanged', function (e) {
+        var names = e.selectedRows.slice(0, 5).map(function (r) { return r.name; });
+        document.getElementById('selStatus').textContent = e.selectedRows.length
+          ? e.selectedRows.length + '개 행 선택됨: ' + names.join(', ') +
+            (e.selectedRows.length > 5 ? ' …' : '')
+          : '선택된 행 없음';
+      });
+    </script>
   </div>
 
-  <!-- Editing -->
+  <!-- ======================================================== Editing -->
   <h2 class="section">Cell Editing</h2>
   <p class="section-desc">
     <code class="inline">editable: true</code> 셀을 더블클릭(또는 Enter)하면 편집 시작 — text / number / select
     에디터, Enter 커밋, Esc 취소, <code class="inline">cellValueChanged</code> 이벤트 발행.
   </p>
-  <div class="card">
-    <div class="grid-wrap-sm" id="gridEdit"></div>
-    <div class="status-line" id="editStatus">셀을 더블클릭해 편집해 보세요.</div>
+  <div class="example-card">
+    <div class="example-html">
+      <div id="gridEdit" class="grid-wrap-sm"></div>
+      <div class="status-line" id="editStatus">셀을 더블클릭해 편집해 보세요.</div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridEdit'), {
+        rowData: DemoData.makeEmployees(20),
+        columnDefs: [
+          { field: 'name', headerName: 'Name (text)', width: 170, editable: true },
+          { field: 'department', headerName: 'Department (select)', width: 180,
+            editable: true, editor: 'select',
+            editorOptions: ['Engineering', 'Design', 'Marketing', 'Sales', 'Finance', 'Support'] },
+          { field: 'salary', headerName: 'Salary (number)', width: 150, align: 'right',
+            editable: true, editor: 'number',
+            valueFormatter: function (v) { return '$' + v.toLocaleString(); } },
+          { field: 'city', headerName: 'City (읽기 전용)', width: 140 },
+        ],
+      });
+
+      grid.on('cellValueChanged', function (e) {
+        document.getElementById('editStatus').textContent =
+          e.colDef.headerName + ': ' + e.oldValue + ' → ' + e.newValue;
+      });
+    </script>
   </div>
 
-  <!-- Pagination -->
+  <!-- ======================================================== Pagination -->
   <h2 class="section">Pagination</h2>
   <p class="section-desc">
     페이지 크기 선택, 처음/이전/번호/다음/마지막 버튼, "X to Y of Z" 요약. 페이지네이션을 끄면 전체 가상 스크롤로 동작합니다.
   </p>
-  <div class="card grid-wrap-sm" id="gridPage"></div>
+  <div class="example-card">
+    <div class="example-html">
+      <div id="gridPage" class="grid-wrap-sm"></div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridPage'), {
+        rowData: DemoData.makeEmployees(1234, 99),
+        pagination: true,
+        paginationPageSize: 10,
+        paginationPageSizeOptions: [10, 20, 50, 100],
+        columnDefs: [
+          { field: 'name', headerName: 'Name', width: 160 },
+          { field: 'department', headerName: 'Department', width: 140 },
+          { field: 'city', headerName: 'City', width: 130 },
+          { field: 'salary', headerName: 'Salary', width: 120, align: 'right',
+            valueFormatter: function (v) { return '$' + v.toLocaleString(); } },
+          { field: 'hireDate', headerName: 'Hire Date', width: 130 },
+        ],
+      });
+    </script>
+  </div>
 
-  <!-- Pinning + resize + reorder -->
+  <!-- ======================================================== Pinning -->
   <h2 class="section">Column Pinning · Resize · Reorder</h2>
   <p class="section-desc">
     <code class="inline">pinned: 'left' | 'right'</code> 고정 컬럼(스크롤 시 그림자), 헤더 경계 드래그로 크기 조절,
     경계 더블클릭으로 자동 맞춤, 헤더 드래그로 순서 변경.
   </p>
-  <div class="card grid-wrap-sm" id="gridPin"></div>
+  <div class="example-card">
+    <div class="example-html">
+      <div id="gridPin" class="grid-wrap-sm"></div>
+    </div>
+    <script type="text/x-example">
+      var money = function (v) { return '$' + v.toLocaleString(); };
 
-  <!-- Virtual scroll -->
+      var grid = new DataGrid(document.getElementById('gridPin'), {
+        rowData: DemoData.makeOrders(60),
+        columnDefs: [
+          { field: 'orderId', headerName: 'Order', width: 110, pinned: 'left' },
+          { field: 'product', headerName: 'Product', width: 160 },
+          { field: 'customer', headerName: 'Customer', width: 160 },
+          { field: 'quantity', headerName: 'Qty', width: 90, align: 'right' },
+          { field: 'unitPrice', headerName: 'Unit Price', width: 120, align: 'right', valueFormatter: money },
+          { field: 'status', headerName: 'Status', width: 130 },
+          { field: 'paid', headerName: 'Paid', width: 90, align: 'center',
+            cellRenderer: DataGrid.renderers.check() },
+          { field: 'total', headerName: 'Total', width: 120, align: 'right', pinned: 'right', valueFormatter: money },
+        ],
+      });
+    </script>
+  </div>
+
+  <!-- ======================================================== Virtualization -->
   <h2 class="section">Row Virtualization — 100,000 rows</h2>
   <p class="section-desc">
     보이는 범위(±6행 버퍼)만 DOM으로 렌더링해 10만 행도 지연 없이 스크롤합니다.
-    현재 DOM row 수: <strong id="domRowCount">–</strong>
   </p>
-  <div class="card grid-wrap-md" id="gridVirtual"></div>
+  <div class="example-card">
+    <div class="example-html">
+      <div id="gridVirtual" class="grid-wrap-md"></div>
+      <div class="status-line">현재 DOM row 수: <strong id="domRowCount">–</strong></div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridVirtual'), {
+        rowData: DemoData.makeEmployees(100000, 3),
+        zebra: true,
+        columnDefs: [
+          { field: 'id', headerName: '#', width: 90, align: 'right' },
+          { field: 'name', headerName: 'Name', width: 160 },
+          { field: 'department', headerName: 'Department', width: 140 },
+          { field: 'city', headerName: 'City', width: 130 },
+          { field: 'salary', headerName: 'Salary', width: 120, align: 'right',
+            valueFormatter: function (v) { return '$' + v.toLocaleString(); } },
+          { field: 'hireDate', headerName: 'Hire Date', width: 130 },
+        ],
+      });
 
-  <!-- CSV -->
-  <h2 class="section">CSV Export</h2>
-  <p class="section-desc">필터·정렬이 적용된 현재 뷰 데이터를 그대로 내보냅니다(포매터 적용, RFC 4180 이스케이프).</p>
-  <div class="card">
-    <div class="toolbar"><button class="tb-btn primary" id="csvBtn" type="button">Export CSV</button></div>
-    <div class="grid-wrap-sm" id="gridCsv"></div>
+      // 실제로 렌더링된 DOM row 수를 표시 (가상 스크롤 확인용)
+      var countEl = document.getElementById('domRowCount');
+      var update = function () {
+        countEl.textContent =
+          document.querySelectorAll('#gridVirtual .dg-row').length + ' / 100,000';
+      };
+      document.querySelector('#gridVirtual .dg-body').addEventListener('scroll', update);
+      update();
+    </script>
   </div>
 
-  <!-- Overlays -->
+  <!-- ======================================================== CSV -->
+  <h2 class="section">CSV Export</h2>
+  <p class="section-desc">필터·정렬이 적용된 현재 뷰 데이터를 그대로 내보냅니다(포매터 적용, RFC 4180 이스케이프).</p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn primary" id="csvBtn" type="button">Export CSV</button>
+      </div>
+      <div id="gridCsv" class="grid-wrap-sm"></div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridCsv'), {
+        rowData: DemoData.makeOrders(25),
+        columnDefs: [
+          { field: 'orderId', headerName: 'Order', width: 110 },
+          { field: 'product', headerName: 'Product', width: 170 },
+          { field: 'customer', headerName: 'Customer', width: 160 },
+          { field: 'total', headerName: 'Total', width: 120, align: 'right',
+            valueFormatter: function (v) { return '$' + v.toLocaleString(); } },
+        ],
+      });
+
+      document.getElementById('csvBtn').addEventListener('click', function () {
+        grid.exportCsv('orders.csv');
+      });
+    </script>
+  </div>
+
+  <!-- ======================================================== Overlays -->
   <h2 class="section">Overlays</h2>
   <p class="section-desc">로딩 스피너 오버레이와 "No rows to show" 빈 상태.</p>
-  <div class="card">
-    <div class="toolbar">
-      <button class="tb-btn" id="loadBtn" type="button">Show loading (2s)</button>
-      <button class="tb-btn" id="emptyBtn" type="button">Set empty data</button>
-      <button class="tb-btn" id="restoreBtn" type="button">Restore data</button>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn" id="loadBtn" type="button">Show loading (2s)</button>
+        <button class="tb-btn" id="emptyBtn" type="button">Set empty data</button>
+        <button class="tb-btn" id="restoreBtn" type="button">Restore data</button>
+      </div>
+      <div id="gridOverlay" class="grid-wrap-sm"></div>
     </div>
-    <div class="grid-wrap-sm" id="gridOverlay"></div>
+    <script type="text/x-example">
+      var data = DemoData.makeEmployees(15);
+
+      var grid = new DataGrid(document.getElementById('gridOverlay'), {
+        rowData: data,
+        columnDefs: [
+          { field: 'name', headerName: 'Name', width: 160 },
+          { field: 'department', headerName: 'Department', width: 140 },
+          { field: 'city', headerName: 'City', width: 130 },
+          { field: 'hireDate', headerName: 'Hire Date', width: 130 },
+        ],
+      });
+
+      document.getElementById('loadBtn').addEventListener('click', function () {
+        grid.showLoadingOverlay();
+        setTimeout(function () { grid.hideLoadingOverlay(); }, 2000);
+      });
+      document.getElementById('emptyBtn').addEventListener('click', function () {
+        grid.setRowData([]);
+      });
+      document.getElementById('restoreBtn').addEventListener('click', function () {
+        grid.setRowData(data);
+      });
+    </script>
   </div>
 
 </div>
 
 <script src="../dist/datagrid.js"></script>
 <script src="../demo/data.js"></script>
+<script src="../demo/highlight.js"></script>
+<script src="../demo/example-tabs.js"></script>
 <script>
 (function () {
   'use strict';
+  ExampleTabs.init();
 
-  var money = function (v) { return v === null || v === undefined ? '' : '$' + Number(v).toLocaleString(); };
-  var employees = DemoData.makeEmployees(60);
-  var orders = DemoData.makeOrders(60);
-  var grids = [];
-
-  var baseCols = function () {
-    return [
-      { field: 'name', headerName: 'Name', width: 160 },
-      { field: 'department', headerName: 'Department', width: 140 },
-      { field: 'city', headerName: 'City', width: 130 },
-      { field: 'salary', headerName: 'Salary', width: 120, align: 'right', valueFormatter: money },
-      { field: 'hireDate', headerName: 'Hire Date', width: 130 },
-    ];
-  };
-
-  function make(id, options) {
-    var g = new DataGrid(document.getElementById(id), options);
-    grids.push(g);
-    return g;
-  }
-
-  /* Sorting */
-  make('gridSort', {
-    rowData: employees.slice(0, 30),
-    sortModel: [{ field: 'department', dir: 'asc' }, { field: 'salary', dir: 'desc' }],
-    columnDefs: baseCols(),
-  });
-
-  /* Column filters */
-  make('gridFilter', {
-    rowData: employees,
-    columnDefs: [
-      { field: 'name', headerName: 'Name (text)', width: 180, filter: 'text' },
-      { field: 'department', headerName: 'Department (set)', width: 170, filter: 'set' },
-      { field: 'city', headerName: 'City (set)', width: 150, filter: 'set' },
-      { field: 'salary', headerName: 'Salary (number)', width: 150, align: 'right', filter: 'number', valueFormatter: money },
-    ],
-  });
-
-  /* Quick filter */
-  var quickGrid = make('gridQuick', { rowData: employees, columnDefs: baseCols() });
-  document.getElementById('qfInput').addEventListener('input', function () {
-    quickGrid.setQuickFilter(this.value);
-  });
-
-  /* Selection */
-  var selGrid = make('gridSelect', {
-    rowData: employees.slice(0, 30),
-    rowSelection: 'multiple',
-    columnDefs: [
-      { colId: 'sel', headerName: '', width: 48, minWidth: 48, checkboxSelection: true,
-        headerCheckboxSelection: true, sortable: false, resizable: false },
-    ].concat(baseCols()),
-  });
-  selGrid.on('selectionChanged', function (e) {
-    document.getElementById('selStatus').textContent =
-      e.selectedRows.length ? e.selectedRows.length + '개 행 선택됨: ' +
-        e.selectedRows.slice(0, 5).map(function (r) { return r.name; }).join(', ') +
-        (e.selectedRows.length > 5 ? ' …' : '') : '선택된 행 없음';
-  });
-
-  /* Editing */
-  var editGrid = make('gridEdit', {
-    rowData: employees.slice(0, 20),
-    columnDefs: [
-      { field: 'name', headerName: 'Name (text)', width: 170, editable: true },
-      { field: 'department', headerName: 'Department (select)', width: 180, editable: true,
-        editor: 'select', editorOptions: ['Engineering', 'Design', 'Marketing', 'Sales', 'Finance', 'Support'] },
-      { field: 'salary', headerName: 'Salary (number)', width: 150, align: 'right',
-        editable: true, editor: 'number', valueFormatter: money },
-      { field: 'city', headerName: 'City (읽기 전용)', width: 140 },
-    ],
-  });
-  editGrid.on('cellValueChanged', function (e) {
-    document.getElementById('editStatus').textContent =
-      e.colDef.headerName + ': ' + e.oldValue + ' → ' + e.newValue;
-  });
-
-  /* Pagination */
-  make('gridPage', {
-    rowData: DemoData.makeEmployees(1234, 99),
-    pagination: true,
-    paginationPageSize: 10,
-    columnDefs: baseCols(),
-  });
-
-  /* Pinning / resize / reorder */
-  make('gridPin', {
-    rowData: orders,
-    columnDefs: [
-      { field: 'orderId', headerName: 'Order', width: 110, pinned: 'left' },
-      { field: 'product', headerName: 'Product', width: 160 },
-      { field: 'customer', headerName: 'Customer', width: 160 },
-      { field: 'quantity', headerName: 'Qty', width: 90, align: 'right' },
-      { field: 'unitPrice', headerName: 'Unit Price', width: 120, align: 'right', valueFormatter: money },
-      { field: 'status', headerName: 'Status', width: 130 },
-      { field: 'paid', headerName: 'Paid', width: 90, align: 'center', cellRenderer: DataGrid.renderers.check() },
-      { field: 'total', headerName: 'Total', width: 120, align: 'right', pinned: 'right', valueFormatter: money },
-    ],
-  });
-
-  /* Virtualization */
-  var vGrid = make('gridVirtual', {
-    rowData: DemoData.makeEmployees(100000, 3),
-    zebra: true,
-    columnDefs: [{ field: 'id', headerName: '#', width: 90, align: 'right' }].concat(baseCols()),
-  });
-  var countEl = document.getElementById('domRowCount');
-  var updateCount = function () {
-    countEl.textContent = document.querySelectorAll('#gridVirtual .dg-row').length +
-      ' / 100,000';
-  };
-  document.querySelector('#gridVirtual .dg-body').addEventListener('scroll', updateCount);
-  updateCount();
-
-  /* CSV */
-  var csvGrid = make('gridCsv', {
-    rowData: orders.slice(0, 25),
-    columnDefs: [
-      { field: 'orderId', headerName: 'Order', width: 110 },
-      { field: 'product', headerName: 'Product', width: 170 },
-      { field: 'customer', headerName: 'Customer', width: 160 },
-      { field: 'total', headerName: 'Total', width: 120, align: 'right', valueFormatter: money },
-    ],
-  });
-  document.getElementById('csvBtn').addEventListener('click', function () {
-    csvGrid.exportCsv('orders.csv');
-  });
-
-  /* Overlays */
-  var overlayData = employees.slice(0, 15);
-  var oGrid = make('gridOverlay', { rowData: overlayData, columnDefs: baseCols() });
-  document.getElementById('loadBtn').addEventListener('click', function () {
-    oGrid.showLoadingOverlay();
-    setTimeout(function () { oGrid.hideLoadingOverlay(); }, 2000);
-  });
-  document.getElementById('emptyBtn').addEventListener('click', function () { oGrid.setRowData([]); });
-  document.getElementById('restoreBtn').addEventListener('click', function () { oGrid.setRowData(overlayData); });
-
-  /* dark mode */
   var themeBtn = document.getElementById('themeToggle');
   themeBtn.addEventListener('click', function () {
     var dark = document.body.classList.toggle('dark');
-    grids.forEach(function (g) { g.setTheme(dark ? 'dark' : 'light'); });
+    document.querySelectorAll('.dg-root').forEach(function (el) {
+      el.classList.toggle('dg-theme-dark', dark);
+    });
     themeBtn.textContent = dark ? '☀️ Light' : '🌙 Dark';
   });
 })();

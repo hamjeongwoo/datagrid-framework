@@ -26,122 +26,131 @@
   <p class="subtitle">
     10,000행 실데이터 템플릿 — 가상 스크롤, 정렬(Shift 멀티), 컬럼 필터 메뉴, 퀵 필터,
     체크박스 선택, 페이지네이션, 인라인 편집, CSV 내보내기를 한 화면에서 사용합니다.
+    <strong>View Source</strong> 탭에서 전체 코드를 확인하세요.
   </p>
 
-  <div class="card">
-    <div class="toolbar">
-      <input class="tb-input" id="quickFilter" type="text" placeholder="Quick filter — 모든 컬럼 검색…">
-      <span class="grow"></span>
-      <button class="tb-btn" id="clearFilters" type="button">Clear filters</button>
-      <button class="tb-btn" id="deleteSelected" type="button" disabled>Delete selected</button>
-      <button class="tb-btn" id="exportCsv" type="button">Export CSV</button>
-      <button class="tb-btn primary" id="addRow" type="button">+ Add employee</button>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <input class="tb-input" id="quickFilter" type="text" placeholder="Quick filter — 모든 컬럼 검색…">
+        <span class="grow"></span>
+        <button class="tb-btn" id="clearFilters" type="button">Clear filters</button>
+        <button class="tb-btn" id="deleteSelected" type="button" disabled>Delete selected</button>
+        <button class="tb-btn" id="exportCsv" type="button">Export CSV</button>
+        <button class="tb-btn primary" id="addRow" type="button">+ Add employee</button>
+      </div>
+      <div id="grid" class="grid-wrap-lg"></div>
+      <div class="status-line" id="statusLine">선택된 행 없음</div>
     </div>
+    <script type="text/x-example">
+      var money = function (v) {
+        return v === null || v === undefined ? '' : '$' + Number(v).toLocaleString();
+      };
 
-    <div id="grid" class="grid-wrap-lg"></div>
-    <div class="status-line" id="statusLine">선택된 행 없음</div>
+      var grid = new DataGrid(document.getElementById('grid'), {
+        rowData: DemoData.makeEmployees(10000),
+        rowSelection: 'multiple',
+        pagination: true,
+        paginationPageSize: 50,
+        zebra: true,
+        defaultColDef: { sortable: true, resizable: true },
+        columnDefs: [
+          { colId: 'sel', headerName: '', width: 48, minWidth: 48, pinned: 'left',
+            checkboxSelection: true, headerCheckboxSelection: true,
+            sortable: false, resizable: false },
+          { field: 'id', headerName: 'ID', width: 76, pinned: 'left', align: 'right', filter: 'number' },
+          { field: 'name', headerName: 'Name', width: 170, filter: 'text', editable: true },
+          { field: 'email', headerName: 'Email', width: 230, filter: 'text' },
+          { field: 'department', headerName: 'Department', width: 140, filter: 'set',
+            editable: true, editor: 'select',
+            editorOptions: ['Engineering', 'Design', 'Marketing', 'Sales', 'Finance', 'Support'] },
+          { field: 'city', headerName: 'City', width: 130, filter: 'set' },
+          { field: 'status', headerName: 'Status', width: 130, filter: 'set',
+            cellRenderer: DataGrid.renderers.tag({
+              'Active': 'green', 'On Leave': 'yellow', 'Contract': 'blue', 'Inactive': 'gray',
+            }) },
+          { field: 'salary', headerName: 'Salary', width: 120, align: 'right',
+            filter: 'number', editable: true, editor: 'number', valueFormatter: money },
+          { field: 'progress', headerName: 'Onboarding', width: 150,
+            cellRenderer: DataGrid.renderers.progress() },
+          { field: 'remote', headerName: 'Remote', width: 90, align: 'center',
+            cellRenderer: DataGrid.renderers.check() },
+          { field: 'hireDate', headerName: 'Hire Date', width: 120, filter: 'text' },
+        ],
+      });
+
+      /* ---- 툴바 연결 ---- */
+      var statusLine = document.getElementById('statusLine');
+      var deleteBtn = document.getElementById('deleteSelected');
+
+      document.getElementById('quickFilter').addEventListener('input', function () {
+        grid.setQuickFilter(this.value);
+      });
+
+      document.getElementById('clearFilters').addEventListener('click', function () {
+        document.getElementById('quickFilter').value = '';
+        grid.clearFilters();
+      });
+
+      document.getElementById('exportCsv').addEventListener('click', function () {
+        grid.exportCsv('employees.csv');
+      });
+
+      var nextId = 10001;
+      document.getElementById('addRow').addEventListener('click', function () {
+        grid.addRow({
+          id: nextId++, name: 'New Employee', email: 'new@example.com',
+          department: 'Engineering', city: 'Seoul', status: 'Active',
+          salary: 50000, rating: 3.0, progress: 0, remote: false,
+          hireDate: '2026-07-31',
+        });
+        statusLine.textContent = '새 직원이 추가되었습니다. (총 ' +
+          grid.getRowData().length.toLocaleString() + '행)';
+      });
+
+      deleteBtn.addEventListener('click', function () {
+        var n = grid.getSelectedRows().length;
+        grid.removeSelectedRows();
+        statusLine.textContent = n + '개 행이 삭제되었습니다.';
+      });
+
+      /* ---- 이벤트 ---- */
+      grid.on('selectionChanged', function (e) {
+        var n = e.selectedRows.length;
+        deleteBtn.disabled = n === 0;
+        if (n > 0) {
+          var total = e.selectedRows.reduce(function (s, r) { return s + (r.salary || 0); }, 0);
+          statusLine.textContent = n.toLocaleString() + '개 행 선택 — 급여 합계 ' + money(total);
+        } else {
+          statusLine.textContent = '선택된 행 없음';
+        }
+      });
+
+      grid.on('cellValueChanged', function (e) {
+        statusLine.textContent =
+          '"' + e.data.name + '" 행의 ' + e.colDef.headerName + ' 값이 ' +
+          e.oldValue + ' → ' + e.newValue + ' (으)로 변경되었습니다.';
+      });
+    </script>
   </div>
 
 </div>
 
 <script src="dist/datagrid.js"></script>
 <script src="demo/data.js"></script>
+<script src="demo/highlight.js"></script>
+<script src="demo/example-tabs.js"></script>
 <script>
 (function () {
   'use strict';
+  ExampleTabs.init();
 
-  var money = function (v) {
-    return v === null || v === undefined ? '' : '$' + Number(v).toLocaleString();
-  };
-
-  var grid = new DataGrid(document.getElementById('grid'), {
-    rowData: DemoData.makeEmployees(10000),
-    rowSelection: 'multiple',
-    pagination: true,
-    paginationPageSize: 50,
-    zebra: true,
-    defaultColDef: { sortable: true, resizable: true },
-    columnDefs: [
-      { colId: 'sel', headerName: '', width: 48, minWidth: 48, pinned: 'left',
-        checkboxSelection: true, headerCheckboxSelection: true,
-        sortable: false, resizable: false },
-      { field: 'id', headerName: 'ID', width: 76, pinned: 'left', align: 'right', filter: 'number' },
-      { field: 'name', headerName: 'Name', width: 170, filter: 'text', editable: true },
-      { field: 'email', headerName: 'Email', width: 230, filter: 'text' },
-      { field: 'department', headerName: 'Department', width: 140, filter: 'set',
-        editable: true, editor: 'select',
-        editorOptions: ['Engineering', 'Design', 'Marketing', 'Sales', 'Finance', 'Support'] },
-      { field: 'city', headerName: 'City', width: 130, filter: 'set' },
-      { field: 'status', headerName: 'Status', width: 130, filter: 'set',
-        cellRenderer: DataGrid.renderers.tag({
-          'Active': 'green', 'On Leave': 'yellow', 'Contract': 'blue', 'Inactive': 'gray',
-        }) },
-      { field: 'salary', headerName: 'Salary', width: 120, align: 'right',
-        filter: 'number', editable: true, editor: 'number', valueFormatter: money },
-      { field: 'progress', headerName: 'Onboarding', width: 150,
-        cellRenderer: DataGrid.renderers.progress() },
-      { field: 'remote', headerName: 'Remote', width: 90, align: 'center',
-        cellRenderer: DataGrid.renderers.check() },
-      { field: 'hireDate', headerName: 'Hire Date', width: 120, filter: 'text' },
-    ],
-  });
-
-  /* toolbar wiring */
-  var statusLine = document.getElementById('statusLine');
-  var deleteBtn = document.getElementById('deleteSelected');
-
-  document.getElementById('quickFilter').addEventListener('input', function () {
-    grid.setQuickFilter(this.value);
-  });
-
-  document.getElementById('clearFilters').addEventListener('click', function () {
-    document.getElementById('quickFilter').value = '';
-    grid.clearFilters();
-  });
-
-  document.getElementById('exportCsv').addEventListener('click', function () {
-    grid.exportCsv('employees.csv');
-  });
-
-  var nextId = 10001;
-  document.getElementById('addRow').addEventListener('click', function () {
-    grid.addRow({
-      id: nextId++, name: 'New Employee', email: 'new@example.com',
-      department: 'Engineering', city: 'Seoul', status: 'Active',
-      salary: 50000, rating: 3.0, progress: 0, remote: false,
-      hireDate: '2026-07-31',
-    });
-    statusLine.textContent = '새 직원이 추가되었습니다. (총 ' + grid.getRowData().length.toLocaleString() + '행)';
-  });
-
-  deleteBtn.addEventListener('click', function () {
-    var n = grid.getSelectedRows().length;
-    grid.removeSelectedRows();
-    statusLine.textContent = n + '개 행이 삭제되었습니다.';
-  });
-
-  grid.on('selectionChanged', function (e) {
-    var n = e.selectedRows.length;
-    deleteBtn.disabled = n === 0;
-    if (n > 0) {
-      var total = e.selectedRows.reduce(function (s, r) { return s + (r.salary || 0); }, 0);
-      statusLine.textContent = n.toLocaleString() + '개 행 선택 — 급여 합계 ' + money(total);
-    } else {
-      statusLine.textContent = '선택된 행 없음';
-    }
-  });
-
-  grid.on('cellValueChanged', function (e) {
-    statusLine.textContent =
-      '"' + e.data.name + '" 행의 ' + e.colDef.headerName + ' 값이 ' +
-      e.oldValue + ' → ' + e.newValue + ' (으)로 변경되었습니다.';
-  });
-
-  /* dark mode */
   var themeBtn = document.getElementById('themeToggle');
   themeBtn.addEventListener('click', function () {
     var dark = document.body.classList.toggle('dark');
-    grid.setTheme(dark ? 'dark' : 'light');
+    document.querySelectorAll('.dg-root').forEach(function (el) {
+      el.classList.toggle('dg-theme-dark', dark);
+    });
     themeBtn.textContent = dark ? '☀️ Light' : '🌙 Dark';
   });
 })();
