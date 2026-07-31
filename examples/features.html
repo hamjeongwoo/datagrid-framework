@@ -1806,6 +1806,62 @@
     </script>
   </div>
 
+  <!-- ======================================================== 트리 지연 로딩 -->
+  <h2 class="section">Tree Lazy Loading (treeData.fetchChildren)</h2>
+  <p class="section-desc">
+    <code class="inline">treeData.fetchChildren(row)</code>는 노드를 처음 펼칠 때 자식을 비동기로 로드합니다
+    (Promise 반환, 로딩 중 토글이 스피너로 회전). <code class="inline">hasChildren(row)</code>가 로드 전 토글 표시 여부를
+    결정하고, 빈 배열이 오면 리프로 확정됩니다. 실패 시 <code class="inline">dataLoadError</code>가 발생하고
+    접힌 상태로 남아 재시도할 수 있습니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div id="gridTreeLazy" class="grid-wrap-sm"></div>
+      <div class="status-line" id="tlazyStatus">폴더를 펼치면 500ms 지연 후 자식이 로드됩니다 (같은 노드는 1회만).</div>
+    </div>
+    <script type="text/x-example">
+      // 시드 고정: 노드 depth 기반으로 결정적 자식 생성 (Math.random 금지)
+      function makeChildren(row) {
+        var depth = row.depth || 0;
+        var out = [];
+        if (depth < 2) {
+          for (var f = 1; f <= 2; f++) {
+            out.push({ name: row.name + '/dir-' + f, kind: 'folder', depth: depth + 1 });
+          }
+        }
+        for (var i = 1; i <= 2 + depth; i++) {
+          out.push({ name: row.name + '/file-' + i + '.txt', kind: 'file', depth: depth + 1 });
+        }
+        return out;
+      }
+
+      var grid = new DataGrid(document.getElementById('gridTreeLazy'), {
+        rowData: [
+          { name: 'remote-a', kind: 'folder', depth: 0 },
+          { name: 'remote-b', kind: 'folder', depth: 0 },
+        ],
+        treeData: {
+          treeField: 'name',
+          hasChildren: function (row) { return row.kind === 'folder'; },
+          fetchChildren: function (row) {
+            document.getElementById('tlazyStatus').textContent = '"' + row.name + '" 자식 로드 중…';
+            return new Promise(function (resolve) {
+              setTimeout(function () { resolve(makeChildren(row)); }, 500);
+            });
+          },
+        },
+        columnDefs: [
+          { field: 'name', headerName: 'Name', flex: 2 },
+          { field: 'kind', headerName: 'Kind', width: 110 },
+        ],
+      });
+
+      grid.on('nodeExpanded', function (e) {
+        document.getElementById('tlazyStatus').textContent = '"' + e.data.name + '" 로드 완료 — 다시 접었다 펴면 재요청하지 않습니다.';
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

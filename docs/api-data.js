@@ -20,7 +20,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.0.0',
+  version: '2.1.0',
   updated: '2026-07-31',
 
   sections: [
@@ -417,7 +417,9 @@ window.ApiDocs = {
             '<code>checkbox: true</code>는 트리 컬럼에 3상태 체크박스를 표시하고 <code>cascade</code>(기본 true)로 ' +
             '부모↔자손 연동, <code>checkboxDisabled(row)</code>로 조건부 비활성을 제어합니다. ' +
             '<code>summary: true</code>는 <code>column.aggFunc</code> 컬럼에서 부모 행에 자손 리프 집계를 ' +
-            '표시합니다(표시 전용, 필터 반영).',
+            '표시합니다(표시 전용, 필터 반영). <code>fetchChildren(row) =&gt; Promise</code>는 첫 펼침 때 자식을 ' +
+            '비동기 로드합니다(nested 형식 전용, <code>hasChildren(row)</code>로 로드 전 토글 표시 결정, ' +
+            '실패 시 <code>dataLoadError</code> 후 재시도 가능).',
           example:
             "treeData: {\n  treeField: 'name',\n  indent: 20,\n  defaultExpandLevel: 1,\n  checkbox: true,        // 3상태 체크박스 + cascade\n  // flat 형식이면: parentIdField: 'parentId', idField: 'id'\n},",
         },

@@ -195,7 +195,7 @@
 | [x] | **`treeModel` 코어**: nested(`children[]`)/flat(`parentId`) 데이터(행마다 고유 id 필수), `dataIndx`(트리 컬럼), `indent`, 노드 펼침/접힘, `beforeTreeExpand`/`treeExpand` 이벤트 | `treeData: { childrenField: 'children' \| parentIdField+idField(flat), treeField, indent, defaultExpandLevel }` + `expandNode()/collapseNode()/toggleNode()/expandAllNodes()/collapseAllNodes()/isNodeExpanded()` + `beforeNodeToggle`(취소 가능)/`nodeExpanded`/`nodeCollapsed`. 계층 정렬(형제끼리 재귀)·계층 필터(매치의 조상 유지 + `filterKeepChildren`) 통합 — v2.1.0 | **T1** |
 | [x] | **체크박스**: `treeModel.checkbox · cascade`, `Tree().getCheckedNodes() · checkNodes() · unCheckAll()`, `beforeCheck`/`check` 이벤트, `pq_tree_cb` 숨김 컬럼 트릭으로 비활성화 | `treeData.checkbox: true` + `treeData.cascade: true`(3상태 indeterminate 포함) + `treeData.checkboxDisabled(row)` 콜백 + `setNodeChecked()/isNodeChecked()/getCheckedRows()/checkAllNodes()/unCheckAllNodes()` + `beforeNodeCheck`(취소 가능)/`nodeCheckChanged` — v2.1.0 | **T2** |
 | [x] | `treeModel.summaryInTitleRow` (부모 행 자체에 자식 집계 표시) | `treeData.summary: true` — `column.aggFunc` 재사용, 부모 노드 행에 자손 리프 집계를 표시(표시 전용, 데이터 불변, 필터 반영) — v2.1.0 | **T3** |
-| [ ] | **Lazy loading** (원격 자식 로딩) | `treeData.fetchChildren(row) => Promise<rows>` + `treeData.hasChildren(row)` — 첫 펼침 때 로드 + 로딩 표시, 실패 시 `dataLoadError` 재사용. nested 형식 전제 | **T4** |
+| [x] | **Lazy loading** (원격 자식 로딩) | `treeData.fetchChildren(row) => Promise<rows>` + `treeData.hasChildren(row)` — 첫 펼침 때 로드 + 토글 스피너, 빈 배열 = 리프 확정, 실패 시 `dataLoadError` 후 접힌 채 재시도 가능. nested 형식 전용 — v2.1.0 | **T4** |
 
 ### 도입하지 않는 것 (TreeGrid)
 

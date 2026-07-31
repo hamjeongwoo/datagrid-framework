@@ -1381,6 +1381,8 @@
     this._treeInfo = null; /* rowId -> { level, hasChildren, expanded } — 뷰 계산 시 갱신 */
     this._treeColId = null; /* 트리 UI(들여쓰기+토글)를 그릴 컬럼 */
     this._treeSummary = null; /* rowId -> { field: 집계값 } (treeData.summary) */
+    this._treeLoading = {}; /* rowId -> true (fetchChildren 진행 중) */
+    this._treeLoaded = {}; /* rowId -> true (fetchChildren 완료 — 리프 확정 포함) */
     if (this._treeData) {
       if (this._pagination) {
         console.error('[DataGrid] treeData는 pagination과 함께 쓸 수 없습니다 — pagination을 끕니다.');
@@ -1389,6 +1391,12 @@
       if (this._groupBy.length > 0) {
         console.error('[DataGrid] treeData는 groupBy와 함께 쓸 수 없습니다 — groupBy를 무시합니다.');
         this._groupBy = [];
+      }
+      if (this._treeData.fetchChildren && this._treeData.parentIdField) {
+        console.error(
+          '[DataGrid] treeData.fetchChildren은 nested(children) 형식 전용입니다 — fetchChildren을 무시합니다.'
+        );
+        this._treeData = Object.assign({}, this._treeData, { fetchChildren: null });
       }
     }
 
@@ -1807,12 +1815,28 @@
     var defLevel = td.defaultExpandLevel === undefined ? 0 : td.defaultExpandLevel;
     var nodes = collectTreeNodes(roots);
     var info = {};
+    /* fetchChildren(지연 로딩): 아직 로드 전인 노드도 hasChildren(row)가 true면 토글 표시 */
+    var lazyHas = td.fetchChildren && td.hasChildren
+      ? function (row) {
+          try {
+            return !!td.hasChildren(row);
+          } catch (err) {
+            console.error('[DataGrid] treeData.hasChildren failed:', err);
+            return false;
+          }
+        }
+      : null;
     nodes.forEach(function (n) {
       var id = self._rowId(n.row);
-      if (n.children.length > 0 && self._treeExpanded[id] === undefined) {
-        self._treeExpanded[id] = defLevel === -1 || n.level < defLevel;
+      var has =
+        n.children.length > 0 ||
+        !!(lazyHas && !self._treeLoaded[id] && lazyHas(n.row));
+      if (has && self._treeExpanded[id] === undefined) {
+        /* 지연 노드는 로드 전이므로 defaultExpandLevel과 무관하게 접힘으로 시작 */
+        self._treeExpanded[id] =
+          n.children.length > 0 && (defLevel === -1 || n.level < defLevel);
       }
-      info[id] = { level: n.level, hasChildren: n.children.length > 0, expanded: false };
+      info[id] = { level: n.level, hasChildren: has, expanded: false };
     });
     var flat = flattenTreeNodes(roots, function (row) {
       return !!self._treeExpanded[self._rowId(row)];
@@ -2573,7 +2597,9 @@
           if (tInfo.hasChildren) {
             var tChev = el(
               'span',
-              'dg-group-chevron dg-tree-toggle' + (tInfo.expanded ? ' dg-expanded' : ''),
+              'dg-group-chevron dg-tree-toggle' +
+                (tInfo.expanded ? ' dg-expanded' : '') +
+                (self._treeLoading[id] ? ' dg-tree-loading' : ''),
               cell
             );
             tChev.innerHTML = CHEVRON_SVG;
@@ -3013,17 +3039,57 @@
    */
   DataGrid.prototype.toggleNode = function (row, expanded) {
     if (!this._treeData || !row || !this._treeInfo) return false;
+    var td = this._treeData;
     var id = this._rowId(row);
     var info = this._treeInfo[id];
     if (!info || !info.hasChildren) return false;
     var target = expanded === undefined ? !this._treeExpanded[id] : !!expanded;
     if (target === !!this._treeExpanded[id]) return false;
+
+    /* fetchChildren: 첫 펼침이면 자식을 비동기 로드한 뒤 펼친다 */
+    var kids = row[td.childrenField || 'children'];
+    if (target && td.fetchChildren && !this._treeLoaded[id] && !(Array.isArray(kids) && kids.length > 0)) {
+      return this._loadChildren(row);
+    }
+
     var ev = { data: row, expanded: target, cancel: false };
     this._emitter.emit('beforeNodeToggle', ev);
     if (ev.cancel) return false;
     this._treeExpanded[id] = target;
     this.refresh();
     this._emitter.emit(target ? 'nodeExpanded' : 'nodeCollapsed', { data: row });
+    return true;
+  };
+
+  /** fetchChildren 비동기 로드: 로딩 표시 → row.children에 부착 → 펼침. 시작하면 true. */
+  DataGrid.prototype._loadChildren = function (row) {
+    var self = this;
+    var td = this._treeData;
+    var id = this._rowId(row);
+    if (this._treeLoading[id]) return false; /* 이미 로드 중 — 중복 요청 방지 */
+    var ev = { data: row, expanded: true, cancel: false };
+    this._emitter.emit('beforeNodeToggle', ev);
+    if (ev.cancel) return false;
+    this._treeLoading[id] = true;
+    this.refreshRow(row); /* 토글에 로딩 스피너 표시 */
+    Promise.resolve()
+      .then(function () { return td.fetchChildren(row); })
+      .then(function (children) {
+        if (self._destroyed) return;
+        delete self._treeLoading[id];
+        self._treeLoaded[id] = true; /* 빈 배열이면 리프로 확정 (토글 제거) */
+        row[td.childrenField || 'children'] = Array.isArray(children) ? children : [];
+        self._treeExpanded[id] = true;
+        self.refresh();
+        self._emitter.emit('nodeExpanded', { data: row });
+      })
+      .catch(function (err) {
+        if (self._destroyed) return;
+        delete self._treeLoading[id];
+        self.refreshRow(row); /* 스피너 제거 — 접힌 상태 유지, 재시도 가능 */
+        console.error('[DataGrid] treeData.fetchChildren failed:', err);
+        self._emitter.emit('dataLoadError', { error: err });
+      });
     return true;
   };
 
@@ -4481,6 +4547,8 @@
     this._focusedCell = null;
     this._treeExpanded = {}; /* 새 데이터 = 펼침 상태 초기화 (defaultExpandLevel 재적용) */
     this._treeChecked = {};
+    this._treeLoading = {};
+    this._treeLoaded = {};
     this._resetTracking(); /* 새 데이터 = 새 기준선 */
     this._undoStack = [];
     this._redoStack = [];
@@ -4958,7 +5026,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.0.0';
+  DataGrid.version = '2.1.0';
 
   /* Internals exposed for headless unit tests (not part of the public API). */
   DataGrid._test = {
