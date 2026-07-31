@@ -337,6 +337,15 @@ window.ApiDocs = {
           description: "<code>editor: 'select'</code>일 때의 선택지 목록.",
         },
         {
+          name: 'suppressCopy',
+          type: 'boolean',
+          default: 'false',
+          since: '1.1.0',
+          description:
+            '클립보드 복사(<kbd>Ctrl+C</kbd> / <code>copy()</code>) 대상에서 이 컬럼을 제외합니다. ' +
+            'CSV 내보내기에는 영향이 없습니다.',
+        },
+        {
           name: 'validator',
           type: "(value, row) => true | string",
           since: '1.1.0',
@@ -570,6 +579,33 @@ window.ApiDocs = {
           signature: 'isEditing(): boolean',
           since: '1.1.0',
           description: '인라인 편집이 진행 중인지 반환합니다.',
+        },
+
+        /* ---- 클립보드 ---- */
+        {
+          name: 'copy',
+          group: 'Clipboard',
+          signature: 'copy(): string | null',
+          since: '1.1.0',
+          description:
+            '선택된 행(뷰 순서, 없으면 포커스 셀)을 엑셀 호환 TSV로 클립보드에 복사하고 그 문자열을 반환합니다. ' +
+            '복사할 대상이 없으면 <code>null</code>. 값은 <strong>원시 데이터</strong>를 사용합니다' +
+            '(포매터 미적용 — 스프레드시트 숫자 인식과 붙여넣기 왕복을 위해). ' +
+            '<code>suppressCopy</code> 컬럼과 <code>field</code> 없는 컬럼(체크박스 등)은 제외됩니다. ' +
+            '<kbd>Ctrl/⌘+C</kbd>와 같은 동작입니다.',
+          example: "var tsv = grid.copy();  // '1\\tAlice\\t52000\\r\\n2\\tBob\\t61000'",
+        },
+        {
+          name: 'pasteTsv',
+          group: 'Clipboard',
+          signature: 'pasteTsv(text: string): number',
+          since: '1.1.0',
+          description:
+            '포커스 셀을 시작점으로 TSV 텍스트를 붙여넣고 갱신된 셀 수를 반환합니다. ' +
+            '<strong>편집 가능한(<code>editable</code>) 셀에만</strong> 쓰이며, 숫자 에디터 컬럼은 숫자로 변환' +
+            '(실패 시 건너뜀), <code>validator</code>와 <code>beforeCellSave</code>를 통과한 값만 반영됩니다. ' +
+            '갱신된 셀마다 <code>cellValueChanged</code>가 발생합니다. <kbd>Ctrl/⌘+V</kbd>가 내부적으로 사용하는 API입니다.',
+          example: "grid.pasteTsv('Kim\\t72000\\nLee\\t68000');  // 포커스 셀부터 2행 2열",
         },
 
         /* ---- 필터/정렬 ---- */
@@ -936,6 +972,8 @@ window.ApiDocs = {
         '<tr><td><kbd>Enter</kbd></td><td>편집 가능한 셀에서 편집 시작 / 편집 중 커밋</td></tr>' +
         '<tr><td><kbd>Esc</kbd></td><td>편집 취소</td></tr>' +
         '<tr><td><kbd>Space</kbd></td><td>포커스된 행 선택 토글</td></tr>' +
+        '<tr><td><kbd>Ctrl/⌘</kbd>+<kbd>C</kbd></td><td>선택 행(없으면 포커스 셀)을 TSV로 복사 — <code>suppressCopy</code> 컬럼 제외</td></tr>' +
+        '<tr><td><kbd>Ctrl/⌘</kbd>+<kbd>V</kbd></td><td>포커스 셀부터 TSV 붙여넣기 — 편집 가능 + 검증 통과 셀만</td></tr>' +
         '<tr><td><kbd>Shift</kbd>+클릭</td><td>범위 선택(multiple) / 헤더에서 다중 정렬 추가</td></tr>' +
         '<tr><td><kbd>Ctrl/⌘</kbd>+클릭</td><td>개별 선택 토글(multiple)</td></tr>' +
         '</tbody></table>',

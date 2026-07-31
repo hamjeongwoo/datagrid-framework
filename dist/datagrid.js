@@ -174,6 +174,58 @@
   }
 
   /**
+   * 행 배열 → 엑셀 호환 TSV. 값은 원시 데이터를 그대로 사용한다
+   * (포매터 미적용 — 붙여넣기 왕복과 스프레드시트 숫자 인식을 위해).
+   * 탭·개행·따옴표가 든 값은 큰따옴표로 감싸고 내부 따옴표는 두 번 쓴다.
+   */
+  function buildTsv(rows, columns) {
+    function esc(v) {
+      var s = v === null || v === undefined ? '' : String(v);
+      if (/[\t\r\n"]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+      return s;
+    }
+    return rows
+      .map(function (row) {
+        return columns.map(function (c) { return esc(row[c.field]); }).join('\t');
+      })
+      .join('\r\n');
+  }
+
+  /**
+   * TSV 텍스트 → 2차원 문자열 배열. 큰따옴표 셀(내부 탭/개행/"" 이스케이프)을
+   * 지원하고, 스프레드시트가 붙이는 마지막 빈 줄 하나는 무시한다.
+   */
+  function parseTsv(text) {
+    var rows = [];
+    var row = [];
+    var cell = '';
+    var inQuotes = false;
+    var i = 0;
+    var s = String(text);
+    while (i < s.length) {
+      var ch = s[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (s[i + 1] === '"') { cell += '"'; i += 2; continue; }
+          inQuotes = false; i++; continue;
+        }
+        cell += ch; i++; continue;
+      }
+      if (ch === '"' && cell === '') { inQuotes = true; i++; continue; }
+      if (ch === '\t') { row.push(cell); cell = ''; i++; continue; }
+      if (ch === '\r') { i++; continue; }
+      if (ch === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; i++; continue; }
+      cell += ch; i++;
+    }
+    row.push(cell);
+    rows.push(row);
+    /* 스프레드시트 복사분은 개행으로 끝나 마지막에 빈 행이 하나 생긴다 */
+    var last = rows[rows.length - 1];
+    if (rows.length > 1 && last.length === 1 && last[0] === '') rows.pop();
+    return rows;
+  }
+
+  /**
    * column.validator 반환값 해석: 유효하면 null, 아니면 표시할 오류 메시지.
    * true/undefined/null = 유효, 문자열 = 해당 메시지로 거부,
    * 그 외 falsy(false 등) = 기본 메시지로 거부.
@@ -447,6 +499,7 @@
     this._rowHeight = options.rowHeight || 42;
     this._headerHeight = options.headerHeight || 48;
 
+    this._pasteCount = 0; /* paste 이벤트/클립보드 API 폴백의 이중 실행 방지용 */
     this._docListeners = [];
     this._buildDom();
     this._bindEvents();
@@ -505,6 +558,16 @@
     this._canvasEl.addEventListener('click', function (e) { self._onCellClick(e); });
     this._canvasEl.addEventListener('dblclick', function (e) { self._onCellDblClick(e); });
     this._rootEl.addEventListener('keydown', function (e) { self._onKeyDown(e); });
+
+    /* Ctrl+V 1차 경로 — 브라우저가 클립보드 내용을 이벤트로 직접 전달 */
+    this._rootEl.addEventListener('paste', function (e) {
+      if (self._editing || !self._focusedCell) return;
+      var text = e.clipboardData && e.clipboardData.getData('text/plain');
+      if (!text) return;
+      self._pasteCount++;
+      e.preventDefault();
+      self.pasteTsv(text);
+    });
 
     var closeMenus = function (e) {
       if (!self._menuEl || self._menuEl.contains(e.target)) return;
@@ -1454,6 +1517,33 @@
 
   DataGrid.prototype._onKeyDown = function (e) {
     if (this._editing) return; /* editor handles its own keys */
+
+    /* 클립보드: Ctrl/⌘+C 복사(선택 행 또는 포커스 셀), Ctrl/⌘+V 붙여넣기 */
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
+      var tsv = this._selectionTsv();
+      if (tsv !== null) {
+        this._writeClipboard(tsv);
+        e.preventDefault();
+      }
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) {
+      /* 1차 경로는 root의 paste 이벤트(_bindEvents). 브라우저가 비편집 요소에
+       * paste를 발화하지 않는 경우를 위해 잠시 뒤 clipboard API로 폴백한다.
+       * (_pasteCount 비교로 이중 붙여넣기를 방지) */
+      var self = this;
+      var seqBefore = this._pasteCount;
+      if (this._focusedCell && navigator.clipboard && navigator.clipboard.readText) {
+        setTimeout(function () {
+          if (self._pasteCount !== seqBefore || self._destroyed) return;
+          navigator.clipboard.readText()
+            .then(function (text) { if (text) self.pasteTsv(text); })
+            .catch(function () { /* 권한 거부 — 붙여넣기 불가 환경 */ });
+        }, 80);
+      }
+      return;
+    }
+
     if (!this._focusedCell) return;
     var r = this._focusedCell.r;
     var c = this._focusedCell.c;
@@ -1649,6 +1739,106 @@
   };
 
   DataGrid.prototype.isEditing = function () { return !!this._editing; };
+
+  /* ---- clipboard (엑셀 호환 TSV) ---- */
+
+  /** 선택 행(뷰 순서) 또는 포커스 셀을 TSV로 만든다. 대상이 없으면 null. */
+  DataGrid.prototype._selectionTsv = function () {
+    var self = this;
+    var cols = this._visibleColumns().filter(function (c) {
+      return c.field !== undefined && !c.suppressCopy;
+    });
+    if (cols.length === 0) return null;
+
+    var rows = this._viewRows.filter(function (r) { return self._selection[self._rowId(r)]; });
+    if (rows.length > 0) return buildTsv(rows, cols);
+
+    if (this._focusedCell) {
+      var row = this._pageRows[this._focusedCell.r];
+      var col = this._visibleColumns()[this._focusedCell.c];
+      if (row && !row.__group && col && col.field !== undefined && !col.suppressCopy) {
+        return buildTsv([row], [col]);
+      }
+    }
+    return null;
+  };
+
+  DataGrid.prototype._writeClipboard = function (text) {
+    var fallback = function () {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch (e) { /* 클립보드 접근 불가 환경 */ }
+      document.body.removeChild(ta);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).catch(fallback);
+    } else {
+      fallback();
+    }
+  };
+
+  /** 선택 행(없으면 포커스 셀)을 TSV로 클립보드에 복사하고 그 문자열을 반환한다. */
+  DataGrid.prototype.copy = function () {
+    var tsv = this._selectionTsv();
+    if (tsv !== null) this._writeClipboard(tsv);
+    return tsv;
+  };
+
+  /**
+   * 포커스 셀을 시작점으로 TSV 텍스트를 붙여넣는다. 편집 가능한 셀에만 쓰며
+   * validator·beforeCellSave를 통과한 값만 반영한다. 갱신된 셀 수를 반환.
+   */
+  DataGrid.prototype.pasteTsv = function (text) {
+    if (!text || !this._focusedCell) return 0;
+    var self = this;
+    var matrix = parseTsv(String(text));
+    var cols = this._visibleColumns();
+    var startR = this._focusedCell.r;
+    var startC = this._focusedCell.c;
+    var updated = 0;
+
+    matrix.forEach(function (cells, i) {
+      var row = self._pageRows[startR + i];
+      if (!row || row.__group) return;
+      cells.forEach(function (raw, j) {
+        var col = cols[startC + j];
+        if (!col || !col.editable || col.field === undefined) return;
+        var value = raw;
+        var editorType = col.editor || (col.filter === 'number' ? 'number' : 'text');
+        if (editorType === 'number') {
+          var n = Number(value);
+          if (value === '' || isNaN(n)) return;
+          value = n;
+        }
+        var oldValue = row[col.field];
+        if (value === oldValue) return;
+        if (col.validator) {
+          var result;
+          try { result = col.validator(value, row); }
+          catch (e) {
+            console.error('[DataGrid] validator failed for "' + col.field + '":', e);
+            result = true;
+          }
+          if (validationMessage(result)) return;
+        }
+        var evt = { data: row, colDef: col, oldValue: oldValue, newValue: value, cancel: false };
+        self._emitter.emit('beforeCellSave', evt);
+        if (evt.cancel) return;
+        row[col.field] = evt.newValue;
+        updated++;
+        self._emitter.emit('cellValueChanged', {
+          data: row, colDef: col, oldValue: oldValue, newValue: evt.newValue,
+        });
+      });
+    });
+
+    if (updated > 0) this.refresh();
+    return updated;
+  };
 
   /* ---- column resize ---- */
 
@@ -1992,6 +2182,8 @@
     quickFilterRows: quickFilterRows,
     buildFloatingFilterModel: buildFloatingFilterModel,
     validationMessage: validationMessage,
+    buildTsv: buildTsv,
+    parseTsv: parseTsv,
     aggregateValues: aggregateValues,
     buildGroupView: buildGroupView,
     paginate: paginate,

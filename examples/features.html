@@ -384,6 +384,69 @@
     </script>
   </div>
 
+  <!-- ======================================================== Clipboard -->
+  <h2 class="section">Clipboard Copy &amp; Paste (TSV)</h2>
+  <p class="section-desc">
+    선택한 행을 <kbd>Ctrl+C</kbd>로 엑셀 호환 TSV로 복사하고(선택이 없으면 포커스 셀),
+    포커스 셀을 시작점으로 <kbd>Ctrl+V</kbd>로 붙여넣습니다 — 편집 가능한 셀에만 쓰이고
+    validator·<code class="inline">beforeCellSave</code>를 통과한 값만 반영됩니다.
+    <code class="inline">column.suppressCopy</code>로 복사에서 제외할 컬럼을 지정하고,
+    <code class="inline">copy()</code> / <code class="inline">pasteTsv(text)</code>로 코드에서도 제어합니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn" id="copyBtn" type="button">copy() — 선택 행 복사</button>
+        <button class="tb-btn" id="pasteBtn" type="button">pasteTsv() — 포커스 셀에 붙여넣기</button>
+      </div>
+      <div id="gridClipboard" class="grid-wrap-sm"></div>
+      <textarea class="tb-input" id="tsvBox" rows="4" style="width:100%;resize:vertical;font-family:ui-monospace,Consolas,monospace;font-size:12.5px"
+        placeholder="copy() 결과가 여기 표시됩니다. 직접 수정하거나 스프레드시트에서 붙여넣은 뒤 pasteTsv()를 눌러 보세요."></textarea>
+      <div class="status-line" id="clipStatus">
+        행을 선택해 Ctrl+C, 셀을 클릭해 포커스한 뒤 Ctrl+V — Email은 suppressCopy라 복사에서 빠집니다.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridClipboard'), {
+        rowData: DemoData.makeEmployees(15, 31),
+        rowSelection: 'multiple',
+        columnDefs: [
+          { colId: 'sel', headerName: '', width: 48, minWidth: 48,
+            checkboxSelection: true, headerCheckboxSelection: true,
+            sortable: false, resizable: false },
+          { field: 'name', headerName: 'Name', width: 160, editable: true },
+          { field: 'email', headerName: 'Email (suppressCopy)', width: 210, suppressCopy: true },
+          { field: 'department', headerName: 'Department', width: 150, editable: true, editor: 'select',
+            editorOptions: ['Engineering', 'Design', 'Marketing', 'Sales', 'Finance', 'Support'] },
+          { field: 'salary', headerName: 'Salary', width: 130, align: 'right',
+            editable: true, editor: 'number',
+            validator: function (v) { return v >= 0 || '급여는 0 이상이어야 합니다'; },
+            valueFormatter: function (v) { return '$' + v.toLocaleString(); } },
+        ],
+      });
+
+      var tsvBox = document.getElementById('tsvBox');
+      var status = document.getElementById('clipStatus');
+
+      document.getElementById('copyBtn').addEventListener('click', function () {
+        var tsv = grid.copy();   // 클립보드에도 기록됨
+        if (tsv === null) {
+          status.textContent = '복사할 대상이 없습니다 — 행을 선택하거나 셀을 포커스하세요.';
+          return;
+        }
+        tsvBox.value = tsv;
+        status.textContent = tsv.split('\n').length + '행을 TSV로 복사했습니다 (Email 컬럼 제외).';
+      });
+
+      document.getElementById('pasteBtn').addEventListener('click', function () {
+        var n = grid.pasteTsv(tsvBox.value);
+        status.textContent = n > 0
+          ? n + '개 셀이 갱신되었습니다 (편집 가능 + 검증 통과한 셀만).'
+          : '갱신된 셀 없음 — 먼저 셀을 클릭해 붙여넣기 시작점을 포커스하세요.';
+      });
+    </script>
+  </div>
+
   <!-- ======================================================== Pinning -->
   <h2 class="section">Column Pinning · Resize · Reorder</h2>
   <p class="section-desc">

@@ -82,6 +82,7 @@ python demo/server.py
 | `editable` | 더블클릭/Enter로 인라인 편집 |
 | `editor` | `'text'` \| `'number'` \| `'select'` (+ `editorOptions`) |
 | `validator(value, row)` | `true` 또는 오류 메시지 반환 — 거부 시 커밋 차단 + 빨간 표시 |
+| `suppressCopy` | 클립보드 복사에서 제외 (CSV에는 영향 없음) |
 | `valueFormatter(value, row)` | 표시 문자열 (기본 HTML 이스케이프) |
 | `cellRenderer(params)` | HTML/Node 반환 커스텀 렌더러 |
 | `cellClass` | string 또는 `fn(value, row)` |
@@ -104,6 +105,7 @@ cellRenderer: DataGrid.renderers.progress()   // 0–100 진행 바
 `setRowData(rows)` · `getRowData()` · `addRow(row)` / `addRows(rows)` · `updateRow(row, changes)` ·
 `removeRows(rows)` / `removeSelectedRows()` · `getSelectedRows()` · `selectAll()` / `deselectAll()` ·
 `startEdit(row, field)` / `stopEdit(commit)` / `isEditing()` ·
+`copy()` / `pasteTsv(text)` (Ctrl+C/V 엑셀 호환 TSV) ·
 `setQuickFilter(text)` · `applyColumnFilter(field, model)` · `getFilterModel()` · `clearFilters()` ·
 `setSortModel(model)` / `getSortModel()` · `setGroupBy(fields)` / `getGroupBy()` ·
 `expandAllGroups()` / `collapseAllGroups()` · `setPage(n)` / `setPageSize(n)` ·

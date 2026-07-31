@@ -142,6 +142,41 @@ suite('quickFilterRows', function () {
   assertEq(T.quickFilterRows(rows, '  ', fields).length, 3, 'blank text returns all');
 });
 
+/* ---------------- clipboard TSV ---------------- */
+suite('buildTsv', function () {
+  var cols = [{ field: 'a' }, { field: 'b' }];
+  assertEq(T.buildTsv([{ a: 1, b: 'x' }, { a: 2, b: 'y' }], cols), '1\tx\r\n2\ty', 'rows joined with CRLF, cells with tab');
+  assertEq(T.buildTsv([{ a: null, b: undefined }], cols), '\t', 'null/undefined become empty');
+  assertEq(T.buildTsv([{ a: 'has\ttab', b: 'has"quote' }], cols), '"has\ttab"\t"has""quote"', 'tab/quote cells quoted, quotes doubled');
+  assertEq(T.buildTsv([{ a: 'line1\nline2', b: 'ok' }], cols), '"line1\nline2"\tok', 'newline cell quoted');
+  assertEq(
+    T.buildTsv([{ a: 52000, b: 'raw' }], [{ field: 'a', valueFormatter: function (v) { return '$' + v; } }]),
+    '52000',
+    'raw values, no formatter (roundtrip/spreadsheet friendly)'
+  );
+});
+
+suite('parseTsv', function () {
+  assertEq(T.parseTsv('1\tx\r\n2\ty'), [['1', 'x'], ['2', 'y']], 'CRLF rows');
+  assertEq(T.parseTsv('1\tx\n2\ty'), [['1', 'x'], ['2', 'y']], 'LF rows');
+  assertEq(T.parseTsv('a\tb\n'), [['a', 'b']], 'trailing newline does not add an empty row');
+  assertEq(T.parseTsv('solo'), [['solo']], 'single cell');
+  assertEq(T.parseTsv('"has\ttab"\tplain'), [['has\ttab', 'plain']], 'quoted cell with tab');
+  assertEq(T.parseTsv('"line1\nline2"\tok'), [['line1\nline2', 'ok']], 'quoted cell with newline');
+  assertEq(T.parseTsv('"say ""hi"""\tx'), [['say "hi"', 'x']], 'doubled quotes unescaped');
+  assertEq(T.parseTsv('a\t\tb'), [['a', '', 'b']], 'empty middle cell');
+  assertEq(T.parseTsv(''), [['']], 'empty text is one empty cell');
+
+  /* 왕복: buildTsv → parseTsv */
+  var cols = [{ field: 'a' }, { field: 'b' }];
+  var rows = [{ a: 'x\ty', b: 'q"z' }, { a: 'line\nbreak', b: 'end' }];
+  assertEq(
+    T.parseTsv(T.buildTsv(rows, cols)),
+    [['x\ty', 'q"z'], ['line\nbreak', 'end']],
+    'roundtrip preserves special characters'
+  );
+});
+
 /* ---------------- validation message ---------------- */
 suite('validationMessage', function () {
   var v = T.validationMessage;

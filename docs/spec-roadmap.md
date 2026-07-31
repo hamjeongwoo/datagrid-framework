@@ -77,7 +77,7 @@
 
 | | ParamQuery | 제안 API | 우선순위 |
 |---|---|---|---|
-| [ ] | **`copy()` / `paste()` / `pasteModel` / `column > copy`** (엑셀 호환 TSV 클립보드) | 선택 영역 <kbd>Ctrl+C</kbd> 복사, editable 셀에 <kbd>Ctrl+V</kbd> 붙여넣기, `column.suppressCopy` | **P1** |
+| [x] | **`copy()` / `paste()` / `pasteModel` / `column > copy`** (엑셀 호환 TSV 클립보드) | 선택 행 <kbd>Ctrl+C</kbd> 복사(원시 값, `copy()` 메서드), 포커스 셀에 <kbd>Ctrl+V</kbd> 붙여넣기(`pasteTsv(text)`, editable+validator+beforeCellSave 통과 셀만), `column.suppressCopy` — v1.1.0 | **P1** |
 | [ ] | **`saveState()` / `loadState()`** (컬럼 폭·순서·정렬·필터·페이지 저장/복원) | `getState()` / `setState(state)` — JSON 직렬화 가능 | **P1** |
 | [ ] | `exportData({format:'json'\|'html'})` | `getJson()` — 뷰 데이터 JSON 내보내기 | **P1** (쉬움) |
 | [ ] | `exportExcel` / `exportData({format:'xlsx'})` | `exportExcel()` — 의존성 없이 가능한 SpreadsheetML/xlsx 최소 구현 검토 | **P2** |
