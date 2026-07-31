@@ -69,8 +69,35 @@
 | 실전 조합 시나리오에 어울리는 기능 (그룹핑, 상태 저장, 클립보드 등) | `index.html` 템플릿 예제에도 통합해 다른 기능과 함께 동작하는 모습을 보여준다 |
 | 새 시각 요소/상태가 생긴 경우 (그룹 헤더 행, 요약 행, dirty 표시, 채우기 핸들 등) | `examples/components.html` 갤러리에 정적 견본 + 상태 변형 추가 |
 
-카드 작성 규칙: **자체 완결형 코드**(복사하면 그대로 실행), 마크업은 `demo/example-tabs.js` 상단 주석 참조.
-기존 카드에 기능을 덧붙이기보다 스펙당 전용 카드를 새로 만드는 것을 기본으로 한다(검색·링크 용이).
+**카드는 반드시 features.html의 기존 Example/View Source 형식 그대로** 작성한다.
+표시되는 소스 = 실행되는 소스 원칙에 따라 `text/x-example` 스크립트 하나가 실행과 View Source 표시를 겸한다:
+
+```html
+<!-- ======================================================== 스펙 이름 -->
+<h2 class="section">스펙 이름 (영문 제목)</h2>
+<p class="section-desc">
+  무엇을 하는 기능인지 + 핵심 API를 <code class="inline">코드</code>로 표기한 1~3문장 설명.
+</p>
+<div class="example-card">
+  <div class="example-html">
+    <!-- 조작 UI가 필요하면: <div class="toolbar"> 버튼/입력/셀렉트 </div> -->
+    <div id="gridXxx" class="grid-wrap-sm"></div>  <!-- sm/md/lg 중 선택 -->
+    <div class="status-line" id="xxxStatus">이벤트/호출 결과를 보여줄 안내 문구</div>
+  </div>
+  <script type="text/x-example">
+    var grid = new DataGrid(document.getElementById('gridXxx'), {
+      rowData: DemoData.makeEmployees(60, 7),  // 시드 고정 — Math.random 금지
+      /* 이번 스펙의 옵션/컬럼 설정 */
+    });
+    // 버튼·이벤트 연결, status line 갱신 등 — 복사하면 그대로 실행되는 자체 완결형 코드
+  </script>
+</div>
+```
+
+- 컨테이너 id(`gridXxx`)와 status id는 페이지 안에서 유일해야 한다 (기존 카드와 충돌 금지).
+- `ExampleTabs.init()`이 카드를 Example/View Source 탭으로 감싸므로 카드 자체에 탭 마크업을 쓰지 않는다.
+- 기존 카드에 기능을 덧붙이기보다 **스펙당 전용 카드**를 새로 만드는 것을 기본으로 한다(검색·링크 용이).
+- 세부 마크업 규약이 바뀌면 `demo/example-tabs.js` 상단 주석이 최종 기준.
 
 ### 5. 문서 갱신 체크리스트 (전부 필수 — 하나라도 빠지면 미완성)
 - [ ] `docs/api-data.js` — 해당 섹션에 항목 추가, `since: '1.x.0'` 명시. 새 카테고리면 섹션 추가(구조는 파일 상단 주석 참조)
