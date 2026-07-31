@@ -427,6 +427,19 @@
   );
 }
 
+/* 셀 병합 (mergeCells): 이어지는 셀은 값 없이 위 경계선만 지운다 */
+.dg-cell.dg-cell-merged:not(.dg-pinned-left):not(.dg-pinned-right) { position: relative; }
+.dg-cell.dg-cell-merged::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--dg-background-color);
+}
+.dg-zebra .dg-row-odd .dg-cell-merged::before { background: var(--dg-odd-row-background-color); }
+
 /* 채우기 핸들 (fillHandle) */
 .dg-cell-fill-anchor { position: relative; }
 .dg-fill-handle {

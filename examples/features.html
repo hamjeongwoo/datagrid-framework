@@ -1411,6 +1411,41 @@
     </script>
   </div>
 
+  <!-- ======================================================== 셀 병합 -->
+  <h2 class="section">Merge Cells (연속 값 세로 병합)</h2>
+  <p class="section-desc">
+    <code class="inline">mergeCells: ['field'...]</code>는 표시 순서상 연속된 같은 값을 세로로 병합해
+    보여줍니다 — 이어지는 셀은 값과 경계선을 숨깁니다. 해당 컬럼으로 정렬하면 병합 효과가 커지고,
+    그룹 헤더·디테일 행에서는 병합이 끊깁니다. 데이터 자체는 그대로라 CSV/클립보드에는 영향이 없습니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div id="gridMerge" class="grid-wrap-sm"></div>
+      <div class="status-line" id="mergeStatus">
+        Product·Status 컬럼이 병합 대상입니다 — 헤더를 클릭해 정렬을 바꾸면 병합이 재계산됩니다.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridMerge'), {
+        rowData: DemoData.makeOrders(60, 83),
+        mergeCells: ['product', 'status'],
+        sortModel: [{ field: 'product', dir: 'asc' }, { field: 'status', dir: 'asc' }],
+        columnDefs: [
+          { field: 'product', headerName: 'Product', width: 180 },
+          { field: 'status', headerName: 'Status', width: 140 },
+          { field: 'orderId', headerName: 'Order ID', width: 130 },
+          { field: 'quantity', headerName: 'Qty', dataType: 'number', width: 90 },
+          { field: 'total', headerName: 'Total', dataType: 'number', format: '$#,##0', width: 120 },
+        ],
+      });
+
+      grid.on('sortChanged', function () {
+        document.getElementById('mergeStatus').textContent =
+          '정렬 변경 — 표시 순서 기준으로 병합이 다시 계산되었습니다.';
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

@@ -343,6 +343,17 @@ window.ApiDocs = {
             '<code>cellRangeChanged</code> 이벤트가 발생합니다.',
         },
         {
+          name: 'mergeCells',
+          type: 'string[]',
+          since: '2.0.0',
+          description:
+            '지정한 필드들에서 표시 순서상 <strong>연속된 같은 값</strong>을 세로 병합으로 표현합니다 — ' +
+            '이어지는 셀은 값과 위 경계선을 숨깁니다(엄격 비교 <code>===</code>). ' +
+            '해당 컬럼으로 정렬하면 병합 묶음이 커지고, 그룹 헤더/디테일 행에서 병합이 끊깁니다. ' +
+            '표시만 병합될 뿐 데이터는 그대로이므로 CSV/클립보드/편집에는 영향이 없습니다.',
+          example: "mergeCells: ['product', 'status'],\nsortModel: [{ field: 'product', dir: 'asc' }]",
+        },
+        {
           name: 'fillHandle',
           type: 'boolean',
           default: 'false',

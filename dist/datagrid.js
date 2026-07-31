@@ -611,6 +611,30 @@
   }
 
   /**
+   * mergeCells: 표시 리스트에서 "이전 리프 행과 같은 값이라 병합되는" 위치 계산.
+   * result[i] = true면 i번째 항목의 해당 컬럼 셀은 이어짐(값 숨김 + 경계선 제거).
+   * 그룹 헤더/디테일 행에서 병합 run이 끊긴다.
+   */
+  function computeMergeContinuation(items, field) {
+    var out = new Array(items.length);
+    var prev;
+    var hasPrev = false;
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      if (!it || it.__group || it.__detail) {
+        out[i] = false;
+        hasPrev = false;
+        continue;
+      }
+      var v = it[field];
+      out[i] = hasPrev && v === prev;
+      prev = v;
+      hasPrev = true;
+    }
+    return out;
+  }
+
+  /**
    * 채우기 핸들의 연속 값 생성 (엑셀 방식).
    * - 원본이 모두 숫자이고 2개 이상이면 등차 수열로 외삽
    *   ([1, 3] → 5, 7, 9 …, 부동소수 오차는 10자리에서 반올림)
@@ -1365,6 +1389,18 @@
       this._pageOrdinals = layout.ordinals;
       this._totalRowsHeight = layout.total;
     }
+
+    this._computeMergeMap();
+  };
+
+  DataGrid.prototype._computeMergeMap = function () {
+    this._mergeMap = null;
+    var fields = this.options.mergeCells;
+    if (!fields || fields.length === 0) return;
+    this._mergeMap = {};
+    for (var i = 0; i < fields.length; i++) {
+      this._mergeMap[fields[i]] = computeMergeContinuation(this._pageRows, fields[i]);
+    }
   };
 
   DataGrid.prototype._detailHeight = function () {
@@ -1939,6 +1975,15 @@
         cell.classList.add('dg-cell-focused');
       }
       self._applyCellLayout(cell, col.colId);
+
+      /* mergeCells: 이전 행과 같은 값이면 값 숨김 + 경계선 제거로 병합 표현 */
+      if (
+        self._mergeMap && col.field !== undefined &&
+        self._mergeMap[col.field] && self._mergeMap[col.field][pageIndex]
+      ) {
+        cell.classList.add('dg-cell-merged');
+        return;
+      }
 
       if (col.__rowNumber) {
         cell.classList.add('dg-rownum-cell');
@@ -4108,6 +4153,7 @@
     rollbackRows: rollbackRows,
     findNextMatch: findNextMatch,
     fillSeries: fillSeries,
+    computeMergeContinuation: computeMergeContinuation,
     buildGroupHeaderRuns: buildGroupHeaderRuns,
     buildDataSourceRequest: buildDataSourceRequest,
     parseDataSourceResponse: parseDataSourceResponse,

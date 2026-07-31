@@ -546,6 +546,29 @@ suite('buildGroupHeaderRuns', function () {
   assertEq(T.buildGroupHeaderRuns([], groups), [], 'no columns → empty');
 });
 
+/* ---------------- computeMergeContinuation ---------------- */
+suite('computeMergeContinuation', function () {
+  var M = T.computeMergeContinuation;
+  assertEq(
+    M([{ d: 'A' }, { d: 'A' }, { d: 'B' }, { d: 'B' }, { d: 'A' }], 'd'),
+    [false, true, false, true, false],
+    'consecutive equal values marked as continuation'
+  );
+  assertEq(
+    M([{ d: 'A' }, { __group: true }, { d: 'A' }], 'd'),
+    [false, false, false],
+    'group header breaks the run'
+  );
+  assertEq(
+    M([{ d: 'A' }, { __detail: true, row: {} }, { d: 'A' }], 'd'),
+    [false, false, false],
+    'detail row breaks the run'
+  );
+  assertEq(M([{ d: null }, { d: null }], 'd'), [false, true], 'nulls merge together');
+  assertEq(M([{ d: 1 }, { d: '1' }], 'd'), [false, false], 'strict equality (1 !== "1")');
+  assertEq(M([], 'd'), [], 'empty list');
+});
+
 /* ---------------- fillSeries ---------------- */
 suite('fillSeries', function () {
   assertEq(T.fillSeries([1, 3], 3), [5, 7, 9], 'arithmetic extrapolation');
