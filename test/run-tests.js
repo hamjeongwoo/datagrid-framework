@@ -408,6 +408,54 @@ suite('normalizeColumns (dataType/format)', function () {
   assertEq(cols[5].valueFormatter(1), 'custom', 'explicit valueFormatter wins over format');
 });
 
+/* ---------------- computeColumnWidths ---------------- */
+suite('computeColumnWidths', function () {
+  var W = T.computeColumnWidths;
+  assertEq(
+    W([{ colId: 'a', width: 100, minWidth: 60 }, { colId: 'b', width: 200, minWidth: 60 }], {}, 1000),
+    { a: 100, b: 200 },
+    'fixed widths used as-is'
+  );
+  assertEq(
+    W([{ colId: 'a', width: 100, minWidth: 60 }, { colId: 'f', width: 160, minWidth: 60, flex: 1 }], {}, 500),
+    { a: 100, f: 400 },
+    'flex takes remaining space'
+  );
+  assertEq(
+    W([
+      { colId: 'x', width: 100, minWidth: 60, flex: 1 },
+      { colId: 'y', width: 100, minWidth: 60, flex: 3 },
+    ], {}, 400),
+    { x: 100, y: 300 },
+    'flex ratio split'
+  );
+  assertEq(
+    W([{ colId: 'a', width: 100, minWidth: 60 }], { a: 300 }, 1000),
+    { a: 300 },
+    'override wins over width'
+  );
+  assertEq(
+    W([{ colId: 'a', width: 100, minWidth: 120 }], {}, 1000),
+    { a: 120 },
+    'minWidth clamps up'
+  );
+  assertEq(
+    W([{ colId: 'a', width: 100, minWidth: 60, maxWidth: 80 }], { a: 500 }, 1000),
+    { a: 80 },
+    'maxWidth clamps override down'
+  );
+  assertEq(
+    W([{ colId: 'f', width: 100, minWidth: 60, maxWidth: 150, flex: 1 }], {}, 900),
+    { f: 150 },
+    'maxWidth clamps flex'
+  );
+  assertEq(
+    W([{ colId: 'f', width: 100, minWidth: 200, flex: 1 }], {}, 100),
+    { f: 200 },
+    'flex never below minWidth even without space'
+  );
+});
+
 /* ---------------- applyColumnState ---------------- */
 suite('applyColumnState', function () {
   function cols() {

@@ -90,9 +90,9 @@
 | [ ] | **`column > colModel`** (중첩 컬럼 = 헤더 그룹 2단) | `columnGroups: [{ headerName, children: [...] }]` | **P2** |
 | [x] | `column > dataType/type` (`string·integer·float·date·bool`) | `column.dataType: 'string'\|'number'\|'date'\|'bool'` — 정렬 비교·필터 종류·기본 정렬(align)·기본 에디터 자동 결정 — v1.1.0 | **P1** |
 | [x] | `column > format` (`#,###.00`, 날짜 포맷) + util `formatNumber` | `column.format: '#,##0.00' \| 'yyyy-MM-dd'` 선언적 포맷 (valueFormatter의 간편판) + `DataGrid.format()` 유틸 — v1.1.0 | **P1** |
-| [ ] | `numberCell` (행 번호 컬럼) | `rowNumbers: true` 옵션 | **P1** (쉬움) |
-| [ ] | `column > maxWidth` | `maxWidth` — 리사이즈·flex 상한 | **P1** (쉬움) |
-| [ ] | `editable` (그리드 레벨 on/off) | `editable: false` 옵션 — 컬럼 설정 무시하고 잠금 + `setEditable(bool)` | **P1** (쉬움) |
+| [x] | `numberCell` (행 번호 컬럼) | `rowNumbers: true` 옵션 (좌측 고정, 표시 순서 기준) — v1.1.0 | **P1** (쉬움) |
+| [x] | `column > maxWidth` | `maxWidth` — 리사이즈·flex·autoSize 상한 — v1.1.0 | **P1** (쉬움) |
+| [x] | `editable` (그리드 레벨 on/off) | `editable: false` 옵션 — 컬럼 설정 무시하고 잠금 + `setEditable(bool)` / `isEditable()` — v1.1.0 | **P1** (쉬움) |
 | [ ] | `column > nodrag/nodrop` | `column.suppressMove` | **P2** |
 | [ ] | `rowInit` (행별 클래스/속성) | `getRowClass(row, index) => string` 옵션 | **P2** |
 | [ ] | `column > halign` (헤더만 다른 정렬) | `headerAlign` | P3 |

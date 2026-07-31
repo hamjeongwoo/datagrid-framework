@@ -461,6 +461,14 @@
   padding: 0;
 }
 
+/* 행 번호 컬럼 (rowNumbers: true) */
+.dg-rownum-cell {
+  color: var(--dg-secondary-foreground-color);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+
 /* ==========================================================================
    Tag / badge cell renderer
    ========================================================================== */

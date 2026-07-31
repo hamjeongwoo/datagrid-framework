@@ -680,6 +680,49 @@
     </script>
   </div>
 
+  <!-- ======================================================== rowNumbers · maxWidth · editable -->
+  <h2 class="section">Row Numbers · Max Width · Grid-level Editable</h2>
+  <p class="section-desc">
+    <code class="inline">rowNumbers: true</code>는 왼쪽에 고정된 행 번호 컬럼을 추가합니다(정렬·필터·복사 제외).
+    <code class="inline">column.maxWidth</code>는 드래그 리사이즈·flex·자동 맞춤의 상한이 됩니다.
+    그리드 레벨 <code class="inline">editable: false</code> / <code class="inline">setEditable(bool)</code>은
+    컬럼 설정을 무시하고 편집 전체를 잠급니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn" id="editLockBtn" type="button">setEditable() — 편집 잠금/해제</button>
+      </div>
+      <div id="gridRowNum" class="grid-wrap-sm"></div>
+      <div class="status-line" id="rowNumStatus">
+        지금은 편집 잠김(editable: false) — Name을 더블클릭해도 편집기가 열리지 않습니다.
+        City는 maxWidth: 160이라 그 이상 넓힐 수 없습니다.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridRowNum'), {
+        rowData: DemoData.makeEmployees(50, 23),
+        rowNumbers: true,
+        editable: false,           // 그리드 전체 편집 잠금 (컬럼 editable보다 우선)
+        columnDefs: [
+          { field: 'name', headerName: 'Name (editable)', width: 170, editable: true },
+          { field: 'city', headerName: 'City (maxWidth 160)', width: 130, maxWidth: 160 },
+          { field: 'department', headerName: 'Department', width: 150 },
+          { field: 'salary', headerName: 'Salary', dataType: 'number', format: '$#,##0', width: 120 },
+        ],
+      });
+
+      var status = document.getElementById('rowNumStatus');
+      document.getElementById('editLockBtn').addEventListener('click', function () {
+        var next = !grid.isEditable();
+        grid.setEditable(next);
+        status.textContent = next
+          ? '편집 해제됨 — Name 셀을 더블클릭하면 편집기가 열립니다.'
+          : '편집 잠김 — 더블클릭·Enter·붙여넣기가 모두 무시됩니다.';
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

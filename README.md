@@ -67,6 +67,8 @@ python demo/server.py
 | `groupBy` | array | 행 그룹핑 필드 목록 (`['dept', 'city']` 다단계 지원) |
 | `groupDefaultExpanded` | boolean | 그룹 초기 펼침 상태 (기본 true) |
 | `grandTotal` | boolean | 하단 전체 요약 행 (`aggFunc` 컬럼 집계) |
+| `rowNumbers` | boolean | 왼쪽 고정 행 번호 컬럼 |
+| `editable` | boolean | 그리드 전체 편집 잠금 (`false`면 컬럼 설정 무시, `setEditable`로 전환) |
 
 ## 컬럼 정의
 
@@ -74,7 +76,7 @@ python demo/server.py
 |---|---|
 | `field` | 행 객체의 키 |
 | `headerName` | 헤더 라벨 |
-| `width` / `minWidth` / `flex` | 픽셀 폭 / 최소 폭 / 남은 공간 비율 |
+| `width` / `minWidth` / `maxWidth` / `flex` | 픽셀 폭 / 최소·최대 폭 / 남은 공간 비율 |
 | `sortable` (기본 true) | 헤더 클릭 정렬, Shift+클릭 다중 정렬 |
 | `comparator(a, b, rowA, rowB)` | 커스텀 정렬 |
 | `dataType` | `'string'` \| `'number'` \| `'date'` \| `'bool'` — 정렬 비교·필터 종류·정렬 방향 자동 결정 |
@@ -106,7 +108,7 @@ cellRenderer: DataGrid.renderers.progress()   // 0–100 진행 바
 
 `setRowData(rows)` · `getRowData()` · `addRow(row)` / `addRows(rows)` · `updateRow(row, changes)` ·
 `removeRows(rows)` / `removeSelectedRows()` · `getSelectedRows()` · `selectAll()` / `deselectAll()` ·
-`startEdit(row, field)` / `stopEdit(commit)` / `isEditing()` ·
+`startEdit(row, field)` / `stopEdit(commit)` / `isEditing()` · `setEditable(bool)` / `isEditable()` ·
 `copy()` / `pasteTsv(text)` (Ctrl+C/V 엑셀 호환 TSV) ·
 `setQuickFilter(text)` · `applyColumnFilter(field, model)` · `getFilterModel()` · `clearFilters()` ·
 `setSortModel(model)` / `getSortModel()` · `setGroupBy(fields)` / `getGroupBy()` ·

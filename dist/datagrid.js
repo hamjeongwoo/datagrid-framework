@@ -540,6 +540,35 @@
   }
 
   /**
+   * 컬럼 폭 계산: 사용자 리사이즈(overrides) > flex(남은 공간 비율) > width.
+   * 모든 결과는 minWidth 이상, maxWidth(있으면) 이하로 클램프된다.
+   */
+  function computeColumnWidths(cols, overrides, available) {
+    overrides = overrides || {};
+    var fixedTotal = 0;
+    var flexTotal = 0;
+    cols.forEach(function (c) {
+      var w = overrides[c.colId];
+      if (w === undefined && c.flex) { flexTotal += c.flex; return; }
+      fixedTotal += w !== undefined ? w : c.width;
+    });
+    var widths = {};
+    var flexSpace = Math.max(0, available - fixedTotal);
+    cols.forEach(function (c) {
+      var w = overrides[c.colId];
+      if (w === undefined && c.flex) {
+        w = Math.floor((flexSpace * c.flex) / (flexTotal || 1));
+      } else if (w === undefined) {
+        w = c.width;
+      }
+      w = Math.max(c.minWidth, w);
+      if (typeof c.maxWidth === 'number') w = Math.min(c.maxWidth, w);
+      widths[c.colId] = w;
+    });
+    return widths;
+  }
+
+  /**
    * getState()의 컬럼 상태를 현재 컬럼 목록에 적용한 결과를 계산한다.
    * - stateColumns 순서대로 재배열, 목록에 없는 colId는 무시
    * - state에 빠진 컬럼은 원래 상대 순서를 유지한 채 뒤에 붙인다
@@ -616,8 +645,9 @@
     this._destroyed = false;
 
     /* column state */
-    this._columns = normalizeColumns(options.columnDefs, options.defaultColDef);
+    this._columns = this._buildColumns();
     this._colWidths = {};
+    this._editable = options.editable !== false;
 
     /* data state */
     this._rows = [];
@@ -656,6 +686,20 @@
 
     this.setRowData(options.rowData || []);
   }
+
+  /* ---- columns (normalize + built-in row number column) ---- */
+
+  DataGrid.prototype._buildColumns = function () {
+    var cols = normalizeColumns(this.options.columnDefs, this.options.defaultColDef);
+    if (this.options.rowNumbers) {
+      cols.unshift({
+        colId: '__rowNum', headerName: '', width: 52, minWidth: 40, maxWidth: 90,
+        sortable: false, resizable: true, editable: false, filter: false,
+        hide: false, pinned: 'left', align: 'right', __rowNumber: true,
+      });
+    }
+    return cols;
+  };
 
   /* ---- events ---- */
   DataGrid.prototype.on = function (name, fn) { this._emitter.on(name, fn); return this; };
@@ -1009,28 +1053,9 @@
   DataGrid.prototype._layoutColumns = function () {
     if (this._destroyed) return;
     var cols = this._visibleColumns();
-    var self = this;
     var available = this._bodyEl.clientWidth || this._rootEl.clientWidth;
 
-    var fixedTotal = 0;
-    var flexTotal = 0;
-    cols.forEach(function (c) {
-      var w = self._colWidths[c.colId];
-      if (w === undefined && c.flex) { flexTotal += c.flex; return; }
-      fixedTotal += w !== undefined ? w : c.width;
-    });
-
-    var widths = {};
-    var flexSpace = Math.max(0, available - fixedTotal);
-    cols.forEach(function (c) {
-      var w = self._colWidths[c.colId];
-      if (w === undefined && c.flex) {
-        w = Math.max(c.minWidth, Math.floor((flexSpace * c.flex) / (flexTotal || 1)));
-      } else if (w === undefined) {
-        w = c.width;
-      }
-      widths[c.colId] = Math.max(c.minWidth, w);
-    });
+    var widths = computeColumnWidths(cols, this._colWidths, available);
     this._computedWidths = widths;
 
     /* pinned offsets */
@@ -1148,7 +1173,7 @@
       if (col.align === 'center') cell.classList.add('dg-align-center');
       if (col.pinned === 'left') cell.classList.add('dg-pinned-left');
       if (col.pinned === 'right') cell.classList.add('dg-pinned-right');
-      if (col.editable) cell.classList.add('dg-cell-editable');
+      if (col.editable && self._editable) cell.classList.add('dg-cell-editable');
       if (col.cellClass) {
         var cls = typeof col.cellClass === 'function' ? col.cellClass(row[col.field], row) : col.cellClass;
         if (cls) cell.classList.add.apply(cell.classList, String(cls).split(/\s+/));
@@ -1161,6 +1186,13 @@
         cell.classList.add('dg-cell-focused');
       }
       self._applyCellLayout(cell, col.colId);
+
+      if (col.__rowNumber) {
+        cell.classList.add('dg-rownum-cell');
+        var num = el('span', 'dg-cell-value', cell);
+        num.textContent = (globalIndex + 1).toLocaleString();
+        return;
+      }
 
       if (col.checkboxSelection) {
         cell.classList.add('dg-checkbox-cell');
@@ -1194,7 +1226,7 @@
     var cols = this._visibleColumns();
     var labelColId = null;
     for (var i = 0; i < cols.length; i++) {
-      if (!cols[i].checkboxSelection) { labelColId = cols[i].colId; break; }
+      if (!cols[i].checkboxSelection && !cols[i].__rowNumber) { labelColId = cols[i].colId; break; }
     }
 
     cols.forEach(function (col, cIdx) {
@@ -1508,7 +1540,7 @@
     var cols = this._visibleColumns();
     var labelColId = null;
     for (var i = 0; i < cols.length; i++) {
-      if (!cols[i].checkboxSelection && !cols[i].aggFunc) { labelColId = cols[i].colId; break; }
+      if (!cols[i].checkboxSelection && !cols[i].aggFunc && !cols[i].__rowNumber) { labelColId = cols[i].colId; break; }
     }
 
     cols.forEach(function (col) {
@@ -1652,7 +1684,7 @@
     var hit = this._cellFromEvent(e);
     if (!hit || !hit.row || hit.row.__group) return;
     this._emitter.emit('rowDoubleClicked', { data: hit.row, rowIndex: hit.r });
-    if (hit.col && hit.col.editable) this._startEdit(hit);
+    if (hit.col && hit.col.editable && this._editable) this._startEdit(hit);
   };
 
   DataGrid.prototype._setFocusedCell = function (r, c) {
@@ -1711,7 +1743,7 @@
         var row = this._pageRows[r];
         if (row && row.__group) { this._toggleGroup(row); break; }
         var col = this._visibleColumns()[c];
-        if (col && col.editable && row) {
+        if (col && col.editable && this._editable && row) {
           var rowEl = this._renderedRows[r];
           var cellEl = rowEl && rowEl.querySelector('[data-col-index="' + c + '"]');
           if (cellEl) this._startEdit({ cellEl: cellEl, r: r, c: c, row: row, col: col });
@@ -1861,7 +1893,7 @@
    *  편집 불가 컬럼·미표시 행이면 false를 반환한다. */
   DataGrid.prototype.startEdit = function (row, field) {
     var col = this._visibleColumns().find(function (c) { return c.field === field; });
-    if (!col || !col.editable || !row) return false;
+    if (!col || !col.editable || !this._editable || !row) return false;
 
     var displayIndex = this._displayRows.indexOf(row);
     if (displayIndex === -1) return false;
@@ -1891,6 +1923,14 @@
   };
 
   DataGrid.prototype.isEditing = function () { return !!this._editing; };
+
+  /** 그리드 전체 편집 잠금/해제. false면 컬럼 editable 설정을 무시하고 잠근다. */
+  DataGrid.prototype.setEditable = function (enabled) {
+    this._editable = enabled !== false;
+    this.refresh(); /* refresh가 진행 중 편집도 정리한다 */
+  };
+
+  DataGrid.prototype.isEditable = function () { return this._editable; };
 
   /* ---- clipboard (엑셀 호환 TSV) ---- */
 
@@ -1945,7 +1985,7 @@
    * validator·beforeCellSave를 통과한 값만 반영한다. 갱신된 셀 수를 반환.
    */
   DataGrid.prototype.pasteTsv = function (text) {
-    if (!text || !this._focusedCell) return 0;
+    if (!text || !this._focusedCell || !this._editable) return 0;
     var self = this;
     var matrix = parseTsv(String(text));
     var cols = this._visibleColumns();
@@ -2004,7 +2044,9 @@
       var startX = e.clientX;
       var startW = self._computedWidths[col.colId] || col.width;
       var onMove = function (me) {
-        self._colWidths[col.colId] = Math.max(col.minWidth, startW + (me.clientX - startX));
+        var w = Math.max(col.minWidth, startW + (me.clientX - startX));
+        if (typeof col.maxWidth === 'number') w = Math.min(col.maxWidth, w);
+        self._colWidths[col.colId] = w;
         self._layoutColumns();
       };
       var onUp = function () {
@@ -2038,7 +2080,9 @@
       if (v === null || v === undefined) continue;
       max = Math.max(max, ctx.measureText(String(v)).width + 34);
     }
-    this._colWidths[colId] = Math.ceil(Math.max(col.minWidth, Math.min(max, 500)));
+    var w = Math.ceil(Math.max(col.minWidth, Math.min(max, 500)));
+    if (typeof col.maxWidth === 'number') w = Math.min(col.maxWidth, w);
+    this._colWidths[colId] = w;
     this._layoutColumns();
   };
 
@@ -2336,7 +2380,7 @@
       this._groupDefaultExpanded = this.options.groupDefaultExpanded !== false;
     }
     if (all || parts.columns) {
-      this._columns = normalizeColumns(this.options.columnDefs, this.options.defaultColDef);
+      this._columns = this._buildColumns();
       this._colWidths = {};
     }
     if (all || parts.page) {
@@ -2445,6 +2489,7 @@
     buildCsv: buildCsv,
     normalizeColumns: normalizeColumns,
     applyColumnState: applyColumnState,
+    computeColumnWidths: computeColumnWidths,
     escapeHtml: escapeHtml,
   };
 

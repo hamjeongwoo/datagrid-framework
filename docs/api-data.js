@@ -219,6 +219,26 @@ window.ApiDocs = {
             '전체 행 수(필터 적용 후)를 보여주며, <code>aggFunc</code> 컬럼이 하나도 없으면 표시되지 않습니다. ' +
             '그룹핑 없이도 사용할 수 있습니다.',
         },
+        {
+          name: 'rowNumbers',
+          type: 'boolean',
+          default: 'false',
+          since: '1.1.0',
+          description:
+            '왼쪽에 고정(pinned left)된 행 번호 컬럼을 추가합니다. 번호는 필터·정렬이 적용된 표시 순서 기준이며 ' +
+            '정렬·필터·클립보드 복사·CSV 대상에서 제외됩니다. 그룹 헤더 행에는 번호가 표시되지 않습니다.',
+          example: 'rowNumbers: true',
+        },
+        {
+          name: 'editable',
+          type: 'boolean',
+          default: 'true',
+          since: '1.1.0',
+          description:
+            '그리드 전체 편집 스위치. <code>false</code>면 컬럼의 <code>editable</code> 설정을 무시하고 ' +
+            '더블클릭·<kbd>Enter</kbd>·<code>startEdit()</code>·붙여넣기를 모두 잠급니다. ' +
+            '런타임에는 <a href="#api-methods-setEditable"><code>setEditable()</code></a>로 전환합니다.',
+        },
       ],
     },
 
@@ -264,6 +284,14 @@ window.ApiDocs = {
           type: 'number',
           default: '60',
           description: '최소 폭(px). 리사이즈·flex 계산 시에도 이 값 아래로 줄어들지 않습니다.',
+        },
+        {
+          name: 'maxWidth',
+          type: 'number',
+          since: '1.1.0',
+          description:
+            '최대 폭(px). 드래그 리사이즈·flex 분배·<code>autoSizeColumn()</code> 모두 이 값을 넘지 않습니다.',
+          example: "{ field: 'code', width: 90, maxWidth: 120 }",
         },
         {
           name: 'flex',
@@ -607,6 +635,16 @@ window.ApiDocs = {
           signature: 'isEditing(): boolean',
           since: '1.1.0',
           description: '인라인 편집이 진행 중인지 반환합니다.',
+        },
+        {
+          name: 'setEditable',
+          group: 'Editing',
+          signature: 'setEditable(enabled: boolean): void',
+          since: '1.1.0',
+          description:
+            '그리드 전체 편집을 잠그거나 해제합니다(<code>editable</code> 옵션의 런타임 버전). ' +
+            '잠그면 진행 중인 편집도 정리됩니다. 현재 상태는 <code>isEditable()</code>로 확인합니다.',
+          example: 'grid.setEditable(false);  // 읽기 전용 모드',
         },
 
         /* ---- 클립보드 ---- */
