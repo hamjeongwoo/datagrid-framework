@@ -326,6 +326,21 @@ suite('csv', function () {
   assertEq(csv, 'Name,Amount\r\n"Kim, Minsoo",$1200', 'header + formatted + escaped row');
 });
 
+/* ---------------- buildJsonRows ---------------- */
+suite('buildJsonRows', function () {
+  var rows = [
+    { id: 1, name: 'Alice', secret: 'x' },
+    { id: 2, name: null, secret: 'y' },
+  ];
+  var cols = [{ field: 'id' }, { field: 'name' }, { colId: 'chk' }];
+  var out = T.buildJsonRows(rows, cols);
+  assertEq(out, [{ id: 1, name: 'Alice' }, { id: 2, name: null }], 'field columns only, raw values');
+  assert(out[0] !== rows[0], 'returns new objects');
+  assertEq(T.buildJsonRows([], cols), [], 'empty rows');
+  assertEq(T.buildJsonRows(rows, []), [{}, {}], 'no field columns → empty objects');
+  assert(JSON.parse(JSON.stringify(out)).length === 2, 'JSON round-trip safe');
+});
+
 /* ---------------- column normalization ---------------- */
 suite('normalizeColumns', function () {
   var cols = T.normalizeColumns(

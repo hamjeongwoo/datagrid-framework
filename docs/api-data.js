@@ -752,6 +752,38 @@ window.ApiDocs = {
           description: '페이지 크기를 변경합니다. 현재 보고 있던 첫 행이 포함된 페이지로 이동합니다.',
         },
 
+        /* ---- 탐색 ---- */
+        {
+          name: 'focusCell',
+          group: 'Navigation',
+          signature: 'focusCell(rowIndex: number, field?: string): boolean',
+          since: '1.1.0',
+          description:
+            '표시 리스트(그룹 헤더 행 포함) 기준 <code>rowIndex</code>의 셀에 포커스를 줍니다. ' +
+            '다른 페이지에 있으면 페이지를 이동하고, 세로·가로 스크롤로 셀을 보이게 만듭니다. ' +
+            '<code>field</code> 생략 시 첫 번째 콘텐츠 컬럼. 범위 밖이거나 컬럼이 없으면 <code>false</code>.',
+          example: "grid.focusCell(137, 'salary');",
+        },
+        {
+          name: 'ensureRowVisible',
+          group: 'Navigation',
+          signature: 'ensureRowVisible(row: object): boolean',
+          since: '1.1.0',
+          description:
+            '행 객체가 화면에 보이도록 페이지 이동 + 세로 스크롤합니다. ' +
+            '행이 현재 뷰에 없으면(필터로 제외, 접힌 그룹 안 등) <code>false</code>.',
+          example: 'grid.ensureRowVisible(grid.getSelectedRows()[0]);',
+        },
+        {
+          name: 'ensureColumnVisible',
+          group: 'Navigation',
+          signature: 'ensureColumnVisible(colId: string): boolean',
+          since: '1.1.0',
+          description:
+            '컬럼이 고정(pinned) 컬럼에 가리지 않고 보이도록 가로 스크롤합니다. ' +
+            '<code>colId</code> 또는 <code>field</code>로 찾으며, 고정 컬럼은 항상 보이므로 바로 <code>true</code>를 반환합니다.',
+        },
+
         /* ---- 상태 저장/복원 ---- */
         {
           name: 'getState',
@@ -829,6 +861,17 @@ window.ApiDocs = {
           signature: "exportCsv(filename?: string): void",
           description:
             '<code>getCsv()</code> 결과를 UTF-8(BOM 포함) 파일로 다운로드합니다. 기본 파일명은 <code>export.csv</code>.',
+        },
+        {
+          name: 'getJson',
+          group: 'Export',
+          signature: 'getJson(): string',
+          since: '1.1.0',
+          description:
+            '필터·정렬이 적용된 현재 뷰 전체를 JSON 문자열(객체 배열)로 반환합니다. ' +
+            '표시 중인 컬럼의 <code>field</code>만 포함하며 값은 원시 데이터입니다(포매터 미적용 — ' +
+            '<code>getCsv()</code>와 달리 데이터 왕복이 목적).',
+          example: 'var rows = JSON.parse(grid.getJson());',
         },
 
         /* ---- 표시 ---- */
@@ -979,6 +1022,14 @@ window.ApiDocs = {
           name: 'rowDoubleClicked',
           payload: '{ data, rowIndex }',
           description: '행 더블클릭 시(편집 시작 여부와 무관하게 발생).',
+        },
+        {
+          name: 'cellDoubleClicked',
+          payload: '{ data, colDef, value, rowIndex }',
+          since: '1.1.0',
+          description:
+            '셀 더블클릭 시(그룹 헤더 행 제외). <code>rowDoubleClicked</code>보다 먼저 발생하며, ' +
+            '편집 가능 셀이면 이어서 인라인 편집이 시작됩니다.',
         },
         {
           name: 'cellClicked',

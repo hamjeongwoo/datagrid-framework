@@ -474,6 +474,17 @@
     return out;
   }
 
+  /** 뷰 행 배열 → field가 있는 컬럼만 담은 평범한 객체 배열 (getJson()용). */
+  function buildJsonRows(rows, columns) {
+    return rows.map(function (row) {
+      var out = {};
+      columns.forEach(function (c) {
+        if (c.field !== undefined) out[c.field] = row[c.field];
+      });
+      return out;
+    });
+  }
+
   function csvEscape(value) {
     var s = value === null || value === undefined ? '' : String(value);
     if (/[",\r\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
@@ -1683,6 +1694,12 @@
   DataGrid.prototype._onCellDblClick = function (e) {
     var hit = this._cellFromEvent(e);
     if (!hit || !hit.row || hit.row.__group) return;
+    this._emitter.emit('cellDoubleClicked', {
+      data: hit.row,
+      colDef: hit.col,
+      value: hit.col && hit.col.field !== undefined ? hit.row[hit.col.field] : undefined,
+      rowIndex: hit.r,
+    });
     this._emitter.emit('rowDoubleClicked', { data: hit.row, rowIndex: hit.r });
     if (hit.col && hit.col.editable && this._editable) this._startEdit(hit);
   };
@@ -1776,6 +1793,77 @@
     else if (bottom > this._bodyEl.scrollTop + this._bodyEl.clientHeight) {
       this._bodyEl.scrollTop = bottom - this._bodyEl.clientHeight;
     }
+  };
+
+  /* ---- programmatic navigation ---- */
+
+  /** 표시 리스트 인덱스의 행이 다른 페이지면 이동하고, 페이지 내 인덱스를 반환. 범위 밖이면 -1. */
+  DataGrid.prototype._goToDisplayIndex = function (displayIndex) {
+    if (displayIndex < 0 || displayIndex >= this._displayRows.length) return -1;
+    if (this._pagination) {
+      var page = Math.floor(displayIndex / this._pageSize);
+      if (page !== this._currentPage) this.setPage(page);
+      return displayIndex - this._currentPage * this._pageSize;
+    }
+    return displayIndex;
+  };
+
+  /**
+   * 표시 리스트(그룹 헤더 포함) 기준 rowIndex의 셀에 포커스를 준다.
+   * field 생략 시 첫 번째 콘텐츠 컬럼. 페이지 이동·스크롤을 포함하며 성공 여부를 반환.
+   */
+  DataGrid.prototype.focusCell = function (rowIndex, field) {
+    var cols = this._visibleColumns();
+    var cIdx = -1;
+    if (field === undefined) {
+      cIdx = cols.findIndex(function (c) { return c.field !== undefined; });
+    } else {
+      cIdx = cols.findIndex(function (c) { return c.field === field; });
+    }
+    if (cIdx === -1) return false;
+    var pageIndex = this._goToDisplayIndex(rowIndex);
+    if (pageIndex === -1) return false;
+    this._scrollRowIntoView(pageIndex);
+    this._renderVisibleRows();
+    this._setFocusedCell(pageIndex, cIdx);
+    this.ensureColumnVisible(cols[cIdx].colId);
+    return true;
+  };
+
+  /** 행 객체가 현재 뷰에 보이도록 페이지 이동 + 세로 스크롤. 뷰에 없으면 false. */
+  DataGrid.prototype.ensureRowVisible = function (row) {
+    var displayIndex = this._displayRows.indexOf(row);
+    var pageIndex = this._goToDisplayIndex(displayIndex);
+    if (pageIndex === -1) return false;
+    this._scrollRowIntoView(pageIndex);
+    this._renderVisibleRows();
+    return true;
+  };
+
+  /** 컬럼이 고정 컬럼에 가리지 않고 보이도록 가로 스크롤. 없거나 숨김이면 false. */
+  DataGrid.prototype.ensureColumnVisible = function (colId) {
+    var cols = this._visibleColumns();
+    var target = null;
+    var x = 0;
+    for (var i = 0; i < cols.length; i++) {
+      if (cols[i].colId === colId || cols[i].field === colId) { target = cols[i]; break; }
+      x += this._computedWidths[cols[i].colId] || 0;
+    }
+    if (!target) return false;
+    if (target.pinned) return true; /* 고정 컬럼은 항상 보인다 */
+    var w = this._computedWidths[target.colId] || 0;
+    var pinnedLeft = 0;
+    var pinnedRight = 0;
+    var self = this;
+    cols.forEach(function (c) {
+      if (c.pinned === 'left') pinnedLeft += self._computedWidths[c.colId] || 0;
+      if (c.pinned === 'right') pinnedRight += self._computedWidths[c.colId] || 0;
+    });
+    var viewLeft = this._bodyEl.scrollLeft + pinnedLeft;
+    var viewRight = this._bodyEl.scrollLeft + this._bodyEl.clientWidth - pinnedRight;
+    if (x < viewLeft) this._bodyEl.scrollLeft = x - pinnedLeft;
+    else if (x + w > viewRight) this._bodyEl.scrollLeft = x + w - this._bodyEl.clientWidth + pinnedRight;
+    return true;
   };
 
   /* ---- editing ---- */
@@ -2399,6 +2487,15 @@
     return buildCsv(this._viewRows, cols);
   };
 
+  /**
+   * 필터·정렬이 적용된 현재 뷰를 JSON 문자열로 반환한다.
+   * 표시 중인 컬럼의 field만 포함하며 값은 원시 데이터(포매터 미적용).
+   */
+  DataGrid.prototype.getJson = function () {
+    var cols = this._visibleColumns().filter(function (c) { return c.field !== undefined; });
+    return JSON.stringify(buildJsonRows(this._viewRows, cols));
+  };
+
   DataGrid.prototype.exportCsv = function (filename) {
     var csv = this.getCsv();
     var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -2487,6 +2584,7 @@
     pageButtonModel: pageButtonModel,
     csvEscape: csvEscape,
     buildCsv: buildCsv,
+    buildJsonRows: buildJsonRows,
     normalizeColumns: normalizeColumns,
     applyColumnState: applyColumnState,
     computeColumnWidths: computeColumnWidths,

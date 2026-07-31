@@ -114,8 +114,9 @@ cellRenderer: DataGrid.renderers.progress()   // 0–100 진행 바
 `setSortModel(model)` / `getSortModel()` · `setGroupBy(fields)` / `getGroupBy()` ·
 `expandAllGroups()` / `collapseAllGroups()` · `setPage(n)` / `setPageSize(n)` ·
 `setColumnVisible(colId, visible)` · `autoSizeColumn(colId)` ·
+`focusCell(rowIndex, field)` / `ensureRowVisible(row)` / `ensureColumnVisible(colId)` ·
 `getState()` / `setState(state)` / `resetState(parts?)` (컬럼·정렬·필터·그룹·페이지 상태 저장/복원) ·
-`getCsv()` / `exportCsv(filename)` · `showLoadingOverlay()` / `hideLoadingOverlay()` ·
+`getCsv()` / `exportCsv(filename)` / `getJson()` · `showLoadingOverlay()` / `hideLoadingOverlay()` ·
 `setTheme('light'|'dark')` · `refresh()` · `destroy()`
 
 ## 이벤트
@@ -125,8 +126,8 @@ grid.on('selectionChanged', function (e) { e.selectedRows });
 grid.on('cellValueChanged', function (e) { e.data, e.colDef, e.oldValue, e.newValue });
 grid.on('sortChanged' | 'filterChanged' | 'paginationChanged' | 'groupChanged' |
         'groupToggled' | 'editingStarted' | 'editingStopped' | 'rowClicked' |
-        'rowDoubleClicked' | 'cellClicked' | 'columnResized' | 'columnMoved' |
-        'stateChanged', fn);
+        'rowDoubleClicked' | 'cellClicked' | 'cellDoubleClicked' | 'columnResized' |
+        'columnMoved' | 'stateChanged', fn);
 
 // 취소 가능 이벤트: e.cancel = true로 저장 거부
 grid.on('beforeCellSave', function (e) { if (e.newValue < 0) e.cancel = true; });

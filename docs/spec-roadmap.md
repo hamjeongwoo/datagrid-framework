@@ -79,7 +79,7 @@
 |---|---|---|---|
 | [x] | **`copy()` / `paste()` / `pasteModel` / `column > copy`** (엑셀 호환 TSV 클립보드) | 선택 행 <kbd>Ctrl+C</kbd> 복사(원시 값, `copy()` 메서드), 포커스 셀에 <kbd>Ctrl+V</kbd> 붙여넣기(`pasteTsv(text)`, editable+validator+beforeCellSave 통과 셀만), `column.suppressCopy` — v1.1.0 | **P1** |
 | [x] | **`saveState()` / `loadState()`** (컬럼 폭·순서·정렬·필터·페이지 저장/복원) | `getState()` / `setState(state)` — JSON 직렬화 가능, `stateChanged` 이벤트 — v1.1.0 | **P1** |
-| [ ] | `exportData({format:'json'\|'html'})` | `getJson()` — 뷰 데이터 JSON 내보내기 | **P1** (쉬움) |
+| [x] | `exportData({format:'json'\|'html'})` | `getJson()` — 뷰 데이터 JSON 문자열 내보내기 (원시 값) — v1.1.0 | **P1** (쉬움) |
 | [ ] | `exportExcel` / `exportData({format:'xlsx'})` | `exportExcel()` — 의존성 없이 가능한 SpreadsheetML/xlsx 최소 구현 검토 | **P2** |
 | [ ] | `beforeExport` 이벤트, `column > exportRender` | `beforeExport`(취소·가공 가능), `column.exportFormatter` | **P2** |
 
@@ -106,11 +106,11 @@
 | | ParamQuery | 제안 API | 우선순위 |
 |---|---|---|---|
 | [ ] | **`selectionModel`** (`type:'cell'`, `type:'block'` — 셀/블록 범위 선택) | `cellSelection: true` — 셀 단위 선택 + 드래그 블록 선택 (클립보드 복사의 기반) | **P2** |
-| [ ] | `focus() · setSelection() · scrollRow() · scrollColumn()` | `focusCell(rowIndex, field)` / `ensureRowVisible(row)` / `ensureColumnVisible(colId)` | **P1** (쉬움) |
+| [x] | `focus() · setSelection() · scrollRow() · scrollColumn()` | `focusCell(rowIndex, field)` / `ensureRowVisible(row)` / `ensureColumnVisible(colId)` — 페이지 이동·스크롤 포함, boolean 반환 — v1.1.0 | **P1** (쉬움) |
 | [ ] | `search()` (찾아서 스크롤+포커스) | `findNext(text)` — 퀵필터와 별개의 탐색 | **P2** |
 | [ ] | `cellRightClick / rowRightClick / headerCellClick` | `cellContextMenu` / `headerClicked` 이벤트 (컨텍스트 메뉴는 소비자 구현) | **P2** |
 | [ ] | `cellKeyDown` | `cellKeyDown` 이벤트 (payload에 `e.originalEvent`) | **P2** |
-| [ ] | `cellDblClick` | `cellDoubleClicked` 이벤트 | **P1** (쉬움) |
+| [x] | `cellDblClick` | `cellDoubleClicked` 이벤트 (payload: data/colDef/value/rowIndex) — v1.1.0 | **P1** (쉬움) |
 | [ ] | `swipeModel` (모바일 킨네틱 스크롤) | 터치 스크롤은 네이티브로 충분 — 필요 시 재검토 | P3 |
 | [ ] | `autofill / fillHandle` (엑셀식 채우기 핸들, 패턴 인식) | 셀 선택 + 편집 위에 `fillHandle: true` | P3 |
 | [ ] | `hoverMode` (`cell` 호버) | 현재 row 호버로 충분 | P3 |

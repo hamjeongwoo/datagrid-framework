@@ -723,6 +723,76 @@
     </script>
   </div>
 
+  <!-- ======================================================== 탐색 API & getJson -->
+  <h2 class="section">Programmatic Navigation &amp; JSON Export</h2>
+  <p class="section-desc">
+    <code class="inline">focusCell(rowIndex, field)</code>는 페이지 이동·스크롤을 포함해 셀에 포커스를 주고,
+    <code class="inline">ensureRowVisible(row)</code> / <code class="inline">ensureColumnVisible(colId)</code>는
+    행·컬럼이 보이도록 스크롤합니다. <code class="inline">getJson()</code>은 필터·정렬이 적용된
+    현재 뷰를 JSON 문자열로 반환하고, 셀 더블클릭은 <code class="inline">cellDoubleClicked</code> 이벤트를 발생시킵니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <input class="tb-input" id="navRowIdx" type="number" value="137" min="0" max="199" style="width:90px">
+        <button class="tb-btn" id="navFocusBtn" type="button">focusCell(n, 'salary')</button>
+        <button class="tb-btn" id="navColBtn" type="button">ensureColumnVisible('note')</button>
+        <button class="tb-btn" id="navJsonBtn" type="button">getJson()</button>
+      </div>
+      <div id="gridNav" class="grid-wrap-sm"></div>
+      <div class="status-line" id="navStatus">
+        행 번호를 입력하고 focusCell을 눌러 보세요 — 페이지를 넘어가며 해당 셀이 포커스됩니다.
+        셀을 더블클릭하면 cellDoubleClicked 페이로드가 표시됩니다.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var rows = DemoData.makeEmployees(200, 29).map(function (r, i) {
+        r.note = 'memo-' + (i + 1);   // 오른쪽 끝 컬럼 (가로 스크롤 확인용)
+        return r;
+      });
+      var grid = new DataGrid(document.getElementById('gridNav'), {
+        rowData: rows,
+        pagination: true,
+        paginationPageSize: 25,
+        columnDefs: [
+          { field: 'id', headerName: 'ID', width: 70, pinned: 'left' },
+          { field: 'name', headerName: 'Name', width: 170 },
+          { field: 'department', headerName: 'Department', width: 160 },
+          { field: 'city', headerName: 'City', width: 150 },
+          { field: 'salary', headerName: 'Salary', dataType: 'number', format: '$#,##0', width: 140 },
+          { field: 'email', headerName: 'Email', width: 230 },
+          { field: 'note', headerName: 'Note', width: 140 },
+        ],
+      });
+
+      var status = document.getElementById('navStatus');
+
+      document.getElementById('navFocusBtn').addEventListener('click', function () {
+        var n = Number(document.getElementById('navRowIdx').value);
+        var ok = grid.focusCell(n, 'salary');
+        status.textContent = ok
+          ? n + '번째 행의 salary 셀로 이동해 포커스했습니다 (페이지 자동 이동).'
+          : 'focusCell 실패 — 인덱스가 뷰 범위(0–' + (grid.getDisplayedRowCount() - 1) + ') 밖입니다.';
+      });
+
+      document.getElementById('navColBtn').addEventListener('click', function () {
+        grid.ensureColumnVisible('note');
+        status.textContent = 'Note 컬럼이 보이도록 가로 스크롤했습니다.';
+      });
+
+      document.getElementById('navJsonBtn').addEventListener('click', function () {
+        var json = grid.getJson();
+        status.textContent = 'getJson(): ' + JSON.parse(json).length + '행, ' +
+          json.length.toLocaleString() + ' bytes — ' + json.slice(0, 70) + '…';
+      });
+
+      grid.on('cellDoubleClicked', function (e) {
+        status.textContent = "cellDoubleClicked: " + e.colDef.field + " = " + e.value +
+          " (row " + e.rowIndex + ", " + e.data.name + ")";
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>
