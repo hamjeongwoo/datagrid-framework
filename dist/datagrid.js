@@ -1759,6 +1759,15 @@
 
     this._emitter.emit('cellClicked', { data: hit.row, colDef: hit.col, value: hit.col && hit.col.field !== undefined ? hit.row[hit.col.field] : undefined });
     this._emitter.emit('rowClicked', { data: hit.row, rowIndex: hit.r });
+
+    /* editOnSingleClick: 클릭 한 번으로 편집 시작 (체크박스 클릭 제외) */
+    if (
+      this.options.editOnSingleClick &&
+      hit.col && hit.col.editable && this._editable &&
+      !e.target.closest('.dg-checkbox')
+    ) {
+      this._startEdit(hit);
+    }
   };
 
   DataGrid.prototype._onCellDblClick = function (e) {
@@ -1944,48 +1953,84 @@
     var row = hit.row;
     var value = row[col.field];
     var cellEl = hit.cellEl;
+    var self = this;
     cellEl.innerHTML = '';
 
-    var editorType = col.editor ||
-      (col.dataType === 'number' || col.filter === 'number' ? 'number' : 'text');
-    var input;
-    if (editorType === 'select') {
-      input = document.createElement('select');
-      (col.editorOptions || []).forEach(function (v) {
-        var opt = document.createElement('option');
-        opt.value = v;
-        opt.textContent = v;
-        input.appendChild(opt);
-      });
-      input.value = value === null || value === undefined ? '' : String(value);
-    } else {
-      input = document.createElement('input');
-      input.type = editorType === 'number' ? 'number' : 'text';
-      input.value = value === null || value === undefined ? '' : String(value);
-    }
-    input.className = 'dg-cell-editor';
-    cellEl.appendChild(input);
-    input.focus();
-    if (input.select) input.select();
+    /* 에디터 준비 — 내장(input/select) 또는 커스텀 객체({ init, getValue, destroy }) */
+    var isCustom = col.editor && typeof col.editor === 'object';
+    var editorType = isCustom ? 'custom'
+      : col.editor || (col.dataType === 'number' || col.filter === 'number' ? 'number' : 'text');
+    var input = null;
+    var invalidEl; /* dg-invalid 표시 대상 */
+    var getValue;
+    var cleanup = null;
 
-    var self = this;
+    if (isCustom) {
+      try {
+        col.editor.init(cellEl, value, row, col);
+      } catch (e) {
+        console.error('[DataGrid] custom editor init failed for "' + col.field + '":', e);
+        this._renderCellValue(cellEl, col, row);
+        return;
+      }
+      cellEl.classList.add('dg-cell-editing');
+      getValue = function () {
+        try { return col.editor.getValue(); }
+        catch (e) {
+          console.error('[DataGrid] custom editor getValue failed for "' + col.field + '":', e);
+          return value;
+        }
+      };
+      cleanup = function () {
+        cellEl.classList.remove('dg-cell-editing');
+        if (col.editor.destroy) {
+          try { col.editor.destroy(); }
+          catch (e) { console.error('[DataGrid] custom editor destroy failed:', e); }
+        }
+      };
+      invalidEl = cellEl;
+      var focusable = cellEl.querySelector('input, select, textarea, [tabindex]');
+      if (focusable) focusable.focus();
+    } else {
+      if (editorType === 'select') {
+        input = document.createElement('select');
+        (col.editorOptions || []).forEach(function (v) {
+          var opt = document.createElement('option');
+          opt.value = v;
+          opt.textContent = v;
+          input.appendChild(opt);
+        });
+        input.value = value === null || value === undefined ? '' : String(value);
+      } else {
+        input = document.createElement('input');
+        input.type = editorType === 'number' ? 'number' : 'text';
+        input.value = value === null || value === undefined ? '' : String(value);
+      }
+      input.className = 'dg-cell-editor';
+      cellEl.appendChild(input);
+      input.focus();
+      if (input.select) input.select();
+      getValue = function () { return input.value; };
+      invalidEl = input;
+    }
+
     var finished = false;
     var markInvalid = function (message) {
-      input.classList.add('dg-invalid');
-      input.setAttribute('aria-invalid', 'true');
-      if (message) input.title = message;
-      input.focus();
+      invalidEl.classList.add('dg-invalid');
+      invalidEl.setAttribute('aria-invalid', 'true');
+      if (message) invalidEl.title = message;
+      if (input) input.focus();
     };
     var clearInvalid = function () {
-      input.classList.remove('dg-invalid');
-      input.removeAttribute('aria-invalid');
-      input.removeAttribute('title');
+      invalidEl.classList.remove('dg-invalid');
+      invalidEl.removeAttribute('aria-invalid');
+      invalidEl.removeAttribute('title');
     };
     /* commit=true 커밋 시도: validator 실패 또는 beforeCellSave 취소면
-     * 편집기를 닫지 않고 유지한다(사용자가 고치거나 Esc로 취소하도록). */
+     * 편집기를 닫지 않고 유지한다. 닫혔으면 true를 반환한다(연속 편집용). */
     var finish = function (commit) {
-      if (finished) return;
-      var newValue = input.value;
+      if (finished) return true;
+      var newValue = getValue();
       var committed = false;
       if (commit) {
         if (editorType === 'number') {
@@ -2001,11 +2046,11 @@
               result = true; /* validator 자체 오류는 편집을 막지 않는다 */
             }
             var message = validationMessage(result);
-            if (message) { markInvalid(message); return; }
+            if (message) { markInvalid(message); return false; }
           }
           var evt = { data: row, colDef: col, oldValue: value, newValue: newValue, cancel: false };
           self._emitter.emit('beforeCellSave', evt);
-          if (evt.cancel) { markInvalid(); return; }
+          if (evt.cancel) { markInvalid(); return false; }
           clearInvalid();
           row[col.field] = evt.newValue;
           newValue = evt.newValue;
@@ -2017,6 +2062,7 @@
       }
       finished = true;
       self._editing = null;
+      if (cleanup) cleanup();
       /* re-render the cell in place */
       cellEl.innerHTML = '';
       self._renderCellValue(cellEl, col, row);
@@ -2027,18 +2073,75 @@
         newValue: committed ? newValue : value,
         committed: committed,
       });
+      return true;
     };
 
-    input.addEventListener('input', clearInvalid);
-    input.addEventListener('keydown', function (e) {
+    /* 연속 편집: 커밋에 성공해 닫힌 경우에만 인접 셀로 이동 */
+    var onKeyDown = function (e) {
       e.stopPropagation();
-      if (e.key === 'Enter') finish(true);
-      else if (e.key === 'Escape') finish(false);
-    });
-    input.addEventListener('blur', function () { finish(true); });
+      if (e.key === 'Enter') {
+        if (finish(true) && self.options.enterMovesDown) self._editNext(hit.r, hit.c, 1, 0);
+      } else if (e.key === 'Tab' && self.options.tabMovesRight) {
+        e.preventDefault();
+        if (finish(true)) self._editNext(hit.r, hit.c, 0, e.shiftKey ? -1 : 1);
+      } else if (e.key === 'Escape') {
+        finish(false);
+      }
+    };
+
+    if (input) {
+      input.addEventListener('input', clearInvalid);
+      input.addEventListener('keydown', onKeyDown);
+      input.addEventListener('blur', function () { finish(true); });
+    } else {
+      cellEl.addEventListener('keydown', onKeyDown);
+      cellEl.addEventListener('focusout', function (e) {
+        if (finished) return;
+        if (e.relatedTarget && cellEl.contains(e.relatedTarget)) return;
+        finish(true);
+      });
+    }
 
     this._editing = { finish: finish, row: row, col: col };
     this._emitter.emit('editingStarted', { data: row, colDef: col, value: value });
+  };
+
+  /**
+   * (r, c)에서 dr/dc 방향으로 다음 편집 가능 셀을 찾아 편집을 시작한다
+   * (연속 편집 — enterMovesDown / tabMovesRight). 가로 이동은 행 끝에서
+   * 다음/이전 행으로 감싼다. 그룹 헤더 행은 건너뛴다.
+   */
+  DataGrid.prototype._editNext = function (r, c, dr, dc) {
+    var cols = this._visibleColumns();
+    var nr = r;
+    var nc = c;
+    var guard = this._pageRows.length * cols.length + 2;
+    while (guard-- > 0) {
+      if (dc !== 0) {
+        nc += dc;
+        if (nc >= cols.length) { nc = 0; nr++; }
+        else if (nc < 0) { nc = cols.length - 1; nr--; }
+      } else {
+        nr += dr;
+      }
+      if (nr < 0 || nr >= this._pageRows.length) return false;
+      var row = this._pageRows[nr];
+      if (!row || row.__group) continue;
+      var col = cols[nc];
+      if (!col || !col.editable || !this._editable || col.field === undefined) {
+        if (dc !== 0) continue;
+        continue; /* 세로 이동: 같은 컬럼이 계속 편집 불가면 다음 행에서 재시도 */
+      }
+      this._scrollRowIntoView(nr);
+      this._renderVisibleRows();
+      var rowEl = this._renderedRows[nr];
+      var cellEl = rowEl && rowEl.querySelector('[data-col-index="' + nc + '"]');
+      if (!cellEl) return false;
+      this._setFocusedCell(nr, nc);
+      this._startEdit({ cellEl: cellEl, r: nr, c: nc, row: row, col: col });
+      return true;
+    }
+    return false;
   };
 
   DataGrid.prototype._cancelEdit = function () {

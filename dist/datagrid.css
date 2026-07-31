@@ -338,6 +338,15 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--dg-invalid-color) 18%, transparent);
 }
 
+/* 커스텀 에디터({ init, getValue, destroy })가 열린 셀 */
+.dg-cell.dg-cell-editing {
+  box-shadow: inset 0 0 0 2px var(--dg-accent-color);
+  overflow: visible;
+}
+.dg-cell.dg-cell-editing.dg-invalid {
+  box-shadow: inset 0 0 0 2px var(--dg-invalid-color);
+}
+
 /* ==========================================================================
    Row grouping + summary rows
    ========================================================================== */

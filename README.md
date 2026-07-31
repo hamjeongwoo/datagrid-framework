@@ -70,6 +70,7 @@ python demo/server.py
 | `rowNumbers` | boolean | 왼쪽 고정 행 번호 컬럼 |
 | `getRowClass(row, index)` | function | 행별 CSS 클래스 |
 | `editable` | boolean | 그리드 전체 편집 잠금 (`false`면 컬럼 설정 무시, `setEditable`로 전환) |
+| `editOnSingleClick` / `enterMovesDown` / `tabMovesRight` | boolean | 클릭 한 번 편집 / Enter·Tab 연속 편집 |
 
 ## 컬럼 정의
 
@@ -85,7 +86,7 @@ python demo/server.py
 | `aggFunc` | `'sum'` \| `'avg'` \| `'min'` \| `'max'` \| `'count'` — 그룹/전체 요약 집계 |
 | `filter` | `'text'` \| `'number'` \| `'set'` (`true` = text) |
 | `editable` | 더블클릭/Enter로 인라인 편집 |
-| `editor` | `'text'` \| `'number'` \| `'select'` (+ `editorOptions`) |
+| `editor` | `'text'` \| `'number'` \| `'select'` (+ `editorOptions`) 또는 `{ init, getValue, destroy }` 커스텀 객체 |
 | `validator(value, row)` | `true` 또는 오류 메시지 반환 — 거부 시 커밋 차단 + 빨간 표시 |
 | `suppressCopy` | 클립보드 복사에서 제외 (CSV에는 영향 없음) |
 | `valueGetter(row)` | 파생 값 계산 — 정렬·필터·내보내기에도 반영 |

@@ -220,6 +220,33 @@ window.ApiDocs = {
             '그룹핑 없이도 사용할 수 있습니다.',
         },
         {
+          name: 'editOnSingleClick',
+          type: 'boolean',
+          default: 'false',
+          since: '1.2.0',
+          description:
+            '클릭 한 번으로 편집을 시작합니다(기본은 더블클릭 또는 <kbd>Enter</kbd>). ' +
+            '체크박스 클릭은 제외됩니다.',
+        },
+        {
+          name: 'enterMovesDown',
+          type: 'boolean',
+          default: 'false',
+          since: '1.2.0',
+          description:
+            '편집 중 <kbd>Enter</kbd>로 커밋하면 같은 컬럼의 아래 행에서 편집을 이어갑니다(연속 편집). ' +
+            '그룹 헤더 행은 건너뛰고, 검증 실패로 커밋되지 않으면 이동하지 않습니다.',
+        },
+        {
+          name: 'tabMovesRight',
+          type: 'boolean',
+          default: 'false',
+          since: '1.2.0',
+          description:
+            '편집 중 <kbd>Tab</kbd>/<kbd>Shift+Tab</kbd>으로 커밋 후 오른쪽/왼쪽의 다음 편집 가능 셀로 이동합니다. ' +
+            '행 끝에서는 다음/이전 행으로 감쌉니다.',
+        },
+        {
           name: 'getRowClass',
           type: '(row, index) => string',
           since: '1.2.0',
@@ -336,6 +363,27 @@ window.ApiDocs = {
             '헤더 메뉴에서 열 수 있는 컬럼 필터 종류. <code>true</code>는 <code>dataType</code>에 맞는 종류' +
             '(number → <code>\'number\'</code>, bool → <code>\'set\'</code>, 그 외 <code>\'text\'</code>)로 해석됩니다. ' +
             '필터 모델 구조는 <a href="#filter-model">Filter Model</a> 섹션 참고.',
+        },
+        {
+          name: 'editor',
+          type: "'text' | 'number' | 'select' | { init, getValue, destroy? }",
+          since: '1.2.0',
+          description:
+            '인라인 에디터. 문자열이면 내장 에디터(<code>\'select\'</code>는 <code>editorOptions</code> 배열 필요), ' +
+            '객체면 커스텀 에디터: <code>init(cellEl, value, row, col)</code>로 UI를 셀에 렌더링하고, ' +
+            '커밋 시 <code>getValue()</code>가 새 값을 반환하며, 닫힐 때 <code>destroy()</code>(선택)가 호출됩니다. ' +
+            '커스텀 에디터에서도 <kbd>Enter</kbd> 커밋 / <kbd>Esc</kbd> 취소 / 포커스 이탈 커밋과 ' +
+            '<code>validator</code>·<code>beforeCellSave</code> 검증이 동일하게 동작합니다. ' +
+            '생략 시 <code>dataType</code>/<code>filter</code>가 number면 숫자, 아니면 텍스트 에디터.',
+          example:
+            "editor: {\n" +
+            "  init: function (cell, value) {\n" +
+            "    this._input = document.createElement('input');\n" +
+            "    this._input.type = 'range'; this._input.value = value;\n" +
+            '    cell.appendChild(this._input); this._input.focus();\n' +
+            '  },\n' +
+            '  getValue: function () { return Number(this._input.value); },\n' +
+            '}',
         },
         {
           name: 'valueGetter',

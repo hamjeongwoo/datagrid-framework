@@ -67,8 +67,8 @@
 | [x] | **`column > validations`**, `validation`, `isValid()` (편집 검증: minLen/maxLen/format/regexp/nonEmpty/gte/lte) | `column.validator(value, row) => true \| '오류 메시지'` — 실패 시 커밋 거부 + 편집기 유지(`--dg-invalid-color` 표시, title 툴팁) — v1.1.0 | **P1** |
 | [x] | **편집 프로그래매틱 제어**: `editCell() · quitEditMode() · saveEditCell() · getEditCell() · isEditableCell()` | `startEdit(row, field)`(페이지 이동·스크롤 포함, 성공 여부 반환) / `stopEdit(commit)` / `isEditing()` — v1.1.0 | **P1** |
 | [x] | 편집 라이프사이클 이벤트: `editorBegin · editorEnd · cellBeforeSave(취소 가능) · cellSave` | `editingStarted` / `editingStopped`(payload에 `committed`) / `beforeCellSave`(`e.cancel = true` 거부, `e.newValue` 수정 가능) — v1.1.0 | **P1** |
-| [ ] | `editModel` (Enter/Tab/화살표로 다음 셀 이동하며 연속 편집, 클릭 한 번 편집) | `editOnSingleClick`, `enterMovesDown`, `tabMovesRight` 옵션 | **P2** |
-| [ ] | 커스텀 에디터 (`column > editor` 함수형: init/getData) | `editor: { init(cell, value), getValue(), destroy() }` 객체 지원 | **P2** |
+| [x] | `editModel` (Enter/Tab/화살표로 다음 셀 이동하며 연속 편집, 클릭 한 번 편집) | `editOnSingleClick`, `enterMovesDown`, `tabMovesRight` 옵션 — 커밋 성공 시에만 이동, 행 끝 줄바꿈 — v1.2.0 | **P2** |
+| [x] | 커스텀 에디터 (`column > editor` 함수형: init/getData) | `editor: { init(cell, value, row, col), getValue(), destroy() }` 객체 지원 — validator·beforeCellSave 동일 적용 — v1.2.0 | **P2** |
 | [ ] | **`trackModel` + `getChanges() · isDirty() · commit() · rollback()`** (변경 추적) | `trackChanges: true` 옵션 + `getChanges()` (added/updated/deleted) / `commitChanges()` / `rollbackChanges()` + dirty 셀 표시 | **P2** |
 | [ ] | `historyModel` + `history({method:'undo'\|'redo'})` | `undo()` / `redo()` + `canUndo()/canRedo()` | **P2** (변경 추적 위에) |
 | [ ] | `change` 이벤트 (행 단위 변경 묶음) | `rowValueChanged` | P3 |

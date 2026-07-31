@@ -898,6 +898,62 @@
     </script>
   </div>
 
+  <!-- ======================================================== 연속 편집 & 커스텀 에디터 -->
+  <h2 class="section">Continuous Editing &amp; Custom Editor</h2>
+  <p class="section-desc">
+    <code class="inline">editOnSingleClick</code>(클릭 한 번 편집) ·
+    <code class="inline">enterMovesDown</code>(Enter로 아래 셀 연속 편집) ·
+    <code class="inline">tabMovesRight</code>(Tab/Shift+Tab으로 좌우 이동, 행 끝에서 줄바꿈) 옵션과,
+    <code class="inline">editor: { init(cell, value, row, col), getValue(), destroy() }</code>
+    커스텀 에디터 객체입니다. Rating 컬럼은 슬라이더 에디터를 씁니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div id="gridEditModel" class="grid-wrap-sm"></div>
+      <div class="status-line" id="editModelStatus">
+        아무 셀이나 클릭하면 즉시 편집 — Enter는 아래로, Tab은 오른쪽으로 이어집니다.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var sliderEditor = {
+        _input: null,
+        init: function (cell, value, row, col) {
+          this._input = document.createElement('input');
+          this._input.type = 'range';
+          this._input.min = '1'; this._input.max = '5'; this._input.step = '0.1';
+          this._input.value = value;
+          this._input.style.width = '100%';
+          cell.appendChild(this._input);
+          this._input.focus();
+        },
+        getValue: function () { return Number(this._input.value); },
+        destroy: function () { this._input = null; },
+      };
+
+      var grid = new DataGrid(document.getElementById('gridEditModel'), {
+        rowData: DemoData.makeEmployees(25, 47),
+        editOnSingleClick: true,
+        enterMovesDown: true,
+        tabMovesRight: true,
+        columnDefs: [
+          { field: 'name', headerName: 'Name', width: 160, editable: true },
+          { field: 'department', headerName: 'Department', width: 150, editable: true,
+            editor: 'select',
+            editorOptions: ['Engineering', 'Design', 'Marketing', 'Sales', 'Finance', 'Support'] },
+          { field: 'salary', headerName: 'Salary', dataType: 'number', format: '$#,##0',
+            width: 130, editable: true },
+          { field: 'rating', headerName: 'Rating (슬라이더)', dataType: 'number', format: '0.0 ★',
+            width: 150, editable: true, editor: sliderEditor },
+        ],
+      });
+
+      grid.on('cellValueChanged', function (e) {
+        document.getElementById('editModelStatus').textContent =
+          e.data.name + '의 ' + e.colDef.field + ': ' + e.oldValue + ' → ' + e.newValue;
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>
