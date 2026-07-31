@@ -105,11 +105,11 @@
 
 | | ParamQuery | 제안 API | 우선순위 |
 |---|---|---|---|
-| [ ] | **`selectionModel`** (`type:'cell'`, `type:'block'` — 셀/블록 범위 선택) | `cellSelection: true` — 셀 단위 선택 + 드래그 블록 선택 (클립보드 복사의 기반) | **P2** |
+| [x] | **`selectionModel`** (`type:'cell'`, `type:'block'` — 셀/블록 범위 선택) | `cellSelection: true` — 드래그/Shift 블록 선택 + `getCellRange()`/`clearCellRange()` + Ctrl+C 블록 복사 + `cellRangeChanged` — v1.2.0 | **P2** |
 | [x] | `focus() · setSelection() · scrollRow() · scrollColumn()` | `focusCell(rowIndex, field)` / `ensureRowVisible(row)` / `ensureColumnVisible(colId)` — 페이지 이동·스크롤 포함, boolean 반환 — v1.1.0 | **P1** (쉬움) |
-| [ ] | `search()` (찾아서 스크롤+포커스) | `findNext(text)` — 퀵필터와 별개의 탐색 | **P2** |
-| [ ] | `cellRightClick / rowRightClick / headerCellClick` | `cellContextMenu` / `headerClicked` 이벤트 (컨텍스트 메뉴는 소비자 구현) | **P2** |
-| [ ] | `cellKeyDown` | `cellKeyDown` 이벤트 (payload에 `e.originalEvent`) | **P2** |
+| [x] | `search()` (찾아서 스크롤+포커스) | `findNext(text)` — 순환 탐색, 퀵필터와 별개 — v1.2.0 | **P2** |
+| [x] | `cellRightClick / rowRightClick / headerCellClick` | `cellContextMenu` / `headerClicked` 이벤트 (컨텍스트 메뉴는 소비자 구현) — v1.2.0 | **P2** |
+| [x] | `cellKeyDown` | `cellKeyDown` 이벤트 (payload에 `originalEvent`) — v1.2.0 | **P2** |
 | [x] | `cellDblClick` | `cellDoubleClicked` 이벤트 (payload: data/colDef/value/rowIndex) — v1.1.0 | **P1** (쉬움) |
 | [ ] | `swipeModel` (모바일 킨네틱 스크롤) | 터치 스크롤은 네이티브로 충분 — 필요 시 재검토 | P3 |
 | [ ] | `autofill / fillHandle` (엑셀식 채우기 핸들, 패턴 인식) | 셀 선택 + 편집 위에 `fillHandle: true` | P3 |

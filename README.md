@@ -73,6 +73,7 @@ python demo/server.py
 | `editOnSingleClick` / `enterMovesDown` / `tabMovesRight` | boolean | 클릭 한 번 편집 / Enter·Tab 연속 편집 |
 | `trackChanges` | boolean | 변경 추적 — dirty 셀 표시 + `getChanges`/`commitChanges`/`rollbackChanges` |
 | `undoRedo` | boolean | Ctrl+Z/Y 실행 취소 스택 (`undo`/`redo`/`canUndo`/`canRedo`) |
+| `cellSelection` | boolean | 셀/블록 범위 선택 (드래그·Shift+화살표, Ctrl+C 블록 복사) |
 
 ## 컬럼 정의
 
@@ -113,7 +114,7 @@ cellRenderer: DataGrid.renderers.progress()   // 0–100 진행 바
 ## API
 
 `setRowData(rows)` · `getRowData()` · `addRow(row)` / `addRows(rows)` · `updateRow(row, changes)` ·
-`removeRows(rows)` / `removeSelectedRows()` · `getSelectedRows()` · `selectAll()` / `deselectAll()` ·
+`removeRows(rows)` / `removeSelectedRows()` · `getSelectedRows()` · `selectAll()` / `deselectAll()` · `getCellRange()` / `clearCellRange()` · `findNext(text)` ·
 `startEdit(row, field)` / `stopEdit(commit)` / `isEditing()` · `setEditable(bool)` / `isEditable()` ·
 `copy()` / `pasteTsv(text)` (Ctrl+C/V 엑셀 호환 TSV) ·
 `getChanges()` / `isDirty()` / `commitChanges()` / `rollbackChanges()` · `undo()` / `redo()` / `canUndo()` / `canRedo()` ·
@@ -134,7 +135,8 @@ grid.on('cellValueChanged', function (e) { e.data, e.colDef, e.oldValue, e.newVa
 grid.on('sortChanged' | 'filterChanged' | 'paginationChanged' | 'groupChanged' |
         'groupToggled' | 'editingStarted' | 'editingStopped' | 'rowClicked' |
         'rowDoubleClicked' | 'cellClicked' | 'cellDoubleClicked' | 'columnResized' |
-        'columnMoved' | 'stateChanged' | 'gridReady' | 'dataChanged' | 'viewRendered', fn);
+        'columnMoved' | 'stateChanged' | 'gridReady' | 'dataChanged' | 'viewRendered' |
+        'cellRangeChanged' | 'cellContextMenu' | 'headerClicked' | 'cellKeyDown', fn);
 
 // 취소 가능 이벤트: e.cancel = true로 동작 거부
 grid.on('beforeCellSave', function (e) { if (e.newValue < 0) e.cancel = true; });

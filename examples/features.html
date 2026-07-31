@@ -1033,6 +1033,68 @@
     </script>
   </div>
 
+  <!-- ======================================================== 셀/블록 선택 & 검색 -->
+  <h2 class="section">Cell / Block Selection &amp; Find</h2>
+  <p class="section-desc">
+    <code class="inline">cellSelection: true</code>는 셀 클릭·드래그·<kbd>Shift</kbd>+클릭/화살표로
+    블록 범위를 선택합니다 — <kbd>Ctrl+C</kbd>는 범위를 그대로 TSV로 복사하고
+    <code class="inline">getCellRange()</code>로 범위를 읽습니다.
+    <code class="inline">findNext(text)</code>는 뷰에서 다음 매치를 찾아 포커스하고(끝에서 처음으로 순환),
+    <code class="inline">cellContextMenu</code> / <code class="inline">headerClicked</code> /
+    <code class="inline">cellKeyDown</code> 이벤트로 상호작용을 확장합니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <input class="tb-input" id="findInput" type="text" placeholder="findNext로 찾을 텍스트… (예: Seoul)" style="min-width:220px">
+        <button class="tb-btn" id="findBtn" type="button">findNext()</button>
+        <button class="tb-btn" id="rangeBtn" type="button">getCellRange()</button>
+      </div>
+      <div id="gridCellSel" class="grid-wrap-sm"></div>
+      <div class="status-line" id="cellSelStatus">
+        셀을 드래그해 블록을 선택하고 Ctrl+C로 복사해 보세요. 우클릭은 cellContextMenu 이벤트를 발생시킵니다.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridCellSel'), {
+        rowData: DemoData.makeEmployees(60, 59),
+        cellSelection: true,
+        columnDefs: [
+          { field: 'name', headerName: 'Name', width: 160 },
+          { field: 'department', headerName: 'Department', width: 150 },
+          { field: 'city', headerName: 'City', width: 130 },
+          { field: 'salary', headerName: 'Salary', dataType: 'number', format: '$#,##0', width: 130 },
+        ],
+      });
+
+      var status = document.getElementById('cellSelStatus');
+
+      document.getElementById('findBtn').addEventListener('click', function () {
+        var text = document.getElementById('findInput').value;
+        var m = grid.findNext(text);
+        status.textContent = m
+          ? "findNext: " + m.rowIndex + "행 " + m.field + " = " + m.data[m.field]
+          : "'" + text + "' 매치 없음";
+      });
+
+      document.getElementById('rangeBtn').addEventListener('click', function () {
+        var r = grid.getCellRange();
+        status.textContent = r
+          ? 'getCellRange: ' + r.rows.length + '행 × ' + r.fields.length + '컬럼 (' + r.fields.join(', ') + ')'
+          : '선택된 범위가 없습니다 — 셀을 드래그해 보세요.';
+      });
+
+      grid.on('cellContextMenu', function (e) {
+        e.originalEvent.preventDefault();   // 브라우저 기본 메뉴 대신
+        status.textContent = 'cellContextMenu: ' + e.colDef.field + ' = ' + e.value +
+          ' — 여기서 커스텀 메뉴를 띄우면 됩니다.';
+      });
+      grid.on('headerClicked', function (e) {
+        status.textContent = 'headerClicked: ' + e.colDef.headerName;
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

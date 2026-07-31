@@ -492,6 +492,30 @@
   }
 
   /**
+   * findNext()의 다음 매치 탐색. rows에는 그룹 헤더 항목이 섞여 있을 수 있다
+   * (건너뜀). cursor: { index, col } 직전 매치 위치 또는 null(처음부터).
+   * 끝에 닿으면 처음으로 감싸서 계속 찾고, 없으면 null.
+   */
+  function findNextMatch(rows, fields, text, cursor) {
+    var needle = String(text || '').toLowerCase();
+    if (!needle || rows.length === 0 || fields.length === 0) return null;
+    var startIndex = cursor ? cursor.index : 0;
+    var startCol = cursor ? cursor.col + 1 : 0;
+    for (var step = 0; step <= rows.length; step++) {
+      var i = (startIndex + step) % rows.length;
+      var row = rows[i];
+      var cFrom = step === 0 ? startCol : 0;
+      if (!row || row.__group) continue;
+      for (var c = cFrom; c < fields.length; c++) {
+        var v = row[fields[c]];
+        if (v === null || v === undefined) continue;
+        if (String(v).toLowerCase().indexOf(needle) !== -1) return { index: i, col: c };
+      }
+    }
+    return null;
+  }
+
+  /**
    * rollbackChanges()의 행 목록 계산: 추가된 행을 제거하고, 삭제된 행을
    * 기록된 인덱스에 다시 끼워 넣는다. 새 배열을 반환한다.
    * deleted: [{ row, index }] — index는 삭제 당시 전체 행 기준 위치.
@@ -713,6 +737,10 @@
     this._lastClickedViewIndex = -1;
     this._focusedCell = null; /* { r, c } page-view coordinates */
     this._editing = null;
+    this._cellSelection = !!options.cellSelection;
+    this._cellRange = null; /* { anchor: {r,c}, focus: {r,c} } page-view coordinates */
+    this._rangeDragging = false;
+    this._findCursor = null;
 
     /* pagination */
     this._pagination = !!options.pagination;
@@ -810,6 +838,44 @@
     this._canvasEl.addEventListener('click', function (e) { self._onCellClick(e); });
     this._canvasEl.addEventListener('dblclick', function (e) { self._onCellDblClick(e); });
     this._rootEl.addEventListener('keydown', function (e) { self._onKeyDown(e); });
+
+    this._canvasEl.addEventListener('contextmenu', function (e) {
+      var hit = self._cellFromEvent(e);
+      if (!hit || !hit.row || hit.row.__group) return;
+      self._emitter.emit('cellContextMenu', {
+        data: hit.row,
+        colDef: hit.col,
+        value: hit.col && hit.col.field !== undefined ? hit.row[hit.col.field] : undefined,
+        rowIndex: hit.r,
+        originalEvent: e, /* 컨텍스트 메뉴를 띄우려면 e.preventDefault() 후 직접 구현 */
+      });
+    });
+
+    /* 셀/블록 선택: mousedown으로 앵커, 드래그로 범위 확장 */
+    if (this._cellSelection) {
+      this._canvasEl.addEventListener('mousedown', function (e) {
+        if (e.button !== 0 || self._editing) return;
+        if (e.target.closest('.dg-checkbox')) return;
+        var hit = self._cellFromEvent(e);
+        if (!hit || !hit.row || hit.row.__group) return;
+        if (e.shiftKey && self._cellRange) {
+          self._setCellRange(self._cellRange.anchor, { r: hit.r, c: hit.c });
+        } else {
+          self._setCellRange({ r: hit.r, c: hit.c }, { r: hit.r, c: hit.c });
+        }
+        self._rangeDragging = true;
+        e.preventDefault(); /* 텍스트 선택 방지 */
+      });
+      this._canvasEl.addEventListener('mouseover', function (e) {
+        if (!self._rangeDragging || !self._cellRange) return;
+        var hit = self._cellFromEvent(e);
+        if (!hit || !hit.row || hit.row.__group) return;
+        self._setCellRange(self._cellRange.anchor, { r: hit.r, c: hit.c });
+      });
+      var endDrag = function () { self._rangeDragging = false; };
+      document.addEventListener('mouseup', endDrag);
+      this._docListeners.push(['mouseup', endDrag]);
+    }
 
     /* Ctrl+V 1차 경로 — 브라우저가 클립보드 내용을 이벤트로 직접 전달 */
     this._rootEl.addEventListener('paste', function (e) {
@@ -955,6 +1021,11 @@
 
       var label = el('span', 'dg-header-cell-label', cell);
       label.textContent = col.headerName;
+
+      cell.addEventListener('click', function (e) {
+        if (e.target.closest('.dg-header-resizer') || e.target.closest('.dg-header-menu-btn') || e.target.closest('.dg-checkbox')) return;
+        self._emitter.emit('headerClicked', { colDef: col });
+      });
 
       if (col.sortable) {
         cell.classList.add('dg-sortable');
@@ -1243,6 +1314,9 @@
       if (this._addedRows.indexOf(row) !== -1) rowEl.classList.add('dg-row-added');
       else if (this._originals) dirtyFields = this._originals.get(row) || null;
     }
+    /* 스크롤로 새로 생성되는 행에도 셀 범위 표시를 적용 */
+    var rangeRect = this._cellSelection ? this._normalizedRange() : null;
+    if (rangeRect && (pageIndex < rangeRect.r1 || pageIndex > rangeRect.r2)) rangeRect = null;
 
     this._visibleColumns().forEach(function (col, cIdx) {
       var cell = el('div', 'dg-cell', rowEl);
@@ -1257,6 +1331,9 @@
       if (dirtyFields && col.field !== undefined && (col.field in dirtyFields)) {
         cell.classList.add('dg-cell-dirty');
         cell.title = 'Original: ' + dirtyFields[col.field];
+      }
+      if (rangeRect && cIdx >= rangeRect.c1 && cIdx <= rangeRect.c2) {
+        cell.classList.add('dg-cell-range');
       }
       if (col.cellClass) {
         var cls = typeof col.cellClass === 'function' ? col.cellClass(row[col.field], row) : col.cellClass;
@@ -1735,6 +1812,91 @@
     this._commitSelection({});
   };
 
+  /* ---- cell / block selection (cellSelection) ---- */
+
+  DataGrid.prototype._setCellRange = function (anchor, focus) {
+    var prev = this._cellRange;
+    this._cellRange = { anchor: anchor, focus: focus };
+    if (!prev || prev.anchor.r !== anchor.r || prev.anchor.c !== anchor.c) {
+      this._setFocusedCell(anchor.r, anchor.c);
+    }
+    this._syncRangeDom();
+    this._emitter.emit('cellRangeChanged', { range: this.getCellRange() });
+  };
+
+  DataGrid.prototype._normalizedRange = function () {
+    if (!this._cellRange) return null;
+    var a = this._cellRange.anchor;
+    var f = this._cellRange.focus;
+    return {
+      r1: Math.min(a.r, f.r), r2: Math.max(a.r, f.r),
+      c1: Math.min(a.c, f.c), c2: Math.max(a.c, f.c),
+    };
+  };
+
+  DataGrid.prototype._syncRangeDom = function () {
+    var range = this._normalizedRange();
+    for (var idx in this._renderedRows) {
+      var rowEl = this._renderedRows[idx];
+      var r = Number(idx);
+      var isGroup = rowEl.classList.contains('dg-group-row');
+      for (var j = 0; j < rowEl.children.length; j++) {
+        var cell = rowEl.children[j];
+        var c = Number(cell.dataset.colIndex);
+        var inRange = !!range && !isGroup &&
+          r >= range.r1 && r <= range.r2 && c >= range.c1 && c <= range.c2;
+        cell.classList.toggle('dg-cell-range', inRange);
+      }
+    }
+  };
+
+  /** 현재 셀 범위(페이지 좌표 정규화 + 대상 컬럼/리프 행)를 반환. 없으면 null. */
+  DataGrid.prototype.getCellRange = function () {
+    var range = this._normalizedRange();
+    if (!range) return null;
+    var cols = this._visibleColumns().slice(range.c1, range.c2 + 1);
+    var rows = [];
+    for (var r = range.r1; r <= range.r2; r++) {
+      var row = this._pageRows[r];
+      if (row && !row.__group) rows.push(row);
+    }
+    return {
+      startRow: range.r1, endRow: range.r2,
+      startCol: range.c1, endCol: range.c2,
+      columns: cols,
+      fields: cols.map(function (c) { return c.field; }).filter(function (f) { return f !== undefined; }),
+      rows: rows,
+    };
+  };
+
+  DataGrid.prototype.clearCellRange = function () {
+    this._cellRange = null;
+    this._syncRangeDom();
+  };
+
+  /* ---- text search (findNext) ---- */
+
+  /**
+   * 현재 뷰(표시 순서)에서 text를 포함하는 다음 셀을 찾아 포커스·스크롤한다.
+   * 같은 텍스트로 다시 호출하면 다음 매치로 이동하고 끝에서 처음으로 감싼다.
+   * 매치가 없으면 null.
+   */
+  DataGrid.prototype.findNext = function (text) {
+    var needle = String(text || '');
+    if (!needle) { this._findCursor = null; return null; }
+    var fields = this._visibleColumns()
+      .map(function (c) { return c.field; })
+      .filter(function (f) { return f !== undefined; });
+    var cursor = this._findCursor && this._findCursor.text === needle.toLowerCase()
+      ? this._findCursor
+      : null;
+    var m = findNextMatch(this._displayRows, fields, needle, cursor);
+    if (!m) { this._findCursor = null; return null; }
+    this._findCursor = { text: needle.toLowerCase(), index: m.index, col: m.col };
+    this.focusCell(m.index, fields[m.col]);
+    return { data: this._displayRows[m.index], field: fields[m.col], rowIndex: m.index };
+  };
+
   /* ---- cell / row interaction ---- */
 
   DataGrid.prototype._cellFromEvent = function (e) {
@@ -1763,8 +1925,9 @@
 
     this._setFocusedCell(hit.r, hit.c);
 
+    /* cellSelection에서는 클릭 행 선택을 끈다 (체크박스 선택은 유지) */
     var mode = this.options.rowSelection;
-    if (mode && !e.target.closest('.dg-checkbox')) {
+    if (mode && !this._cellSelection && !e.target.closest('.dg-checkbox')) {
       var id = this._rowId(hit.row);
       if (mode === 'multiple' && e.shiftKey && this._lastClickedViewIndex !== -1) {
         var from = Math.min(this._lastClickedViewIndex, hit.r);
@@ -1829,6 +1992,32 @@
 
   DataGrid.prototype._onKeyDown = function (e) {
     if (this._editing) return; /* editor handles its own keys */
+
+    if (this._focusedCell) {
+      var fRow = this._pageRows[this._focusedCell.r];
+      var fCol = this._visibleColumns()[this._focusedCell.c];
+      if (fRow && !fRow.__group) {
+        this._emitter.emit('cellKeyDown', {
+          data: fRow, colDef: fCol, rowIndex: this._focusedCell.r, originalEvent: e,
+        });
+      }
+    }
+
+    /* 셀 선택: Shift+화살표로 범위 확장 */
+    if (
+      this._cellSelection && this._cellRange && e.shiftKey &&
+      (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')
+    ) {
+      var focus = this._cellRange.focus;
+      var nr2 = focus.r + (e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0);
+      var nc2 = focus.c + (e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0);
+      nr2 = clamp(nr2, 0, this._pageRows.length - 1);
+      nc2 = clamp(nc2, 0, this._visibleColumns().length - 1);
+      this._setCellRange(this._cellRange.anchor, { r: nr2, c: nc2 });
+      this._scrollRowIntoView(nr2);
+      e.preventDefault();
+      return;
+    }
 
     /* undo/redo: Ctrl/⌘+Z, Ctrl/⌘+Shift+Z 또는 Ctrl/⌘+Y */
     if (this._undoRedo && (e.ctrlKey || e.metaKey)) {
@@ -1908,6 +2097,8 @@
       if (r !== this._focusedCell.r || c !== this._focusedCell.c) {
         this._setFocusedCell(r, c);
         this._scrollRowIntoView(r);
+        /* 셀 선택 모드에서 포커스 이동은 범위를 단일 셀로 리셋 */
+        if (this._cellSelection) this._setCellRange({ r: r, c: c }, { r: r, c: c });
       }
     }
   };
@@ -2251,9 +2442,17 @@
 
   /* ---- clipboard (엑셀 호환 TSV) ---- */
 
-  /** 선택 행(뷰 순서) 또는 포커스 셀을 TSV로 만든다. 대상이 없으면 null. */
+  /** 셀 범위 > 선택 행(뷰 순서) > 포커스 셀 순으로 TSV를 만든다. 대상이 없으면 null. */
   DataGrid.prototype._selectionTsv = function () {
     var self = this;
+
+    /* 셀/블록 범위가 있으면 범위를 그대로 복사 (블록 모양 유지를 위해 suppressCopy 무시) */
+    var range = this._cellRange ? this.getCellRange() : null;
+    if (range && range.rows.length > 0) {
+      var rangeCols = range.columns.filter(function (c) { return c.field !== undefined; });
+      if (rangeCols.length > 0) return buildTsv(range.rows, rangeCols);
+    }
+
     var cols = this._visibleColumns().filter(function (c) {
       return c.field !== undefined && !c.suppressCopy;
     });
@@ -3015,6 +3214,7 @@
     buildJsonRows: buildJsonRows,
     applyValueGetters: applyValueGetters,
     rollbackRows: rollbackRows,
+    findNextMatch: findNextMatch,
     normalizeColumns: normalizeColumns,
     applyColumnState: applyColumnState,
     computeColumnWidths: computeColumnWidths,

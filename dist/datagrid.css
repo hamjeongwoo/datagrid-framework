@@ -33,6 +33,7 @@
   --dg-invalid-color: #e02525;
   --dg-dirty-color: #e07c00;
   --dg-added-row-background-color: rgba(13, 138, 68, 0.08);
+  --dg-range-background-color: rgba(33, 150, 243, 0.14);
   --dg-group-row-background-color: #f3f6fa;
   --dg-group-indent: 20px;
   --dg-floating-filter-height: 36px;
@@ -88,6 +89,7 @@
   --dg-menu-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
   --dg-dirty-color: #ffa940;
   --dg-added-row-background-color: rgba(52, 199, 119, 0.12);
+  --dg-range-background-color: rgba(33, 150, 243, 0.26);
   --dg-group-row-background-color: #22282c;
 }
 
@@ -340,6 +342,14 @@
 .dg-cell-editor.dg-invalid {
   border-color: var(--dg-invalid-color);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--dg-invalid-color) 18%, transparent);
+}
+
+/* 셀/블록 선택 (cellSelection) — background-image로 겹쳐 고정 컬럼 배경 보존 */
+.dg-cell.dg-cell-range {
+  background-image: linear-gradient(
+    var(--dg-range-background-color),
+    var(--dg-range-background-color)
+  );
 }
 
 /* 변경 추적 (trackChanges): dirty 셀 모서리 마커 + 추가 행 배경 */

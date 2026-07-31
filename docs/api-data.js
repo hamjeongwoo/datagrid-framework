@@ -247,6 +247,18 @@ window.ApiDocs = {
             '행 끝에서는 다음/이전 행으로 감쌉니다.',
         },
         {
+          name: 'cellSelection',
+          type: 'boolean',
+          default: 'false',
+          since: '1.2.0',
+          description:
+            '셀/블록 범위 선택 모드. 셀 클릭이 앵커가 되고 드래그·<kbd>Shift</kbd>+클릭·' +
+            '<kbd>Shift</kbd>+화살표로 사각 범위를 확장합니다. <kbd>Ctrl/⌘+C</kbd>는 범위를 TSV로 복사하고 ' +
+            '<a href="#api-methods-getCellRange"><code>getCellRange()</code></a>로 범위를 읽습니다. ' +
+            '이 모드에서는 클릭 행 선택이 꺼지며(체크박스 선택은 유지) 범위가 바뀔 때마다 ' +
+            '<code>cellRangeChanged</code> 이벤트가 발생합니다.',
+        },
+        {
           name: 'trackChanges',
           type: 'boolean',
           default: 'false',
@@ -855,6 +867,31 @@ window.ApiDocs = {
           description: '페이지 크기를 변경합니다. 현재 보고 있던 첫 행이 포함된 페이지로 이동합니다.',
         },
 
+        /* ---- 셀 선택 · 검색 ---- */
+        {
+          name: 'getCellRange',
+          group: 'Selection',
+          signature: 'getCellRange(): CellRange | null',
+          since: '1.2.0',
+          description:
+            '현재 셀/블록 범위를 반환합니다(<code>cellSelection: true</code> 필요): ' +
+            '<code>{ startRow, endRow, startCol, endCol, columns, fields, rows }</code> — ' +
+            '좌표는 페이지 뷰 기준으로 정규화되고 <code>rows</code>는 범위의 리프 행 객체입니다. ' +
+            '<code>clearCellRange()</code>로 해제합니다.',
+        },
+        {
+          name: 'findNext',
+          group: 'Selection',
+          signature: 'findNext(text: string): { data, field, rowIndex } | null',
+          since: '1.2.0',
+          description:
+            '현재 뷰(표시 순서)에서 <code>text</code>를 포함하는 다음 셀을 찾아 페이지 이동·스크롤·포커스합니다. ' +
+            '같은 텍스트로 다시 호출하면 다음 매치로 이어지고 끝에서 처음으로 순환합니다. ' +
+            '퀵 필터와 달리 행을 걸러내지 않고 탐색만 합니다. 매치가 없으면 <code>null</code>.',
+          example:
+            "searchBtn.onclick = function () { grid.findNext(input.value); };",
+        },
+
         /* ---- 변경 추적 ---- */
         {
           name: 'getChanges',
@@ -1208,6 +1245,35 @@ window.ApiDocs = {
           description:
             '<code>setState()</code> 또는 <code>resetState()</code>로 상태가 복원/리셋되었을 때. ' +
             '<code>state</code>는 적용 후의 <code>getState()</code> 결과입니다.',
+        },
+        {
+          name: 'cellRangeChanged',
+          payload: '{ range: CellRange | null }',
+          since: '1.2.0',
+          description:
+            '셀/블록 범위가 바뀔 때(드래그 중 계속). <code>range</code>는 <code>getCellRange()</code> 결과와 같습니다.',
+        },
+        {
+          name: 'cellContextMenu',
+          payload: '{ data, colDef, value, rowIndex, originalEvent }',
+          since: '1.2.0',
+          description:
+            '셀 우클릭 시. 그리드는 기본 메뉴를 막지 않으므로 커스텀 메뉴를 띄우려면 ' +
+            '<code>e.originalEvent.preventDefault()</code> 후 직접 구현하세요.',
+        },
+        {
+          name: 'headerClicked',
+          payload: '{ colDef }',
+          since: '1.2.0',
+          description:
+            '헤더 셀 클릭 시(리사이저·필터 메뉴 버튼 제외). 정렬 동작과 별개로 함께 발생합니다.',
+        },
+        {
+          name: 'cellKeyDown',
+          payload: '{ data, colDef, rowIndex, originalEvent }',
+          since: '1.2.0',
+          description:
+            '셀에 포커스가 있는 상태의 키 입력(편집 중 제외). 그리드 자체 키 처리(화살표·Enter 등)보다 먼저 발생합니다.',
         },
         {
           name: 'gridReady',

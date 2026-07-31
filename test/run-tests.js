@@ -363,6 +363,33 @@ suite('applyValueGetters', function () {
   assertEq(same, [{ x: 1 }], 'no field or no getter → untouched');
 });
 
+/* ---------------- findNextMatch ---------------- */
+suite('findNextMatch', function () {
+  var rows = [
+    { name: 'Alice', city: 'Seoul' },
+    { __group: true, value: 'G' },
+    { name: 'Bob', city: 'Tokyo' },
+    { name: 'Carol', city: 'Seoul' },
+  ];
+  var fields = ['name', 'city'];
+
+  assertEq(T.findNextMatch(rows, fields, 'seoul', null), { index: 0, col: 1 }, 'first match, case-insensitive');
+  assertEq(T.findNextMatch(rows, fields, 'seoul', { index: 0, col: 1 }), { index: 3, col: 1 }, 'continues after cursor, skips group row');
+  assertEq(T.findNextMatch(rows, fields, 'seoul', { index: 3, col: 1 }), { index: 0, col: 1 }, 'wraps to start');
+  assertEq(T.findNextMatch(rows, fields, 'bo', null), { index: 2, col: 0 }, 'substring match');
+  assertEq(T.findNextMatch(rows, fields, 'zzz', null), null, 'no match → null');
+  assertEq(T.findNextMatch(rows, fields, '', null), null, 'empty text → null');
+  assertEq(T.findNextMatch([], fields, 'a', null), null, 'no rows → null');
+  assertEq(T.findNextMatch(rows, [], 'a', null), null, 'no fields → null');
+
+  /* 같은 행의 다음 컬럼부터 이어서 찾는다 */
+  var multi = [{ a: 'xx', b: 'xx' }];
+  assertEq(T.findNextMatch(multi, ['a', 'b'], 'xx', { index: 0, col: 0 }), { index: 0, col: 1 }, 'next column in same row');
+  assertEq(T.findNextMatch(multi, ['a', 'b'], 'xx', { index: 0, col: 1 }), { index: 0, col: 0 }, 'wraps within single row');
+
+  assertEq(T.findNextMatch([{ v: null }, { v: 'ok' }], ['v'], 'ok', null), { index: 1, col: 0 }, 'null values skipped');
+});
+
 /* ---------------- rollbackRows ---------------- */
 suite('rollbackRows', function () {
   var a = { id: 'a' }, b = { id: 'b' }, c = { id: 'c' }, x = { id: 'x' }, y = { id: 'y' };
