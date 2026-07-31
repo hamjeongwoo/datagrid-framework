@@ -152,6 +152,7 @@
 ```bash
 node test/run-tests.js        # 단위 테스트
 node demo/server.js 8087      # 데모 서버 → http://localhost:8087
+python demo/server.py         # Python판 데모 서버 (index.html 브라우저 자동 오픈, --no-open 지원)
 ```
 
 | 확인할 것 | 위치 |

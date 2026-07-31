@@ -34,6 +34,12 @@ AG Grid Design System (Community) — Quartz 테마의 디자인 토큰과 컴�
 node demo/server.js 8087
 ```
 
+Node가 없으면 Python으로도 띄울 수 있습니다 (브라우저 자동 오픈):
+
+```bash
+python demo/server.py
+```
+
 | 페이지 | 내용 |
 |---|---|
 | `index.html` | **Template** — 10,000행 실전 예제 (툴바 · 퀵 필터 · 선택 · 편집 · CSV · 다크 모드) |
