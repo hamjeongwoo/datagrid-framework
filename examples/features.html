@@ -57,63 +57,6 @@
     </script>
   </div>
 
-  <!-- ======================================================== Row grouping -->
-  <h2 class="section">Row Grouping &amp; Aggregation</h2>
-  <p class="section-desc">
-    <code class="inline">groupBy: ['department']</code>로 행을 그룹핑하고, 그룹 헤더 행을 클릭(또는 Enter)해 접고 펼칩니다.
-    <code class="inline">aggFunc: 'sum' | 'avg' | 'min' | 'max' | 'count'</code>를 컬럼에 지정하면
-    그룹 헤더와 <code class="inline">grandTotal</code> 요약 행에 집계값이 표시됩니다.
-    다단계 그룹핑(<code class="inline">['department', 'city']</code>)도 지원합니다.
-  </p>
-  <div class="example-card">
-    <div class="example-html">
-      <div class="toolbar">
-        <select class="tb-input" id="groupSel">
-          <option value="department">Group by: Department</option>
-          <option value="department,city">Group by: Department → City</option>
-          <option value="city">Group by: City</option>
-          <option value="">Group by: (없음)</option>
-        </select>
-        <button class="tb-btn" id="expandAllBtn" type="button">Expand all</button>
-        <button class="tb-btn" id="collapseAllBtn" type="button">Collapse all</button>
-      </div>
-      <div id="gridGroup" class="grid-wrap-md"></div>
-      <div class="status-line" id="groupStatus">그룹 헤더 행을 클릭해 접고 펼쳐 보세요.</div>
-    </div>
-    <script type="text/x-example">
-      var money = function (v) { return '$' + v.toLocaleString(); };
-
-      var grid = new DataGrid(document.getElementById('gridGroup'), {
-        rowData: DemoData.makeEmployees(60, 7),
-        groupBy: ['department'],          // 초기 그룹 필드
-        grandTotal: true,                 // 하단 전체 요약 행
-        columnDefs: [
-          { field: 'name', headerName: 'Name', width: 180 },
-          { field: 'department', headerName: 'Department', width: 150 },
-          { field: 'city', headerName: 'City', width: 130 },
-          { field: 'salary', headerName: 'Salary (sum)', width: 150, align: 'right',
-            aggFunc: 'sum', valueFormatter: money },
-          { field: 'hireDate', headerName: 'Hire Date', width: 130 },
-        ],
-      });
-
-      document.getElementById('groupSel').addEventListener('change', function () {
-        grid.setGroupBy(this.value ? this.value.split(',') : []);
-      });
-      document.getElementById('expandAllBtn').addEventListener('click', function () {
-        grid.expandAllGroups();
-      });
-      document.getElementById('collapseAllBtn').addEventListener('click', function () {
-        grid.collapseAllGroups();
-      });
-
-      grid.on('groupToggled', function (e) {
-        document.getElementById('groupStatus').textContent =
-          '"' + e.value + '" 그룹 ' + (e.expanded ? '펼침' : '접힘');
-      });
-    </script>
-  </div>
-
   <!-- ======================================================== Filters -->
   <h2 class="section">Column Filters</h2>
   <p class="section-desc">
@@ -140,40 +83,6 @@
 
       // 코드로 필터를 적용할 수도 있습니다:
       // grid.applyColumnFilter('salary', { type: 'number', op: 'greaterThan', value: 100000 });
-    </script>
-  </div>
-
-  <!-- ======================================================== Floating filter -->
-  <h2 class="section">Floating Filter (헤더 필터 행)</h2>
-  <p class="section-desc">
-    <code class="inline">floatingFilter: true</code> — 헤더 바로 아래에 컬럼별 인라인 필터 입력을 표시합니다.
-    text/number는 입력하는 대로(250ms 디바운스) 필터링되고, set은 드롭다운으로 단일 값을 고릅니다.
-    필터 메뉴와 같은 필터 모델을 공유하므로 <kbd>Esc</kbd>로 지우거나 메뉴에서 바꾼 내용이 서로 반영됩니다.
-  </p>
-  <div class="example-card">
-    <div class="example-html">
-      <div id="gridFloating" class="grid-wrap-sm"></div>
-      <div class="status-line" id="floatingStatus">헤더 아래 입력란에 바로 입력해 보세요.</div>
-    </div>
-    <script type="text/x-example">
-      var grid = new DataGrid(document.getElementById('gridFloating'), {
-        rowData: DemoData.makeEmployees(80, 11),
-        floatingFilter: true,
-        columnDefs: [
-          { field: 'name', headerName: 'Name', width: 180, filter: 'text' },
-          { field: 'department', headerName: 'Department', width: 170, filter: 'set' },
-          { field: 'city', headerName: 'City', width: 150, filter: 'set' },
-          { field: 'salary', headerName: 'Salary', width: 150, align: 'right',
-            filter: 'number',
-            valueFormatter: function (v) { return '$' + v.toLocaleString(); } },
-        ],
-      });
-
-      grid.on('filterChanged', function () {
-        document.getElementById('floatingStatus').textContent =
-          grid.getDisplayedRowCount().toLocaleString() + '행 표시 중 — 필터 모델: ' +
-          JSON.stringify(grid.getFilterModel());
-      });
     </script>
   </div>
 
@@ -276,87 +185,6 @@
     </script>
   </div>
 
-  <!-- ======================================================== Edit validation -->
-  <h2 class="section">Edit Validation &amp; Programmatic Control</h2>
-  <p class="section-desc">
-    <code class="inline">column.validator(value, row)</code>가 <code class="inline">true</code>가 아닌 값(오류 메시지 문자열)을
-    반환하면 커밋이 거부되고 편집기가 빨간 테두리로 유지됩니다(Esc로 취소).
-    <code class="inline">beforeCellSave</code> 이벤트에서 <code class="inline">e.cancel = true</code>로 저장을 막을 수 있고,
-    <code class="inline">startEdit(row, field)</code> / <code class="inline">stopEdit(commit)</code> /
-    <code class="inline">isEditing()</code>으로 편집을 코드로 제어합니다.
-    편집 수명주기는 <code class="inline">editingStarted</code> / <code class="inline">editingStopped</code>로 관찰합니다.
-  </p>
-  <div class="example-card">
-    <div class="example-html">
-      <div class="toolbar">
-        <button class="tb-btn" id="startEditBtn" type="button">startEdit(첫 행, salary)</button>
-        <button class="tb-btn" id="commitEditBtn" type="button">stopEdit() 커밋</button>
-        <button class="tb-btn" id="cancelEditBtn" type="button">stopEdit(false) 취소</button>
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px">
-          <input type="checkbox" class="dg-checkbox" id="lockSaves"> 모든 저장 잠금 (beforeCellSave 취소)
-        </label>
-      </div>
-      <div id="gridValidate" class="grid-wrap-sm"></div>
-      <div class="status-line" id="validateStatus">
-        Name은 2자 이상, Salary는 0 ~ 1,000,000만 저장됩니다. 셀을 더블클릭해 잘못된 값을 넣어 보세요.
-      </div>
-    </div>
-    <script type="text/x-example">
-      var grid = new DataGrid(document.getElementById('gridValidate'), {
-        rowData: DemoData.makeEmployees(15, 21),
-        columnDefs: [
-          { field: 'name', headerName: 'Name (2자 이상)', width: 190, editable: true,
-            validator: function (v) {
-              return String(v).trim().length >= 2 || '이름은 2자 이상이어야 합니다';
-            } },
-          { field: 'department', headerName: 'Department', width: 160 },
-          { field: 'salary', headerName: 'Salary (0~1,000,000)', width: 190, align: 'right',
-            editable: true, editor: 'number',
-            validator: function (v) {
-              if (v < 0) return '급여는 0 이상이어야 합니다';
-              if (v > 1000000) return '급여는 1,000,000 이하여야 합니다';
-              return true;
-            },
-            valueFormatter: function (v) { return '$' + v.toLocaleString(); } },
-          { field: 'city', headerName: 'City (읽기 전용)', width: 140 },
-        ],
-      });
-
-      var status = document.getElementById('validateStatus');
-      var lockSaves = document.getElementById('lockSaves');
-
-      /* e.cancel = true로 저장 자체를 거부할 수 있습니다 (검증과 별개의 거부권) */
-      grid.on('beforeCellSave', function (e) {
-        if (lockSaves.checked) {
-          e.cancel = true;
-          status.textContent = 'beforeCellSave 취소됨 — 저장 잠금이 켜져 있습니다 (Esc로 편집 종료)';
-        }
-      });
-
-      grid.on('editingStarted', function (e) {
-        status.textContent = '편집 시작: ' + e.colDef.headerName + ' (현재 값: ' + e.value + ')';
-      });
-      grid.on('editingStopped', function (e) {
-        status.textContent = e.committed
-          ? '커밋됨: ' + e.oldValue + ' → ' + e.newValue
-          : '취소됨 (값 유지: ' + e.oldValue + ')';
-      });
-
-      /* 프로그래매틱 제어 */
-      document.getElementById('startEditBtn').addEventListener('click', function () {
-        grid.startEdit(grid.getDisplayedRows()[0], 'salary');
-      });
-      document.getElementById('commitEditBtn').addEventListener('click', function () {
-        if (grid.isEditing()) grid.stopEdit();
-        else status.textContent = '진행 중인 편집이 없습니다 (isEditing() === false)';
-      });
-      document.getElementById('cancelEditBtn').addEventListener('click', function () {
-        if (grid.isEditing()) grid.stopEdit(false);
-        else status.textContent = '진행 중인 편집이 없습니다 (isEditing() === false)';
-      });
-    </script>
-  </div>
-
   <!-- ======================================================== Pagination -->
   <h2 class="section">Pagination</h2>
   <p class="section-desc">
@@ -380,69 +208,6 @@
             valueFormatter: function (v) { return '$' + v.toLocaleString(); } },
           { field: 'hireDate', headerName: 'Hire Date', width: 130 },
         ],
-      });
-    </script>
-  </div>
-
-  <!-- ======================================================== Clipboard -->
-  <h2 class="section">Clipboard Copy &amp; Paste (TSV)</h2>
-  <p class="section-desc">
-    선택한 행을 <kbd>Ctrl+C</kbd>로 엑셀 호환 TSV로 복사하고(선택이 없으면 포커스 셀),
-    포커스 셀을 시작점으로 <kbd>Ctrl+V</kbd>로 붙여넣습니다 — 편집 가능한 셀에만 쓰이고
-    validator·<code class="inline">beforeCellSave</code>를 통과한 값만 반영됩니다.
-    <code class="inline">column.suppressCopy</code>로 복사에서 제외할 컬럼을 지정하고,
-    <code class="inline">copy()</code> / <code class="inline">pasteTsv(text)</code>로 코드에서도 제어합니다.
-  </p>
-  <div class="example-card">
-    <div class="example-html">
-      <div class="toolbar">
-        <button class="tb-btn" id="copyBtn" type="button">copy() — 선택 행 복사</button>
-        <button class="tb-btn" id="pasteBtn" type="button">pasteTsv() — 포커스 셀에 붙여넣기</button>
-      </div>
-      <div id="gridClipboard" class="grid-wrap-sm"></div>
-      <textarea class="tb-input" id="tsvBox" rows="4" style="width:100%;resize:vertical;font-family:ui-monospace,Consolas,monospace;font-size:12.5px"
-        placeholder="copy() 결과가 여기 표시됩니다. 직접 수정하거나 스프레드시트에서 붙여넣은 뒤 pasteTsv()를 눌러 보세요."></textarea>
-      <div class="status-line" id="clipStatus">
-        행을 선택해 Ctrl+C, 셀을 클릭해 포커스한 뒤 Ctrl+V — Email은 suppressCopy라 복사에서 빠집니다.
-      </div>
-    </div>
-    <script type="text/x-example">
-      var grid = new DataGrid(document.getElementById('gridClipboard'), {
-        rowData: DemoData.makeEmployees(15, 31),
-        rowSelection: 'multiple',
-        columnDefs: [
-          { colId: 'sel', headerName: '', width: 48, minWidth: 48,
-            checkboxSelection: true, headerCheckboxSelection: true,
-            sortable: false, resizable: false },
-          { field: 'name', headerName: 'Name', width: 160, editable: true },
-          { field: 'email', headerName: 'Email (suppressCopy)', width: 210, suppressCopy: true },
-          { field: 'department', headerName: 'Department', width: 150, editable: true, editor: 'select',
-            editorOptions: ['Engineering', 'Design', 'Marketing', 'Sales', 'Finance', 'Support'] },
-          { field: 'salary', headerName: 'Salary', width: 130, align: 'right',
-            editable: true, editor: 'number',
-            validator: function (v) { return v >= 0 || '급여는 0 이상이어야 합니다'; },
-            valueFormatter: function (v) { return '$' + v.toLocaleString(); } },
-        ],
-      });
-
-      var tsvBox = document.getElementById('tsvBox');
-      var status = document.getElementById('clipStatus');
-
-      document.getElementById('copyBtn').addEventListener('click', function () {
-        var tsv = grid.copy();   // 클립보드에도 기록됨
-        if (tsv === null) {
-          status.textContent = '복사할 대상이 없습니다 — 행을 선택하거나 셀을 포커스하세요.';
-          return;
-        }
-        tsvBox.value = tsv;
-        status.textContent = tsv.split('\n').length + '행을 TSV로 복사했습니다 (Email 컬럼 제외).';
-      });
-
-      document.getElementById('pasteBtn').addEventListener('click', function () {
-        var n = grid.pasteTsv(tsvBox.value);
-        status.textContent = n > 0
-          ? n + '개 셀이 갱신되었습니다 (편집 가능 + 검증 통과한 셀만).'
-          : '갱신된 셀 없음 — 먼저 셀을 클릭해 붙여넣기 시작점을 포커스하세요.';
       });
     </script>
   </div>
@@ -575,6 +340,241 @@
       });
       document.getElementById('restoreBtn').addEventListener('click', function () {
         grid.setRowData(data);
+      });
+    </script>
+  </div>
+
+  <!-- ======================================================== Row grouping -->
+  <h2 class="section">Row Grouping &amp; Aggregation</h2>
+  <p class="section-desc">
+    <code class="inline">groupBy: ['department']</code>로 행을 그룹핑하고, 그룹 헤더 행을 클릭(또는 Enter)해 접고 펼칩니다.
+    <code class="inline">aggFunc: 'sum' | 'avg' | 'min' | 'max' | 'count'</code>를 컬럼에 지정하면
+    그룹 헤더와 <code class="inline">grandTotal</code> 요약 행에 집계값이 표시됩니다.
+    다단계 그룹핑(<code class="inline">['department', 'city']</code>)도 지원합니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <select class="tb-input" id="groupSel">
+          <option value="department">Group by: Department</option>
+          <option value="department,city">Group by: Department → City</option>
+          <option value="city">Group by: City</option>
+          <option value="">Group by: (없음)</option>
+        </select>
+        <button class="tb-btn" id="expandAllBtn" type="button">Expand all</button>
+        <button class="tb-btn" id="collapseAllBtn" type="button">Collapse all</button>
+      </div>
+      <div id="gridGroup" class="grid-wrap-md"></div>
+      <div class="status-line" id="groupStatus">그룹 헤더 행을 클릭해 접고 펼쳐 보세요.</div>
+    </div>
+    <script type="text/x-example">
+      var money = function (v) { return '$' + v.toLocaleString(); };
+
+      var grid = new DataGrid(document.getElementById('gridGroup'), {
+        rowData: DemoData.makeEmployees(60, 7),
+        groupBy: ['department'],          // 초기 그룹 필드
+        grandTotal: true,                 // 하단 전체 요약 행
+        columnDefs: [
+          { field: 'name', headerName: 'Name', width: 180 },
+          { field: 'department', headerName: 'Department', width: 150 },
+          { field: 'city', headerName: 'City', width: 130 },
+          { field: 'salary', headerName: 'Salary (sum)', width: 150, align: 'right',
+            aggFunc: 'sum', valueFormatter: money },
+          { field: 'hireDate', headerName: 'Hire Date', width: 130 },
+        ],
+      });
+
+      document.getElementById('groupSel').addEventListener('change', function () {
+        grid.setGroupBy(this.value ? this.value.split(',') : []);
+      });
+      document.getElementById('expandAllBtn').addEventListener('click', function () {
+        grid.expandAllGroups();
+      });
+      document.getElementById('collapseAllBtn').addEventListener('click', function () {
+        grid.collapseAllGroups();
+      });
+
+      grid.on('groupToggled', function (e) {
+        document.getElementById('groupStatus').textContent =
+          '"' + e.value + '" 그룹 ' + (e.expanded ? '펼침' : '접힘');
+      });
+    </script>
+  </div>
+
+  <!-- ======================================================== Floating filter -->
+  <h2 class="section">Floating Filter (헤더 필터 행)</h2>
+  <p class="section-desc">
+    <code class="inline">floatingFilter: true</code> — 헤더 바로 아래에 컬럼별 인라인 필터 입력을 표시합니다.
+    text/number는 입력하는 대로(250ms 디바운스) 필터링되고, set은 드롭다운으로 단일 값을 고릅니다.
+    필터 메뉴와 같은 필터 모델을 공유하므로 <kbd>Esc</kbd>로 지우거나 메뉴에서 바꾼 내용이 서로 반영됩니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div id="gridFloating" class="grid-wrap-sm"></div>
+      <div class="status-line" id="floatingStatus">헤더 아래 입력란에 바로 입력해 보세요.</div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridFloating'), {
+        rowData: DemoData.makeEmployees(80, 11),
+        floatingFilter: true,
+        columnDefs: [
+          { field: 'name', headerName: 'Name', width: 180, filter: 'text' },
+          { field: 'department', headerName: 'Department', width: 170, filter: 'set' },
+          { field: 'city', headerName: 'City', width: 150, filter: 'set' },
+          { field: 'salary', headerName: 'Salary', width: 150, align: 'right',
+            filter: 'number',
+            valueFormatter: function (v) { return '$' + v.toLocaleString(); } },
+        ],
+      });
+
+      grid.on('filterChanged', function () {
+        document.getElementById('floatingStatus').textContent =
+          grid.getDisplayedRowCount().toLocaleString() + '행 표시 중 — 필터 모델: ' +
+          JSON.stringify(grid.getFilterModel());
+      });
+    </script>
+  </div>
+
+  <!-- ======================================================== Edit validation -->
+  <h2 class="section">Edit Validation &amp; Programmatic Control</h2>
+  <p class="section-desc">
+    <code class="inline">column.validator(value, row)</code>가 <code class="inline">true</code>가 아닌 값(오류 메시지 문자열)을
+    반환하면 커밋이 거부되고 편집기가 빨간 테두리로 유지됩니다(Esc로 취소).
+    <code class="inline">beforeCellSave</code> 이벤트에서 <code class="inline">e.cancel = true</code>로 저장을 막을 수 있고,
+    <code class="inline">startEdit(row, field)</code> / <code class="inline">stopEdit(commit)</code> /
+    <code class="inline">isEditing()</code>으로 편집을 코드로 제어합니다.
+    편집 수명주기는 <code class="inline">editingStarted</code> / <code class="inline">editingStopped</code>로 관찰합니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn" id="startEditBtn" type="button">startEdit(첫 행, salary)</button>
+        <button class="tb-btn" id="commitEditBtn" type="button">stopEdit() 커밋</button>
+        <button class="tb-btn" id="cancelEditBtn" type="button">stopEdit(false) 취소</button>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px">
+          <input type="checkbox" class="dg-checkbox" id="lockSaves"> 모든 저장 잠금 (beforeCellSave 취소)
+        </label>
+      </div>
+      <div id="gridValidate" class="grid-wrap-sm"></div>
+      <div class="status-line" id="validateStatus">
+        Name은 2자 이상, Salary는 0 ~ 1,000,000만 저장됩니다. 셀을 더블클릭해 잘못된 값을 넣어 보세요.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridValidate'), {
+        rowData: DemoData.makeEmployees(15, 21),
+        columnDefs: [
+          { field: 'name', headerName: 'Name (2자 이상)', width: 190, editable: true,
+            validator: function (v) {
+              return String(v).trim().length >= 2 || '이름은 2자 이상이어야 합니다';
+            } },
+          { field: 'department', headerName: 'Department', width: 160 },
+          { field: 'salary', headerName: 'Salary (0~1,000,000)', width: 190, align: 'right',
+            editable: true, editor: 'number',
+            validator: function (v) {
+              if (v < 0) return '급여는 0 이상이어야 합니다';
+              if (v > 1000000) return '급여는 1,000,000 이하여야 합니다';
+              return true;
+            },
+            valueFormatter: function (v) { return '$' + v.toLocaleString(); } },
+          { field: 'city', headerName: 'City (읽기 전용)', width: 140 },
+        ],
+      });
+
+      var status = document.getElementById('validateStatus');
+      var lockSaves = document.getElementById('lockSaves');
+
+      /* e.cancel = true로 저장 자체를 거부할 수 있습니다 (검증과 별개의 거부권) */
+      grid.on('beforeCellSave', function (e) {
+        if (lockSaves.checked) {
+          e.cancel = true;
+          status.textContent = 'beforeCellSave 취소됨 — 저장 잠금이 켜져 있습니다 (Esc로 편집 종료)';
+        }
+      });
+
+      grid.on('editingStarted', function (e) {
+        status.textContent = '편집 시작: ' + e.colDef.headerName + ' (현재 값: ' + e.value + ')';
+      });
+      grid.on('editingStopped', function (e) {
+        status.textContent = e.committed
+          ? '커밋됨: ' + e.oldValue + ' → ' + e.newValue
+          : '취소됨 (값 유지: ' + e.oldValue + ')';
+      });
+
+      /* 프로그래매틱 제어 */
+      document.getElementById('startEditBtn').addEventListener('click', function () {
+        grid.startEdit(grid.getDisplayedRows()[0], 'salary');
+      });
+      document.getElementById('commitEditBtn').addEventListener('click', function () {
+        if (grid.isEditing()) grid.stopEdit();
+        else status.textContent = '진행 중인 편집이 없습니다 (isEditing() === false)';
+      });
+      document.getElementById('cancelEditBtn').addEventListener('click', function () {
+        if (grid.isEditing()) grid.stopEdit(false);
+        else status.textContent = '진행 중인 편집이 없습니다 (isEditing() === false)';
+      });
+    </script>
+  </div>
+
+  <!-- ======================================================== Clipboard -->
+  <h2 class="section">Clipboard Copy &amp; Paste (TSV)</h2>
+  <p class="section-desc">
+    선택한 행을 <kbd>Ctrl+C</kbd>로 엑셀 호환 TSV로 복사하고(선택이 없으면 포커스 셀),
+    포커스 셀을 시작점으로 <kbd>Ctrl+V</kbd>로 붙여넣습니다 — 편집 가능한 셀에만 쓰이고
+    validator·<code class="inline">beforeCellSave</code>를 통과한 값만 반영됩니다.
+    <code class="inline">column.suppressCopy</code>로 복사에서 제외할 컬럼을 지정하고,
+    <code class="inline">copy()</code> / <code class="inline">pasteTsv(text)</code>로 코드에서도 제어합니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn" id="copyBtn" type="button">copy() — 선택 행 복사</button>
+        <button class="tb-btn" id="pasteBtn" type="button">pasteTsv() — 포커스 셀에 붙여넣기</button>
+      </div>
+      <div id="gridClipboard" class="grid-wrap-sm"></div>
+      <textarea class="tb-input" id="tsvBox" rows="4" style="width:100%;resize:vertical;font-family:ui-monospace,Consolas,monospace;font-size:12.5px"
+        placeholder="copy() 결과가 여기 표시됩니다. 직접 수정하거나 스프레드시트에서 붙여넣은 뒤 pasteTsv()를 눌러 보세요."></textarea>
+      <div class="status-line" id="clipStatus">
+        행을 선택해 Ctrl+C, 셀을 클릭해 포커스한 뒤 Ctrl+V — Email은 suppressCopy라 복사에서 빠집니다.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridClipboard'), {
+        rowData: DemoData.makeEmployees(15, 31),
+        rowSelection: 'multiple',
+        columnDefs: [
+          { colId: 'sel', headerName: '', width: 48, minWidth: 48,
+            checkboxSelection: true, headerCheckboxSelection: true,
+            sortable: false, resizable: false },
+          { field: 'name', headerName: 'Name', width: 160, editable: true },
+          { field: 'email', headerName: 'Email (suppressCopy)', width: 210, suppressCopy: true },
+          { field: 'department', headerName: 'Department', width: 150, editable: true, editor: 'select',
+            editorOptions: ['Engineering', 'Design', 'Marketing', 'Sales', 'Finance', 'Support'] },
+          { field: 'salary', headerName: 'Salary', width: 130, align: 'right',
+            editable: true, editor: 'number',
+            validator: function (v) { return v >= 0 || '급여는 0 이상이어야 합니다'; },
+            valueFormatter: function (v) { return '$' + v.toLocaleString(); } },
+        ],
+      });
+
+      var tsvBox = document.getElementById('tsvBox');
+      var status = document.getElementById('clipStatus');
+
+      document.getElementById('copyBtn').addEventListener('click', function () {
+        var tsv = grid.copy();   // 클립보드에도 기록됨
+        if (tsv === null) {
+          status.textContent = '복사할 대상이 없습니다 — 행을 선택하거나 셀을 포커스하세요.';
+          return;
+        }
+        tsvBox.value = tsv;
+        status.textContent = tsv.split('\n').length + '행을 TSV로 복사했습니다 (Email 컬럼 제외).';
+      });
+
+      document.getElementById('pasteBtn').addEventListener('click', function () {
+        var n = grid.pasteTsv(tsvBox.value);
+        status.textContent = n > 0
+          ? n + '개 셀이 갱신되었습니다 (편집 가능 + 검증 통과한 셀만).'
+          : '갱신된 셀 없음 — 먼저 셀을 클릭해 붙여넣기 시작점을 포커스하세요.';
       });
     </script>
   </div>
