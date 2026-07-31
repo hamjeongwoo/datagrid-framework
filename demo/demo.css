@@ -130,6 +130,18 @@ p.section-desc { color: var(--page-muted); margin: 0 0 14px; max-width: 760px; }
 .tb-btn.primary:hover { background: #1180d8; color: #fff; }
 .tb-btn:disabled { opacity: 0.45; cursor: default; pointer-events: none; }
 
+.tb-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  font-size: 13.5px;
+  color: var(--page-fg);
+  cursor: pointer;
+  user-select: none;
+}
+.tb-check input { accent-color: var(--page-accent); }
+
 .status-line {
   margin-top: 10px;
   color: var(--page-muted);

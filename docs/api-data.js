@@ -20,7 +20,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '1.0.0',
+  version: '1.1.0',
   updated: '2026-07-31',
 
   sections: [
@@ -1053,6 +1053,54 @@ window.ApiDocs = {
           description:
             '<code>setState()</code> 또는 <code>resetState()</code>로 상태가 복원/리셋되었을 때. ' +
             '<code>state</code>는 적용 후의 <code>getState()</code> 결과입니다.',
+        },
+        {
+          name: 'gridReady',
+          payload: '{ rowCount }',
+          since: '1.1.0',
+          description:
+            '초기 렌더링이 끝난 뒤 <strong>1회</strong> 발생합니다. 생성자 반환 직후 등록한 핸들러도 ' +
+            '받을 수 있도록 비동기(다음 태스크)로 발생합니다.',
+          example:
+            "grid.on('gridReady', function (e) { console.log(e.rowCount + ' rows ready'); });",
+        },
+        {
+          name: 'dataChanged',
+          payload: '{ rowCount }',
+          since: '1.1.0',
+          description:
+            '행 데이터 집합이 바뀌었을 때 — <code>setRowData</code> / <code>addRow(s)</code> / ' +
+            '<code>removeRows</code> / <code>updateRow</code>. 개별 셀 편집은 대신 ' +
+            '<code>cellValueChanged</code>가 발생합니다.',
+        },
+        {
+          name: 'viewRendered',
+          payload: '{ displayedRowCount, page }',
+          since: '1.1.0',
+          description:
+            '<code>refresh()</code>가 끝날 때마다(정렬·필터·페이지 이동·데이터 변경 등 모든 전체 렌더 후) 발생합니다. ' +
+            '자주 발생하므로 무거운 작업은 피하세요.',
+        },
+        {
+          name: 'beforeSort',
+          payload: '{ sortModel, cancel }',
+          since: '1.1.0',
+          description:
+            '정렬이 적용되기 직전(헤더 클릭·<code>setSortModel()</code> 모두). ' +
+            '<code>e.sortModel</code>은 적용될 제안 모델이며 핸들러에서 수정할 수 있고, ' +
+            '<code>e.cancel = true</code>면 정렬이 적용되지 않습니다.',
+          example:
+            "grid.on('beforeSort', function (e) {\n" +
+            "  if (locked) e.cancel = true;\n" +
+            '});',
+        },
+        {
+          name: 'beforeSelectionChange',
+          payload: '{ selectedRows, cancel }',
+          since: '1.1.0',
+          description:
+            '행 선택이 바뀌기 직전(클릭·체크박스·전체 선택·<kbd>Space</kbd>·API 모두). ' +
+            '<code>e.selectedRows</code>는 적용될 선택 결과이며, <code>e.cancel = true</code>면 선택이 유지됩니다.',
         },
       ],
     },

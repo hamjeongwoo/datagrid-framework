@@ -119,8 +119,8 @@
 
 | | ParamQuery | 제안 API | 우선순위 |
 |---|---|---|---|
-| [ ] | `create · load · dataReady · render · refresh · complete` 이벤트 | `gridReady` / `dataChanged` / `viewRendered` 3개로 정리 | **P1** (쉬움) |
-| [ ] | **취소 가능한 before 이벤트 패턴** (`beforeSort · beforeTableView · beforeCheck …`) | 이벤트 payload에 `e.cancel = true` 규약 도입 — 우선 `beforeSort` / `beforeCellSave`(✔ v1.1.0에서 규약 도입) / `beforeExport` / `beforeSelectionChange` | **P1** |
+| [x] | `create · load · dataReady · render · refresh · complete` 이벤트 | `gridReady`(초기 1회, 비동기) / `dataChanged`(setRowData·addRows·removeRows·updateRow) / `viewRendered`(모든 refresh 후) — v1.1.0 | **P1** (쉬움) |
+| [x] | **취소 가능한 before 이벤트 패턴** (`beforeSort · beforeTableView · beforeCheck …`) | `e.cancel = true` 규약 — `beforeSort` / `beforeSelectionChange` / `beforeCellSave` 도입(v1.1.0). `beforeExport`는 §2.3 P2에서 | **P1** |
 | [ ] | `refreshCell() / refreshRow() / refreshColumn()` (부분 갱신) | 동일 이름 — 대량 데이터에서 전체 refresh 회피 | **P2** |
 | [ ] | `option(name, value)` (런타임 옵션 변경) | `setOptions({ ... })` — 재생성 없이 주요 옵션 갱신 | **P2** |
 | [ ] | `one(event, fn)` | `once(event, fn)` | P3 |

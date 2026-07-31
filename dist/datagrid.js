@@ -696,6 +696,12 @@
     this._bindEvents();
 
     this.setRowData(options.rowData || []);
+
+    /* gridReady: 생성자 반환 후 핸들러가 등록될 시간을 주기 위해 비동기로 1회 발생 */
+    var self = this;
+    setTimeout(function () {
+      if (!self._destroyed) self._emitter.emit('gridReady', { rowCount: self._rows.length });
+    }, 0);
   }
 
   /* ---- columns (normalize + built-in row number column) ---- */
@@ -867,6 +873,14 @@
     this._renderGrandTotal();
     this._renderPaging();
     this._updateOverlay();
+    this._emitter.emit('viewRendered', {
+      displayedRowCount: this._viewRows.length,
+      page: this._pageInfo ? this._pageInfo.page : 0,
+    });
+  };
+
+  DataGrid.prototype._emitDataChanged = function () {
+    this._emitter.emit('dataChanged', { rowCount: this._rows.length });
   };
 
   /* ---- header ---- */
@@ -1315,6 +1329,16 @@
 
   /* ---- sorting ---- */
 
+  /** 제안된 정렬 모델로 beforeSort(취소 가능)를 거쳐 적용한다. */
+  DataGrid.prototype._applySortModel = function (proposed) {
+    var evt = { sortModel: proposed.slice(), cancel: false };
+    this._emitter.emit('beforeSort', evt);
+    if (evt.cancel) return;
+    this._sortModel = evt.sortModel.slice();
+    this.refresh();
+    this._emitter.emit('sortChanged', { sortModel: this._sortModel.slice() });
+  };
+
   DataGrid.prototype._toggleSort = function (col, additive) {
     if (!col.field) return;
     var existing = this._sortModel.find(function (s) { return s.field === col.field; });
@@ -1323,18 +1347,15 @@
     else if (existing.dir === 'asc') next = 'desc';
     else next = null;
 
-    if (!additive) this._sortModel = [];
-    else this._sortModel = this._sortModel.filter(function (s) { return s.field !== col.field; });
-    if (next) this._sortModel.push({ field: col.field, dir: next });
-
-    this.refresh();
-    this._emitter.emit('sortChanged', { sortModel: this._sortModel.slice() });
+    var proposed = additive
+      ? this._sortModel.filter(function (s) { return s.field !== col.field; })
+      : [];
+    if (next) proposed.push({ field: col.field, dir: next });
+    this._applySortModel(proposed);
   };
 
   DataGrid.prototype.setSortModel = function (model) {
-    this._sortModel = (model || []).slice();
-    this.refresh();
-    this._emitter.emit('sortChanged', { sortModel: this._sortModel.slice() });
+    this._applySortModel((model || []).slice());
   };
 
   DataGrid.prototype.getSortModel = function () { return this._sortModel.slice(); };
@@ -1582,15 +1603,38 @@
 
   /* ---- selection ---- */
 
+  /**
+   * 제안된 선택 상태(next: id → row)를 beforeSelectionChange(취소 가능)를
+   * 거쳐 적용한다. 취소되면 false를 반환하고 아무것도 바꾸지 않는다.
+   */
+  DataGrid.prototype._commitSelection = function (next) {
+    var proposed = [];
+    for (var id in next) proposed.push(next[id]);
+    var evt = { selectedRows: proposed, cancel: false };
+    this._emitter.emit('beforeSelectionChange', evt);
+    if (evt.cancel) return false;
+    this._selection = next;
+    this._syncSelectionDom();
+    this._emitSelection();
+    return true;
+  };
+
   DataGrid.prototype._setRowSelected = function (row, selected, emit) {
     var mode = this.options.rowSelection;
     if (!mode) return;
     var id = this._rowId(row);
-    if (mode === 'single') this._selection = {};
-    if (selected) this._selection[id] = row;
-    else delete this._selection[id];
-    this._syncSelectionDom();
-    if (emit) this._emitSelection();
+    var next = {};
+    if (mode !== 'single') {
+      for (var k in this._selection) next[k] = this._selection[k];
+    }
+    if (selected) next[id] = row;
+    else delete next[id];
+    if (emit) {
+      this._commitSelection(next);
+    } else {
+      this._selection = next;
+      this._syncSelectionDom();
+    }
   };
 
   DataGrid.prototype._syncSelectionDom = function () {
@@ -1622,15 +1666,14 @@
   DataGrid.prototype.selectAll = function () {
     if (this.options.rowSelection !== 'multiple') return;
     var self = this;
-    this._viewRows.forEach(function (row) { self._selection[self._rowId(row)] = row; });
-    this._syncSelectionDom();
-    this._emitSelection();
+    var next = {};
+    for (var k in this._selection) next[k] = this._selection[k];
+    this._viewRows.forEach(function (row) { next[self._rowId(row)] = row; });
+    this._commitSelection(next);
   };
 
   DataGrid.prototype.deselectAll = function () {
-    this._selection = {};
-    this._syncSelectionDom();
-    this._emitSelection();
+    this._commitSelection({});
   };
 
   /* ---- cell / row interaction ---- */
@@ -1667,22 +1710,23 @@
       if (mode === 'multiple' && e.shiftKey && this._lastClickedViewIndex !== -1) {
         var from = Math.min(this._lastClickedViewIndex, hit.r);
         var to = Math.max(this._lastClickedViewIndex, hit.r);
-        if (!e.ctrlKey && !e.metaKey) this._selection = {};
+        var next = {};
+        if (e.ctrlKey || e.metaKey) {
+          for (var k in this._selection) next[k] = this._selection[k];
+        }
         for (var i = from; i <= to; i++) {
           var row = this._pageRows[i];
-          if (row && !row.__group) this._selection[this._rowId(row)] = row;
+          if (row && !row.__group) next[this._rowId(row)] = row;
         }
-        this._syncSelectionDom();
-        this._emitSelection();
+        this._commitSelection(next);
       } else if (mode === 'multiple' && (e.ctrlKey || e.metaKey)) {
         this._setRowSelected(hit.row, !this._selection[id], true);
         this._lastClickedViewIndex = hit.r;
       } else {
         var wasOnlySelected = this._selection[id] && this.getSelectedRows().length === 1;
-        this._selection = {};
-        if (!wasOnlySelected) this._selection[id] = hit.row;
-        this._syncSelectionDom();
-        this._emitSelection();
+        var single = {};
+        if (!wasOnlySelected) single[id] = hit.row;
+        this._commitSelection(single);
         this._lastClickedViewIndex = hit.r;
       }
     }
@@ -2342,6 +2386,7 @@
     this._lastClickedViewIndex = -1;
     this._focusedCell = null;
     this.refresh();
+    this._emitDataChanged();
   };
 
   DataGrid.prototype.getRowData = function () { return this._rows.slice(); };
@@ -2351,6 +2396,7 @@
   DataGrid.prototype.addRows = function (rows) {
     this._rows = this._rows.concat(rows);
     this.refresh();
+    this._emitDataChanged();
   };
   DataGrid.prototype.addRow = function (row) { this.addRows([row]); };
 
@@ -2361,6 +2407,7 @@
     this._rows = this._rows.filter(function (r) { return !ids[self._rowId(r)]; });
     rows.forEach(function (r) { delete self._selection[self._rowId(r)]; });
     this.refresh();
+    this._emitDataChanged();
   };
 
   DataGrid.prototype.removeSelectedRows = function () {
@@ -2371,6 +2418,7 @@
   DataGrid.prototype.updateRow = function (row, changes) {
     for (var k in changes) row[k] = changes[k];
     this.refresh();
+    this._emitDataChanged();
   };
 
   DataGrid.prototype.setColumnVisible = function (colId, visible) {
@@ -2561,7 +2609,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '1.0.0';
+  DataGrid.version = '1.1.0';
 
   /* Internals exposed for headless unit tests (not part of the public API). */
   DataGrid._test = {

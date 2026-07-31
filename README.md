@@ -127,10 +127,12 @@ grid.on('cellValueChanged', function (e) { e.data, e.colDef, e.oldValue, e.newVa
 grid.on('sortChanged' | 'filterChanged' | 'paginationChanged' | 'groupChanged' |
         'groupToggled' | 'editingStarted' | 'editingStopped' | 'rowClicked' |
         'rowDoubleClicked' | 'cellClicked' | 'cellDoubleClicked' | 'columnResized' |
-        'columnMoved' | 'stateChanged', fn);
+        'columnMoved' | 'stateChanged' | 'gridReady' | 'dataChanged' | 'viewRendered', fn);
 
-// 취소 가능 이벤트: e.cancel = true로 저장 거부
+// 취소 가능 이벤트: e.cancel = true로 동작 거부
 grid.on('beforeCellSave', function (e) { if (e.newValue < 0) e.cancel = true; });
+grid.on('beforeSort', function (e) { if (locked) e.cancel = true; });
+grid.on('beforeSelectionChange', function (e) { if (frozen) e.cancel = true; });
 ```
 
 ## 테마 커스터마이징

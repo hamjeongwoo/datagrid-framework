@@ -793,6 +793,67 @@
     </script>
   </div>
 
+  <!-- ======================================================== 라이프사이클 & before 이벤트 -->
+  <h2 class="section">Lifecycle &amp; Cancelable Events</h2>
+  <p class="section-desc">
+    <code class="inline">gridReady</code>(초기 렌더 후 1회) · <code class="inline">dataChanged</code>(행 추가/삭제/교체) ·
+    <code class="inline">viewRendered</code>(모든 refresh 후) 라이프사이클 이벤트와,
+    <code class="inline">e.cancel = true</code>로 동작을 거부하는
+    <code class="inline">beforeSort</code> / <code class="inline">beforeSelectionChange</code> /
+    <code class="inline">beforeCellSave</code> 취소 가능 이벤트 규약입니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <label class="tb-check"><input type="checkbox" id="lcBlockSort"> beforeSort 취소 (정렬 잠금)</label>
+        <label class="tb-check"><input type="checkbox" id="lcBlockSel"> beforeSelectionChange 취소 (선택 잠금)</label>
+        <button class="tb-btn" id="lcAddBtn" type="button">addRow() — dataChanged 확인</button>
+      </div>
+      <div id="gridLifecycle" class="grid-wrap-sm"></div>
+      <div class="status-line" id="lcStatus">이벤트 로그가 여기 표시됩니다.</div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridLifecycle'), {
+        rowData: DemoData.makeEmployees(30, 37),
+        rowSelection: 'multiple',
+        columnDefs: [
+          { field: 'name', headerName: 'Name', width: 170 },
+          { field: 'department', headerName: 'Department', width: 150 },
+          { field: 'salary', headerName: 'Salary', dataType: 'number', format: '$#,##0', width: 130 },
+        ],
+      });
+
+      var status = document.getElementById('lcStatus');
+      var log = function (msg) { status.textContent = msg; };
+
+      grid.on('gridReady', function (e) { log('gridReady — ' + e.rowCount + '행으로 초기화 완료'); });
+      grid.on('viewRendered', function (e) {
+        // 모든 refresh 후 발생 — 너무 시끄러우니 콘솔 대신 최근 이벤트로만 기록
+        status.dataset.lastRender = 'viewRendered(' + e.displayedRowCount + '행)';
+      });
+      grid.on('dataChanged', function (e) { log('dataChanged — 전체 ' + e.rowCount + '행'); });
+      grid.on('sortChanged', function (e) { log('sortChanged — ' + JSON.stringify(e.sortModel)); });
+      grid.on('selectionChanged', function (e) { log('selectionChanged — ' + e.selectedRows.length + '행 선택'); });
+
+      grid.on('beforeSort', function (e) {
+        if (document.getElementById('lcBlockSort').checked) {
+          e.cancel = true;
+          log('beforeSort 취소됨 — 정렬이 적용되지 않았습니다.');
+        }
+      });
+      grid.on('beforeSelectionChange', function (e) {
+        if (document.getElementById('lcBlockSel').checked) {
+          e.cancel = true;
+          log('beforeSelectionChange 취소됨 — 선택이 바뀌지 않았습니다.');
+        }
+      });
+
+      document.getElementById('lcAddBtn').addEventListener('click', function () {
+        grid.addRow({ name: 'New Hire', department: 'Engineering', salary: 50000 });
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>
