@@ -627,6 +627,26 @@ suite('computeMergeContinuation', function () {
   assertEq(M([], 'd'), [], 'empty list');
 });
 
+/* ---------------- computeMergeSpans ---------------- */
+suite('computeMergeSpans', function () {
+  var S = T.computeMergeSpans;
+  assertEq(
+    S([false, true, false, true, false]),
+    [2, 0, 2, 0, 1],
+    'run starts get run length, continuations get 0'
+  );
+  assertEq(S([false, true, true, true]), [4, 0, 0, 0], 'single long run');
+  assertEq(S([false, false, false]), [1, 1, 1], 'no merges → all standalone (span 1)');
+  assertEq(S([false]), [1], 'single row');
+  assertEq(S([]), [], 'empty list');
+  assertEq(
+    S(T.computeMergeContinuation(
+      [{ d: 'A' }, { d: 'A' }, { __group: true }, { d: 'A' }, { d: 'A' }], 'd')),
+    [2, 0, 1, 2, 0],
+    'composes with computeMergeContinuation (group breaks run)'
+  );
+});
+
 /* ---------------- fillSeries ---------------- */
 suite('fillSeries', function () {
   assertEq(T.fillSeries([1, 3], 3), [5, 7, 9], 'arithmetic extrapolation');

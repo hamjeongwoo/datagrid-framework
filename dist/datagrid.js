@@ -673,6 +673,22 @@
   }
 
   /**
+   * mergeCells: 병합 run 시작 위치의 span(묶이는 행 수) 계산.
+   * computeMergeContinuation 결과로부터 유도한다 —
+   * spans[i] = run 시작이면 run 길이(>= 1), 이어지는 셀이면 0.
+   * 시작 셀을 run 전체 높이로 늘려 하나의 병합 셀처럼 그리는 데 쓴다.
+   */
+  function computeMergeSpans(cont) {
+    var spans = new Array(cont.length);
+    var run = 0;
+    for (var i = cont.length - 1; i >= 0; i--) {
+      if (cont[i]) { spans[i] = 0; run++; }
+      else { spans[i] = run + 1; run = 0; }
+    }
+    return spans;
+  }
+
+  /**
    * 채우기 핸들의 연속 값 생성 (엑셀 방식).
    * - 원본이 모두 숫자이고 2개 이상이면 등차 수열로 외삽
    *   ([1, 3] → 5, 7, 9 …, 부동소수 오차는 10자리에서 반올림)
@@ -1542,8 +1558,10 @@
     var fields = this.options.mergeCells;
     if (!fields || fields.length === 0) return;
     this._mergeMap = {};
+    /* _mergeMap[field] = { cont: 이어짐 여부 배열, span: run 시작 셀의 병합 행 수 } */
     for (var i = 0; i < fields.length; i++) {
-      this._mergeMap[fields[i]] = computeMergeContinuation(this._pageRows, fields[i]);
+      var cont = computeMergeContinuation(this._pageRows, fields[i]);
+      this._mergeMap[fields[i]] = { cont: cont, span: computeMergeSpans(cont) };
     }
   };
 
@@ -2182,13 +2200,24 @@
       }
       self._applyCellLayout(cell, col.colId);
 
-      /* mergeCells: 이전 행과 같은 값이면 값 숨김 + 경계선 제거로 병합 표현 */
-      if (
-        self._mergeMap && col.field !== undefined &&
-        self._mergeMap[col.field] && self._mergeMap[col.field][pageIndex]
-      ) {
+      /* mergeCells: run 시작 셀을 run 전체 높이로 늘려 하나의 병합 셀처럼 그리고
+       * (값 세로 중앙, 불투명 배경이 아래 행들을 덮음), 이어지는 셀은 값 없이
+       * 시작 셀 아래에 숨긴다. 시작 행이 렌더 창(버퍼) 밖으로 나가면 이어지는
+       * 셀만 남는데, 그때는 기존처럼 경계선만 지운 빈 셀로 폴백된다. */
+      var mergeInfo =
+        self._mergeMap && col.field !== undefined ? self._mergeMap[col.field] : null;
+      if (mergeInfo && mergeInfo.cont[pageIndex]) {
         cell.classList.add('dg-cell-merged');
         return;
+      }
+      if (mergeInfo && mergeInfo.span[pageIndex] > 1) {
+        cell.classList.add('dg-cell-merge-start');
+        var mergeEnd = pageIndex + mergeInfo.span[pageIndex];
+        var mergeBottom = mergeEnd < self._pageRows.length
+          ? self._rowTop(mergeEnd)
+          : (self._rowTops ? self._totalRowsHeight : mergeEnd * self._rowHeight);
+        /* -1px: run 마지막 행의 아래 경계선은 남긴다 */
+        cell.style.height = (mergeBottom - self._rowTop(pageIndex) - 1) + 'px';
       }
 
       if (col.__rowNumber) {
@@ -4435,6 +4464,7 @@
     findNextMatch: findNextMatch,
     fillSeries: fillSeries,
     computeMergeContinuation: computeMergeContinuation,
+    computeMergeSpans: computeMergeSpans,
     buildGroupHeaderRuns: buildGroupHeaderRuns,
     buildDataSourceRequest: buildDataSourceRequest,
     parseDataSourceResponse: parseDataSourceResponse,

@@ -475,7 +475,8 @@
 /* 컬럼 가상화 (virtualX): 창 밖 컬럼을 대신하는 폭 스페이서 */
 .dg-cell.dg-colspacer { padding: 0; }
 
-/* 셀 병합 (mergeCells): 이어지는 셀은 값 없이 위 경계선만 지운다 */
+/* 셀 병합 (mergeCells): 이어지는 셀은 값 없이 위 경계선만 지운다
+   (run 시작 행이 렌더 창 밖일 때의 폴백 겸용) */
 .dg-cell.dg-cell-merged:not(.dg-pinned-left):not(.dg-pinned-right) { position: relative; }
 .dg-cell.dg-cell-merged::before {
   content: '';
@@ -487,6 +488,20 @@
   background: var(--dg-background-color);
 }
 .dg-zebra .dg-row-odd .dg-cell-merged::before { background: var(--dg-odd-row-background-color); }
+
+/* 병합 run의 시작 셀: JS가 run 전체 높이를 인라인으로 지정한다.
+   불투명 배경 + z-index 1로 아래 행들(불투명 배경, DOM append 순서 무관)을 덮어
+   하나의 셀처럼 보이게 한다. 고정 컬럼(z-index 3)보다는 아래.
+   값은 .dg-cell의 flex 정렬로 자동 세로 중앙. */
+.dg-cell.dg-cell-merge-start:not(.dg-pinned-left):not(.dg-pinned-right) {
+  position: relative;
+  z-index: 1;
+}
+.dg-cell.dg-cell-merge-start {
+  align-self: flex-start;
+  background: var(--dg-background-color);
+  border-bottom: 1px solid var(--dg-row-border-color);
+}
 
 /* 채우기 핸들 (fillHandle) */
 .dg-cell-fill-anchor { position: relative; }
