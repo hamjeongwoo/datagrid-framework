@@ -75,6 +75,8 @@ python demo/server.py
 | `undoRedo` | boolean | Ctrl+Z/Y 실행 취소 스택 (`undo`/`redo`/`canUndo`/`canRedo`) |
 | `cellSelection` | boolean | 셀/블록 범위 선택 (드래그·Shift+화살표, Ctrl+C 블록 복사) |
 | `columnGroups` | array | 2단 컬럼 그룹 헤더 `[{ headerName, children }]` |
+| `dataSource` | object | 원격 데이터 `{ url, method, params, parse }` (`reloadData()`로 재요청) |
+| `sortMode` / `filterMode` / `pageMode` | `'client'` \| `'server'` | 각 축의 처리 주체 — server면 상태를 요청 파라미터로 전달 |
 
 ## 컬럼 정의
 

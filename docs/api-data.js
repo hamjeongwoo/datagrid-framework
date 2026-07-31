@@ -247,6 +247,37 @@ window.ApiDocs = {
             '행 끝에서는 다음/이전 행으로 감쌉니다.',
         },
         {
+          name: 'dataSource',
+          type: '{ url, method?, params?, parse? }',
+          since: '1.2.0',
+          description:
+            '원격 데이터 소스. <code>fetch</code>로 <code>url</code>을 호출해 행을 불러옵니다. ' +
+            '<code>method</code> 기본은 GET(파라미터를 쿼리스트링으로, POST면 JSON body로), ' +
+            '<code>params</code>는 항상 포함할 고정 파라미터(객체 또는 함수), ' +
+            '<code>parse(json)</code>은 응답을 <code>{ rows, total }</code>로 바꾸는 훅입니다' +
+            '(기본: 배열 또는 <code>{ rows, total }</code> 그대로). ' +
+            '로딩 중 오버레이가 표시되고 실패 시 <code>dataLoadError</code> 이벤트가 발생합니다. ' +
+            '<code>reloadData()</code>로 다시 불러옵니다.',
+          example:
+            "dataSource: {\n" +
+            "  url: '/api/employees',\n" +
+            "  params: function () { return { token: auth.token }; },\n" +
+            '},\n' +
+            "sortMode: 'server', pageMode: 'server', pagination: true",
+        },
+        {
+          name: 'sortMode',
+          type: "'client' | 'server'",
+          default: "'client'",
+          since: '1.2.0',
+          description:
+            '정렬 수행 주체. <code>\'server\'</code>면 클라이언트 정렬을 건너뛰고 정렬이 바뀔 때마다 ' +
+            '<code>dataSource</code>를 다시 호출하며 <code>sort</code> 파라미터(sortModel JSON)를 보냅니다. ' +
+            '<code>filterMode</code>(<code>filter</code>/<code>quickFilter</code> 파라미터)와 ' +
+            '<code>pageMode</code>(<code>page</code>/<code>pageSize</code> 파라미터, 응답 <code>total</code>로 ' +
+            '페이지네이션 계산)도 같은 방식입니다. 세 축을 독립적으로 설정할 수 있습니다.',
+        },
+        {
           name: 'columnGroups',
           type: '{ headerName: string, children: string[] }[]',
           since: '1.2.0',
@@ -702,6 +733,16 @@ window.ApiDocs = {
           group: 'Data',
           signature: 'getDisplayedRowCount(): number',
           description: '현재 뷰의 행 수를 반환합니다.',
+        },
+        {
+          name: 'reloadData',
+          group: 'Data',
+          signature: 'reloadData(): void',
+          since: '1.2.0',
+          description:
+            '<code>dataSource</code>에서 데이터를 다시 불러옵니다. server 모드인 축의 현재 상태' +
+            '(페이지·정렬·필터)가 요청 파라미터로 전달되고, 응답이 오면 행을 교체하고 ' +
+            '<code>dataChanged</code>를 발생시킵니다. 여러 요청이 겹치면 마지막 요청만 반영됩니다.',
         },
         {
           name: 'addRow',
@@ -1290,6 +1331,14 @@ window.ApiDocs = {
           since: '1.2.0',
           description:
             '셀에 포커스가 있는 상태의 키 입력(편집 중 제외). 그리드 자체 키 처리(화살표·Enter 등)보다 먼저 발생합니다.',
+        },
+        {
+          name: 'dataLoadError',
+          payload: '{ error }',
+          since: '1.2.0',
+          description:
+            '<code>dataSource</code> 로드가 실패했을 때(네트워크 오류, HTTP 에러 상태). ' +
+            '콘솔에도 기록되며 기존 행은 유지됩니다.',
         },
         {
           name: 'gridReady',

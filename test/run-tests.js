@@ -363,6 +363,68 @@ suite('applyValueGetters', function () {
   assertEq(same, [{ x: 1 }], 'no field or no getter → untouched');
 });
 
+/* ---------------- buildDataSourceRequest / parseDataSourceResponse ---------------- */
+suite('dataSource request/response', function () {
+  var state = {
+    pagination: true,
+    page: 2,
+    pageSize: 25,
+    sortModel: [{ field: 'name', dir: 'asc' }],
+    filterModel: { city: { type: 'text', op: 'contains', value: 'Seo' } },
+    quickFilter: 'kim',
+    sortMode: 'server',
+    filterMode: 'server',
+    pageMode: 'server',
+  };
+
+  var req = T.buildDataSourceRequest({ url: '/api/emp' }, state);
+  assertEq(req.method, 'GET', 'default method GET');
+  assert(req.url.indexOf('/api/emp?') === 0, 'query string appended');
+  assert(req.url.indexOf('page=2') !== -1 && req.url.indexOf('pageSize=25') !== -1, 'server paging params');
+  assert(req.url.indexOf('sort=') !== -1, 'server sort param');
+  assert(req.url.indexOf('filter=') !== -1 && req.url.indexOf('quickFilter=kim') !== -1, 'server filter params');
+  assert(req.body === null, 'GET has no body');
+
+  var clientState = {
+    pagination: true, page: 2, pageSize: 25,
+    sortModel: state.sortModel, filterModel: state.filterModel, quickFilter: 'kim',
+    sortMode: 'client', filterMode: 'client', pageMode: 'client',
+  };
+  var req2 = T.buildDataSourceRequest({ url: '/api/emp' }, clientState);
+  assertEq(req2.url, '/api/emp', 'client modes send no state params');
+
+  var req3 = T.buildDataSourceRequest(
+    { url: '/api/emp', method: 'post', params: { dept: 'eng' } },
+    state
+  );
+  assertEq(req3.method, 'POST', 'method uppercased');
+  assertEq(req3.url, '/api/emp', 'POST keeps url clean');
+  var body = JSON.parse(req3.body);
+  assertEq(body.dept, 'eng', 'static params merged');
+  assertEq(body.page, 2, 'state params in body');
+
+  var req4 = T.buildDataSourceRequest(
+    { url: '/api/emp?v=1', params: function () { return { token: 'abc' }; } },
+    clientState
+  );
+  assert(req4.url.indexOf('/api/emp?v=1&token=abc') === 0, 'function params + existing query string');
+
+  var emptySort = T.buildDataSourceRequest({ url: '/x' }, {
+    pagination: false, sortModel: [], filterModel: {}, quickFilter: '',
+    sortMode: 'server', filterMode: 'server', pageMode: 'server',
+  });
+  assertEq(emptySort.url, '/x', 'empty sort/filter omitted from params');
+
+  assertEq(T.parseDataSourceResponse([{ a: 1 }]), { rows: [{ a: 1 }], total: 1 }, 'bare array response');
+  assertEq(
+    T.parseDataSourceResponse({ rows: [{ a: 1 }], total: 99 }),
+    { rows: [{ a: 1 }], total: 99 },
+    '{rows, total} response'
+  );
+  assertEq(T.parseDataSourceResponse({ rows: [{}] }), { rows: [{}], total: 1 }, 'total defaults to rows.length');
+  assertEq(T.parseDataSourceResponse(null), { rows: [], total: 0 }, 'malformed response → empty');
+});
+
 /* ---------------- buildGroupHeaderRuns ---------------- */
 suite('buildGroupHeaderRuns', function () {
   var cols = [

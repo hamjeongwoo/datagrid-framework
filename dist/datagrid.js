@@ -492,6 +492,55 @@
   }
 
   /**
+   * dataSource + 현재 그리드 상태 → fetch 요청 스펙 { url, method, body }.
+   * GET이면 파라미터를 쿼리스트링으로, 그 외에는 JSON body로 보낸다.
+   * server 모드인 축의 상태만 파라미터에 포함된다:
+   *   page/pageSize(pageMode) · sort(sortModel JSON, sortMode) ·
+   *   filter(filterModel JSON)/quickFilter(filterMode)
+   */
+  function buildDataSourceRequest(dataSource, state) {
+    var params = {};
+    var base = typeof dataSource.params === 'function' ? dataSource.params() : dataSource.params;
+    for (var k in base || {}) params[k] = base[k];
+    if (state.pageMode === 'server' && state.pagination) {
+      params.page = state.page;
+      params.pageSize = state.pageSize;
+    }
+    if (state.sortMode === 'server' && state.sortModel && state.sortModel.length > 0) {
+      params.sort = JSON.stringify(state.sortModel);
+    }
+    if (state.filterMode === 'server') {
+      var hasFilter = false;
+      for (var f in state.filterModel || {}) { hasFilter = true; break; }
+      if (hasFilter) params.filter = JSON.stringify(state.filterModel);
+      if (state.quickFilter) params.quickFilter = state.quickFilter;
+    }
+    var method = (dataSource.method || 'GET').toUpperCase();
+    var url = dataSource.url;
+    var body = null;
+    if (method === 'GET') {
+      var qs = Object.keys(params)
+        .map(function (key) { return encodeURIComponent(key) + '=' + encodeURIComponent(params[key]); })
+        .join('&');
+      if (qs) url += (url.indexOf('?') === -1 ? '?' : '&') + qs;
+    } else {
+      body = JSON.stringify(params);
+    }
+    return { url: url, method: method, body: body };
+  }
+
+  /**
+   * 원격 응답 해석 기본값: 배열이면 그대로, 아니면 { rows, total }를 기대한다.
+   * 항상 { rows: [], total: n } 형태로 정규화한다.
+   */
+  function parseDataSourceResponse(json) {
+    if (Array.isArray(json)) return { rows: json, total: json.length };
+    var rows = json && Array.isArray(json.rows) ? json.rows : [];
+    var total = json && typeof json.total === 'number' ? json.total : rows.length;
+    return { rows: rows, total: total };
+  }
+
+  /**
    * columnGroups 옵션 → 그룹 헤더 행의 스팬 목록.
    * 표시 컬럼 순서를 따라가며 같은 그룹의 연속 컬럼을 하나의 스팬으로 묶는다.
    * 그룹이 없는 연속 컬럼도 빈 스팬 하나로 합친다. 고정(pinned) 상태가 다르면
@@ -792,12 +841,20 @@
     this._redoStack = [];
     this._historyMuted = false;
 
+    /* remote data source */
+    this._sortMode = options.sortMode === 'server' ? 'server' : 'client';
+    this._filterMode = options.filterMode === 'server' ? 'server' : 'client';
+    this._pageMode = options.pageMode === 'server' ? 'server' : 'client';
+    this._serverTotal = 0;
+    this._loadSeq = 0;
+
     this._pasteCount = 0; /* paste 이벤트/클립보드 API 폴백의 이중 실행 방지용 */
     this._docListeners = [];
     this._buildDom();
     this._bindEvents();
 
     this.setRowData(options.rowData || []);
+    if (options.dataSource) this.reloadData();
 
     /* gridReady: 생성자 반환 후 핸들러가 등록될 시간을 주기 위해 비동기로 1회 발생 */
     var self = this;
@@ -973,9 +1030,15 @@
       .filter(Boolean);
 
     applyValueGetters(this._rows, this._columns);
-    var rows = filterRows(this._rows, this._filterModel);
-    rows = quickFilterRows(rows, this._quickFilter, fields);
-    rows = sortRows(rows, this._sortModel, comparators);
+    /* server 모드인 축은 서버가 이미 처리했으므로 클라이언트 단계를 건너뛴다 */
+    var rows = this._rows.slice();
+    if (this._filterMode !== 'server') {
+      rows = filterRows(rows, this._filterModel);
+      rows = quickFilterRows(rows, this._quickFilter, fields);
+    }
+    if (this._sortMode !== 'server') {
+      rows = sortRows(rows, this._sortModel, comparators);
+    }
     this._viewRows = rows;
 
     /* 그룹핑: 리프 행(_viewRows)과 그룹 헤더가 섞인 표시 리스트(_displayRows)를 분리.
@@ -992,10 +1055,29 @@
     this._displayRows = display;
 
     if (this._pagination) {
-      var info = paginate(display.length, this._pageSize, this._currentPage);
-      this._currentPage = info.page;
-      this._pageInfo = info;
-      this._pageRows = display.slice(info.start, info.end);
+      if (this._pageMode === 'server') {
+        /* 서버 페이징: 현재 rows가 곧 한 페이지. 총계는 서버 응답 기준 */
+        var total = this._serverTotal;
+        var pageCount = Math.max(1, Math.ceil(total / this._pageSize));
+        var page = clamp(this._currentPage, 0, pageCount - 1);
+        this._currentPage = page;
+        var start = page * this._pageSize;
+        this._pageInfo = {
+          page: page,
+          pageCount: pageCount,
+          start: start,
+          end: start + display.length,
+          firstRow: total === 0 ? 0 : start + 1,
+          lastRow: start + display.length,
+          total: total,
+        };
+        this._pageRows = display;
+      } else {
+        var info = paginate(display.length, this._pageSize, this._currentPage);
+        this._currentPage = info.page;
+        this._pageInfo = info;
+        this._pageRows = display.slice(info.start, info.end);
+      }
     } else {
       this._pageInfo = null;
       this._pageRows = display;
@@ -1553,6 +1635,7 @@
     this._sortModel = evt.sortModel.slice();
     this.refresh();
     this._emitter.emit('sortChanged', { sortModel: this._sortModel.slice() });
+    if (this._sortMode === 'server') this.reloadData();
   };
 
   DataGrid.prototype._toggleSort = function (col, additive) {
@@ -1712,6 +1795,7 @@
     this._currentPage = 0;
     this.refresh();
     this._emitter.emit('filterChanged', { filterModel: this.getFilterModel() });
+    if (this._filterMode === 'server') this.reloadData();
   };
 
   DataGrid.prototype.getFilterModel = function () {
@@ -1726,6 +1810,7 @@
     this._currentPage = 0;
     this.refresh();
     this._emitter.emit('filterChanged', { filterModel: {} });
+    if (this._filterMode === 'server') this.reloadData();
   };
 
   DataGrid.prototype.setQuickFilter = function (text) {
@@ -1733,6 +1818,7 @@
     this._currentPage = 0;
     this.refresh();
     this._emitter.emit('filterChanged', { filterModel: this.getFilterModel(), quickFilter: this._quickFilter });
+    if (this._filterMode === 'server') this.reloadData();
   };
 
   /* ---- row grouping ---- */
@@ -2808,6 +2894,7 @@
     this.refresh();
     this._bodyEl.scrollTop = 0;
     this._emitter.emit('paginationChanged', { page: this._currentPage, pageSize: this._pageSize });
+    if (this._pageMode === 'server') this.reloadData();
   };
 
   DataGrid.prototype.setPageSize = function (size) {
@@ -2817,6 +2904,7 @@
     this._currentPage = Math.floor(firstVisible / size);
     this.refresh();
     this._emitter.emit('paginationChanged', { page: this._currentPage, pageSize: this._pageSize });
+    if (this._pageMode === 'server') this.reloadData();
   };
 
   /* ---- overlays ---- */
@@ -2840,6 +2928,72 @@
   DataGrid.prototype.hideLoadingOverlay = function () {
     this._loading = false;
     this._updateOverlay();
+  };
+
+  /* ---- remote data source ---- */
+
+  /**
+   * dataSource에서 데이터를 (다시) 불러온다. server 모드인 축의 현재 상태
+   * (페이지·정렬·필터)가 요청 파라미터로 전달되고, 응답이 도착하면
+   * 행을 교체하고 refresh한다. 경합은 마지막 요청만 반영한다.
+   */
+  DataGrid.prototype.reloadData = function () {
+    var ds = this.options.dataSource;
+    if (!ds || !ds.url || typeof fetch === 'undefined') return;
+    var self = this;
+    var req = buildDataSourceRequest(ds, {
+      pagination: this._pagination,
+      page: this._currentPage,
+      pageSize: this._pageSize,
+      sortModel: this._sortModel,
+      filterModel: this.getFilterModel(),
+      quickFilter: this._quickFilter,
+      sortMode: this._sortMode,
+      filterMode: this._filterMode,
+      pageMode: this._pageMode,
+    });
+    var opts = { method: req.method };
+    if (req.body !== null) {
+      opts.headers = { 'Content-Type': 'application/json' };
+      opts.body = req.body;
+    }
+    this.showLoadingOverlay();
+    var seq = ++this._loadSeq;
+    fetch(req.url, opts)
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + r.statusText);
+        return r.json();
+      })
+      .then(function (json) {
+        if (self._destroyed || seq !== self._loadSeq) return;
+        var parsed;
+        if (ds.parse) {
+          try { parsed = ds.parse(json); }
+          catch (e) {
+            console.error('[DataGrid] dataSource.parse failed:', e);
+            parsed = parseDataSourceResponse(json);
+          }
+        } else {
+          parsed = parseDataSourceResponse(json);
+        }
+        self._serverTotal = parsed.total;
+        self._rows = (parsed.rows || []).slice();
+        self._selection = {};
+        self._focusedCell = null;
+        self._lastClickedViewIndex = -1;
+        self._resetTracking();
+        self._undoStack = [];
+        self._redoStack = [];
+        self.hideLoadingOverlay();
+        self.refresh(); /* 페이지는 유지 — 서버 페이징 이동 후 리셋되면 안 된다 */
+        self._emitDataChanged();
+      })
+      .catch(function (err) {
+        if (self._destroyed || seq !== self._loadSeq) return;
+        console.error('[DataGrid] dataSource load failed:', err);
+        self.hideLoadingOverlay();
+        self._emitter.emit('dataLoadError', { error: err });
+      });
   };
 
   /* ---- data API ---- */
@@ -3296,6 +3450,8 @@
     rollbackRows: rollbackRows,
     findNextMatch: findNextMatch,
     buildGroupHeaderRuns: buildGroupHeaderRuns,
+    buildDataSourceRequest: buildDataSourceRequest,
+    parseDataSourceResponse: parseDataSourceResponse,
     normalizeColumns: normalizeColumns,
     applyColumnState: applyColumnState,
     computeColumnWidths: computeColumnWidths,

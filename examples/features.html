@@ -1136,6 +1136,64 @@
     </script>
   </div>
 
+  <!-- ======================================================== 원격 데이터 소스 -->
+  <h2 class="section">Remote Data Source (Server-side Sort / Filter / Paging)</h2>
+  <p class="section-desc">
+    <code class="inline">dataSource: { url, method, params, parse }</code>는 fetch로 데이터를 불러옵니다.
+    <code class="inline">sortMode</code> / <code class="inline">filterMode</code> /
+    <code class="inline">pageMode: 'server'</code>인 축은 클라이언트 처리를 건너뛰고 현재 상태를
+    요청 파라미터(<code class="inline">page·pageSize·sort·filter·quickFilter</code>)로 보냅니다.
+    <code class="inline">reloadData()</code>로 다시 불러옵니다. 이 데모는 데모 서버의
+    <code class="inline">/api/employees</code>(500행)를 사용합니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <input class="tb-input" id="remoteQuick" type="text" placeholder="서버측 quickFilter… (예: Seoul)">
+        <button class="tb-btn" id="remoteReloadBtn" type="button">reloadData()</button>
+      </div>
+      <div id="gridRemote" class="grid-wrap-sm"></div>
+      <div class="status-line" id="remoteStatus">
+        헤더를 클릭하면 정렬을 서버가 수행하고, 페이지를 넘기면 해당 페이지만 받아옵니다.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridRemote'), {
+        dataSource: { url: '/api/employees' },   // { rows, total } 응답
+        sortMode: 'server',
+        filterMode: 'server',
+        pageMode: 'server',
+        pagination: true,
+        paginationPageSize: 25,
+        columnDefs: [
+          { field: 'id', headerName: 'ID', width: 70 },
+          { field: 'name', headerName: 'Name', width: 160 },
+          { field: 'department', headerName: 'Department', width: 150 },
+          { field: 'city', headerName: 'City', width: 130 },
+          { field: 'salary', headerName: 'Salary', dataType: 'number', format: '$#,##0', width: 130 },
+        ],
+      });
+
+      var status = document.getElementById('remoteStatus');
+      grid.on('dataChanged', function (e) {
+        status.textContent = '서버 응답 수신 — 이 페이지 ' + e.rowCount + '행 (전체 ' +
+          (grid.getState().pagination ? '서버 총계 기준' : '') + ' 페이지네이션 참조)';
+      });
+      grid.on('dataLoadError', function (e) {
+        status.textContent = '로드 실패: ' + e.error.message + ' — 데모 서버(node demo/server.js)로 열었는지 확인하세요.';
+      });
+
+      var timer = null;
+      document.getElementById('remoteQuick').addEventListener('input', function (e) {
+        clearTimeout(timer);
+        timer = setTimeout(function () { grid.setQuickFilter(e.target.value); }, 300);
+      });
+      document.getElementById('remoteReloadBtn').addEventListener('click', function () {
+        grid.reloadData();
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>
