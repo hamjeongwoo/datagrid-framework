@@ -941,6 +941,15 @@
     root.style.setProperty('--dg-row-height', this._rowHeight + 'px');
     root.style.setProperty('--dg-header-height', this._headerHeight + 'px');
 
+    if (this.options.title) {
+      this._titleEl = el('div', 'dg-title-bar', root);
+      this._titleEl.textContent = this.options.title;
+    }
+    if (this.options.toolbar) {
+      this._toolbarEl = el('div', 'dg-toolbar', root);
+      this._mountToolbar(this.options.toolbar);
+    }
+
     this._headerEl = el('div', 'dg-header', root);
     this._headerRowEl = el('div', 'dg-header-row', this._headerEl);
 
@@ -963,6 +972,14 @@
     this._rootEl = root;
     this._renderedRows = {}; /* pageIndex -> row element */
     this._lastRange = null;
+  };
+
+  /** toolbar 옵션(Element 또는 grid를 받는 팩토리 함수)을 슬롯에 넣는다. */
+  DataGrid.prototype._mountToolbar = function (toolbar) {
+    if (!this._toolbarEl) return;
+    this._toolbarEl.innerHTML = '';
+    var node = typeof toolbar === 'function' ? toolbar(this) : toolbar;
+    if (node && node.nodeType) this._toolbarEl.appendChild(node);
   };
 
   DataGrid.prototype._bindEvents = function () {
@@ -1181,6 +1198,130 @@
 
   DataGrid.prototype._emitDataChanged = function () {
     this._emitter.emit('dataChanged', { rowCount: this._rows.length });
+  };
+
+  /* ---- partial refresh (전체 재계산 없이 렌더된 DOM만 갱신) ---- */
+
+  DataGrid.prototype._renderedRowEntry = function (row) {
+    var id = String(this._rowId(row));
+    for (var idx in this._renderedRows) {
+      if (this._renderedRows[idx].dataset.rowId === id) {
+        return { el: this._renderedRows[idx], index: Number(idx) };
+      }
+    }
+    return null;
+  };
+
+  /** 렌더된 셀 하나를 제자리에서 다시 그린다. 화면 밖이면 false. */
+  DataGrid.prototype.refreshCell = function (row, field) {
+    var hit = this._renderedRowEntry(row);
+    if (!hit) return false;
+    var col = this._visibleColumns().find(function (c) { return c.field === field; });
+    if (!col) return false;
+    var cellEl = hit.el.querySelector('[data-col-id="' + col.colId + '"]');
+    if (!cellEl) return false;
+    cellEl.innerHTML = '';
+    this._renderCellValue(cellEl, col, row);
+    return true;
+  };
+
+  /** 렌더된 행 하나를 새로 만들어 교체한다. 화면 밖이면 false. */
+  DataGrid.prototype.refreshRow = function (row) {
+    var hit = this._renderedRowEntry(row);
+    if (!hit) return false;
+    var fresh = this._buildRowEl(hit.index);
+    this._canvasEl.replaceChild(fresh, hit.el);
+    this._renderedRows[hit.index] = fresh;
+    return true;
+  };
+
+  /** 렌더된 모든 행에서 한 컬럼의 셀을 다시 그린다. 컬럼이 없으면 false. */
+  DataGrid.prototype.refreshColumn = function (colId) {
+    var col = this._columns.find(function (c) { return c.colId === colId || c.field === colId; });
+    if (!col) return false;
+    for (var idx in this._renderedRows) {
+      var rowEl = this._renderedRows[idx];
+      var row = this._pageRows[Number(idx)];
+      if (!row || row.__group || row.__detail) continue;
+      var cellEl = rowEl.querySelector('[data-col-id="' + col.colId + '"]');
+      if (cellEl) {
+        cellEl.innerHTML = '';
+        this._renderCellValue(cellEl, col, row);
+      }
+    }
+    return true;
+  };
+
+  /* ---- runtime option changes (setOptions) ---- */
+
+  /**
+   * 재생성 없이 옵션을 갱신한다. 지원: title, toolbar, theme, zebra,
+   * rowHeight, headerHeight, editable, sortModel, groupBy, quickFilter 계열,
+   * columnDefs/defaultColDef/rowNumbers/rowDetail(컬럼 재구성),
+   * pagination/paginationPageSize, floatingFilter, columnGroups,
+   * getRowClass, grandTotal 등 렌더 파이프라인이 읽는 값 전반.
+   * 반영 후 refresh() 1회.
+   */
+  DataGrid.prototype.setOptions = function (patch) {
+    if (!patch) return;
+    for (var k in patch) this.options[k] = patch[k];
+
+    if ('columnDefs' in patch || 'defaultColDef' in patch ||
+        'rowNumbers' in patch || 'rowDetail' in patch) {
+      this._columns = this._buildColumns();
+      this._colWidths = {};
+    }
+    if ('rowHeight' in patch) {
+      this._rowHeight = patch.rowHeight || 42;
+      this._rootEl.style.setProperty('--dg-row-height', this._rowHeight + 'px');
+    }
+    if ('headerHeight' in patch) {
+      this._headerHeight = patch.headerHeight || 48;
+      this._rootEl.style.setProperty('--dg-header-height', this._headerHeight + 'px');
+    }
+    if ('zebra' in patch) this._rootEl.classList.toggle('dg-zebra', !!patch.zebra);
+    if ('theme' in patch) this.setTheme(patch.theme);
+    if ('editable' in patch) this._editable = patch.editable !== false;
+    if ('sortModel' in patch) this._sortModel = (patch.sortModel || []).slice();
+    if ('groupBy' in patch) {
+      this._groupBy = (patch.groupBy || []).slice();
+      this._groupToggled = {};
+    }
+    if ('paginationPageSize' in patch) this._pageSize = patch.paginationPageSize || 20;
+    if ('pagination' in patch) {
+      this._pagination = !!patch.pagination;
+      if (this._pagination && !this._pagingEl) {
+        this._pagingEl = el('div', 'dg-paging-panel', this._rootEl);
+      } else if (!this._pagination && this._pagingEl) {
+        this._pagingEl.parentNode.removeChild(this._pagingEl);
+        this._pagingEl = null;
+        this._currentPage = 0;
+      }
+    }
+    if ('title' in patch) {
+      if (patch.title && !this._titleEl) {
+        this._titleEl = document.createElement('div');
+        this._titleEl.className = 'dg-title-bar';
+        this._rootEl.insertBefore(this._titleEl, this._rootEl.firstChild);
+      }
+      if (this._titleEl) {
+        this._titleEl.textContent = patch.title || '';
+        this._titleEl.hidden = !patch.title;
+      }
+    }
+    if ('toolbar' in patch) {
+      if (patch.toolbar && !this._toolbarEl) {
+        this._toolbarEl = document.createElement('div');
+        this._toolbarEl.className = 'dg-toolbar';
+        this._rootEl.insertBefore(this._toolbarEl, this._headerEl);
+      }
+      if (this._toolbarEl) {
+        if (patch.toolbar) { this._toolbarEl.hidden = false; this._mountToolbar(patch.toolbar); }
+        else this._toolbarEl.hidden = true;
+      }
+    }
+
+    this.refresh();
   };
 
   /* ---- header ---- */

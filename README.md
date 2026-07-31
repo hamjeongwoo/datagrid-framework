@@ -77,6 +77,7 @@ python demo/server.py
 | `columnGroups` | array | 2단 컬럼 그룹 헤더 `[{ headerName, children }]` |
 | `dataSource` | object | 원격 데이터 `{ url, method, params, parse }` (`reloadData()`로 재요청) |
 | `rowDetail` | object | 마스터-디테일 `{ renderer(row), height }` (`expandRow`/`collapseRow`/`toggleRowDetail`) |
+| `title` / `toolbar` | string / element | 그리드 타이틀 바 / 소비자 DOM 툴바 슬롯 |
 | `sortMode` / `filterMode` / `pageMode` | `'client'` \| `'server'` | 각 축의 처리 주체 — server면 상태를 요청 파라미터로 전달 |
 
 ## 컬럼 정의
@@ -129,7 +130,8 @@ cellRenderer: DataGrid.renderers.progress()   // 0–100 진행 바
 `focusCell(rowIndex, field)` / `ensureRowVisible(row)` / `ensureColumnVisible(colId)` ·
 `getState()` / `setState(state)` / `resetState(parts?)` (컬럼·정렬·필터·그룹·페이지 상태 저장/복원) ·
 `getCsv()` / `exportCsv(filename)` / `getJson()` · `showLoadingOverlay()` / `hideLoadingOverlay()` ·
-`setTheme('light'|'dark')` · `refresh()` · `destroy()`
+`setTheme('light'|'dark')` · `refresh()` · `refreshCell(row, field)` / `refreshRow(row)` / `refreshColumn(colId)` ·
+`setOptions(patch)` · `expandRow(row)` / `collapseRow(row)` / `toggleRowDetail(row)` · `reloadData()` · `destroy()`
 
 ## 이벤트
 

@@ -121,8 +121,8 @@
 |---|---|---|---|
 | [x] | `create · load · dataReady · render · refresh · complete` 이벤트 | `gridReady`(초기 1회, 비동기) / `dataChanged`(setRowData·addRows·removeRows·updateRow) / `viewRendered`(모든 refresh 후) — v1.1.0 | **P1** (쉬움) |
 | [x] | **취소 가능한 before 이벤트 패턴** (`beforeSort · beforeTableView · beforeCheck …`) | `e.cancel = true` 규약 — `beforeSort` / `beforeSelectionChange` / `beforeCellSave` 도입(v1.1.0). `beforeExport`는 §2.3 P2에서 | **P1** |
-| [ ] | `refreshCell() / refreshRow() / refreshColumn()` (부분 갱신) | 동일 이름 — 대량 데이터에서 전체 refresh 회피 | **P2** |
-| [ ] | `option(name, value)` (런타임 옵션 변경) | `setOptions({ ... })` — 재생성 없이 주요 옵션 갱신 | **P2** |
+| [x] | `refreshCell() / refreshRow() / refreshColumn()` (부분 갱신) | 동일 이름 — 렌더된 DOM만 제자리 갱신, boolean 반환 — v1.2.0 | **P2** |
+| [x] | `option(name, value)` (런타임 옵션 변경) | `setOptions({ ... })` — 재생성 없이 주요 옵션 갱신 (pagination 패널 생성/제거 포함) — v1.2.0 | **P2** |
 | [ ] | `one(event, fn)` | `once(event, fn)` | P3 |
 | [ ] | `disable() / enable()` | `setEnabled(bool)` — 전체 인터랙션 잠금 오버레이 | P3 |
 | [x] | `reset({filter, group, sort})` | `resetState({ filter, sort, group, columns, page })` 통합 리셋 (인자 없으면 전체) — v1.1.0 | **P1** (쉬움) |
@@ -131,8 +131,8 @@
 
 | | ParamQuery | 제안 API | 우선순위 |
 |---|---|---|---|
-| [ ] | `title / showTitle` | `title: '직원 목록'` 옵션 — 그리드 상단 타이틀 바 | **P2** |
-| [ ] | `toolbar / showToolbar / refreshToolbar` | `toolbar: { items: [...] }` 슬롯 또는 소비자 DOM 주입 — 우리는 데모처럼 외부 툴바 권장, 내장은 최소한으로 | **P2** |
+| [x] | `title / showTitle` | `title: '직원 목록'` 옵션 — 그리드 상단 타이틀 바 (setOptions로 변경) — v1.2.0 | **P2** |
+| [x] | `toolbar / showToolbar / refreshToolbar` | `toolbar: HTMLElement \| (grid) => HTMLElement` 슬롯 — 소비자 DOM 주입 방식 — v1.2.0 | **P2** |
 | [x] | `filterModel`의 **헤더 필터 행** (`header: true`, 컬럼 아래 인라인 필터 입력) | `floatingFilter: true` — 헤더 아래 필터 행, 메뉴와 필터 모델 공유 (text/number 입력 + set 드롭다운) — v1.1.0 | **P1** |
 | [ ] | `showHeader / showTop / showBottom` | `showHeader: false` 정도만 | P3 |
 

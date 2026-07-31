@@ -247,6 +247,25 @@ window.ApiDocs = {
             '행 끝에서는 다음/이전 행으로 감쌉니다.',
         },
         {
+          name: 'title',
+          type: 'string',
+          since: '1.2.0',
+          description:
+            '그리드 최상단에 타이틀 바를 표시합니다. <code>setOptions({ title })</code>로 런타임 변경.',
+        },
+        {
+          name: 'toolbar',
+          type: 'HTMLElement | (grid) => HTMLElement',
+          since: '1.2.0',
+          description:
+            '타이틀 바 아래 툴바 슬롯. <strong>소비자가 만든 DOM</strong>(또는 grid를 받아 DOM을 반환하는 함수)을 ' +
+            '그대로 넣습니다 — 버튼 구성·동작은 앱이 소유하고 그리드는 자리만 제공합니다.',
+          example:
+            "var bar = document.createElement('div');\n" +
+            "bar.innerHTML = '<button>Export</button>';\n" +
+            'new DataGrid(el, { toolbar: bar, ... });',
+        },
+        {
           name: 'rowDetail',
           type: '{ renderer: (row) => string | Node, height?: number }',
           since: '1.2.0',
@@ -1176,6 +1195,33 @@ window.ApiDocs = {
           description:
             '뷰 파이프라인(필터 → 퀵 필터 → 정렬 → 페이지)을 다시 계산하고 전체를 다시 렌더링합니다. ' +
             '행 객체를 외부에서 직접 수정한 뒤 호출하세요.',
+        },
+        {
+          name: 'refreshCell',
+          group: 'Display',
+          signature: 'refreshCell(row: object, field: string): boolean',
+          since: '1.2.0',
+          description:
+            '뷰 재계산 없이 렌더된 셀 하나만 다시 그립니다(값을 외부에서 바꾼 뒤 실시간 갱신용 — ' +
+            '정렬/필터 위치는 다음 <code>refresh()</code>까지 유지). 행이 화면 밖이면 <code>false</code>. ' +
+            '<code>refreshRow(row)</code>는 행 전체, <code>refreshColumn(colId)</code>는 렌더된 모든 행의 ' +
+            '해당 컬럼 셀을 다시 그립니다.',
+          example:
+            'row.price = tick.price;\n' +
+            "grid.refreshCell(row, 'price');",
+        },
+        {
+          name: 'setOptions',
+          group: 'Display',
+          signature: 'setOptions(patch: object): void',
+          since: '1.2.0',
+          description:
+            '그리드를 재생성하지 않고 옵션을 갱신합니다. <code>title</code>·<code>toolbar</code>·' +
+            '<code>theme</code>·<code>zebra</code>·<code>rowHeight</code>/<code>headerHeight</code>·' +
+            '<code>editable</code>·<code>sortModel</code>·<code>groupBy</code>·<code>pagination</code>(패널 생성/제거)·' +
+            '<code>paginationPageSize</code>·<code>columnDefs</code>(컬럼 재구성·사용자 폭 초기화) 등 ' +
+            '렌더 파이프라인이 읽는 값 전반을 지원하며 마지막에 <code>refresh()</code>를 1회 수행합니다.',
+          example: "grid.setOptions({ rowHeight: 32, zebra: true, title: '요약 보기' });",
         },
         {
           name: 'destroy',
