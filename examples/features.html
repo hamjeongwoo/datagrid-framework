@@ -1873,6 +1873,8 @@
     <code class="inline">{ label: '한국', value: 'kr' }</code> 객체 배열도 받습니다 —
     드롭다운에는 <code class="inline">label</code>이 표시되고, 선택하면 <code class="inline">value</code>가
     데이터에 저장되어 셀에 표시됩니다 (숫자 value는 타입이 보존됩니다).
+    <code class="inline">editor</code>를 선언한 컬럼은 <code class="inline">editable: true</code>를
+    생략해도 편집이 켜집니다 (명시적 <code class="inline">editable: false</code>가 우선).
   </p>
   <div class="example-card">
     <div class="example-html">
@@ -1892,20 +1894,21 @@
         rowData: rows,
         columnDefs: [
           { field: 'name', headerName: 'Name', flex: 1 },
-          { field: 'country', headerName: 'Country', width: 120, editable: true, editor: 'select',
+          // editor를 선언하면 editable: true는 생략 가능
+          { field: 'country', headerName: 'Country', width: 120, editor: 'select',
             editorOptions: [                    // label = 표시, value = 저장
               { label: '한국', value: 'kr' },
               { label: '일본', value: 'jp' },
               { label: '미국', value: 'us' },
               { label: '독일', value: 'de' },
             ] },
-          { field: 'grade', headerName: 'Grade', width: 110, editable: true, editor: 'select',
+          { field: 'grade', headerName: 'Grade', width: 110, editor: 'select',
             editorOptions: [                    // 숫자 value는 숫자로 커밋된다
               { label: 'Junior (1)', value: 1 },
               { label: 'Middle (2)', value: 2 },
               { label: 'Senior (3)', value: 3 },
             ] },
-          { field: 'department', headerName: 'Department', width: 140, editable: true, editor: 'select',
+          { field: 'department', headerName: 'Department', width: 140, editor: 'select',
             editorOptions: ['Engineering', 'Design', 'Sales'] },  // 문자열 배열도 그대로 지원
         ],
       });

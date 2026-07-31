@@ -971,6 +971,26 @@ suite('normalizeColumns', function () {
   assertEq(cols[1].sortable, false, 'colDef overrides default');
   assertEq(cols[1].filter, 'text', 'filter:true normalized to text');
   assertEq(cols[0].colId, 'a', 'colId falls back to field');
+
+  /* editor 선언 → editable 생략 시 true */
+  var ed = T.normalizeColumns([
+    { field: 'a', editor: 'select', editorOptions: ['x'] },
+    { field: 'b', editor: 'number', editable: false },
+    { field: 'c', editor: { init: function () {}, getValue: function () {} } },
+    { field: 'd' },
+  ]);
+  assertEq(ed[0].editable, true, 'editor declared → editable defaults to true');
+  assertEq(ed[1].editable, false, 'explicit editable:false wins over editor');
+  assertEq(ed[2].editable, true, 'custom editor object also implies editable');
+  assertEq(ed[3].editable, false, 'no editor → editable stays false');
+
+  var edDefault = T.normalizeColumns(
+    [{ field: 'a', editor: 'text' }, { field: 'b' }],
+    { editable: false }
+  );
+  assertEq(edDefault[0].editable, false, 'defaultColDef editable:false is explicit — editor does not override');
+  var edFromDefault = T.normalizeColumns([{ field: 'a' }], { editor: 'text' });
+  assertEq(edFromDefault[0].editable, true, 'editor from defaultColDef also implies editable');
 });
 
 /* ---------------- typeComparator ---------------- */

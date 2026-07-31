@@ -101,7 +101,7 @@ python demo/server.py
 | `format` | `'$#,##0.00'` \| `'yyyy-MM-dd'` 선언적 포맷 (`DataGrid.format()` 유틸과 동일 패턴) |
 | `aggFunc` | `'sum'` \| `'avg'` \| `'min'` \| `'max'` \| `'count'` — 그룹/전체 요약 집계 |
 | `filter` | `'text'` \| `'number'` \| `'set'` (`true` = text) |
-| `editable` | 더블클릭/Enter로 인라인 편집 |
+| `editable` | 더블클릭/Enter로 인라인 편집 — `editor` 선언 시 생략 가능 (명시적 `false`가 우선) |
 | `editor` | `'text'` \| `'number'` \| `'select'` (+ `editorOptions`) 또는 `{ init, getValue, destroy }` 커스텀 객체 |
 | `editorOptions` | select 선택지 — `['a', 'b']` 또는 `[{ label: '한국', value: 'kr' }]` (label 표시, value 저장·타입 보존) |
 | `validator(value, row)` | `true` 또는 오류 메시지 반환 — 거부 시 커밋 차단 + 빨간 표시 |

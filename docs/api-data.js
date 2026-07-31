@@ -696,11 +696,13 @@ window.ApiDocs = {
         {
           name: 'editable',
           type: 'boolean',
-          default: 'false',
+          default: 'false (editor 선언 시 true)',
           description:
             '셀 더블클릭 또는 포커스 상태에서 <kbd>Enter</kbd>로 인라인 편집을 시작합니다. ' +
             '<kbd>Enter</kbd>/blur로 커밋, <kbd>Esc</kbd>로 취소하며 커밋 시 ' +
-            '<a href="#events-cellValueChanged"><code>cellValueChanged</code></a> 이벤트가 발생합니다.',
+            '<a href="#events-cellValueChanged"><code>cellValueChanged</code></a> 이벤트가 발생합니다. ' +
+            '<code>editor</code>를 선언한 컬럼은 생략해도 <code>true</code>로 간주됩니다 — ' +
+            '명시적 <code>editable: false</code>로 다시 끌 수 있습니다 (v2.2.0).',
         },
         {
           name: 'editor',
@@ -708,9 +710,10 @@ window.ApiDocs = {
           default: "'text'",
           description:
             '인라인 에디터 종류. <code>\'number\'</code>는 커밋 시 숫자로 변환하고 숫자가 아니면 이전 값으로 되돌립니다. ' +
-            '<code>\'select\'</code>는 <code>editorOptions</code>의 선택지를 보여줍니다.',
+            '<code>\'select\'</code>는 <code>editorOptions</code>의 선택지를 보여줍니다. ' +
+            'editor를 선언하면 <code>editable: true</code>는 생략할 수 있습니다 (v2.2.0).',
           example:
-            "{ field: 'department', editable: true, editor: 'select',\n" +
+            "{ field: 'department', editor: 'select',   // editable 생략 가능\n" +
             "  editorOptions: ['Engineering', 'Design', 'Sales'] }",
         },
         {

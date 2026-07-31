@@ -1264,6 +1264,10 @@
       }
       var alignExplicit = ('align' in def) || (defaultColDef && 'align' in defaultColDef);
       if (col.dataType === 'number' && !alignExplicit) col.align = 'right';
+      /* editor를 선언했다는 것 자체가 편집 의도 — editable 생략 시 true로.
+       * 명시적 editable(false 포함)은 그대로 존중한다. */
+      var editableExplicit = ('editable' in def) || (defaultColDef && 'editable' in defaultColDef);
+      if (!editableExplicit && col.editor) col.editable = true;
       /* 선언적 format — valueFormatter가 없을 때만 합성 (CSV·집계·자동 폭에도 일괄 적용) */
       if (col.format && !col.valueFormatter) {
         col.valueFormatter = (function (pattern) {
