@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DataGrid — API Documentation</title>
+<link rel="stylesheet" href="../dist/datagrid.css">
+<link rel="stylesheet" href="../demo/demo.css">
+<style>
+  /* ---- docs layout ---- */
+  .docs-layout {
+    display: grid;
+    grid-template-columns: 250px minmax(0, 1fr);
+    gap: 36px;
+    align-items: start;
+  }
+  @media (max-width: 860px) {
+    .docs-layout { grid-template-columns: 1fr; }
+    .docs-sidebar { position: static !important; max-height: none !important; }
+  }
+
+  /* ---- sidebar ---- */
+  .docs-sidebar {
+    position: sticky;
+    top: 16px;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    padding-right: 8px;
+  }
+  .docs-search {
+    width: 100%;
+    height: 36px;
+    padding: 0 12px;
+    margin-bottom: 14px;
+    font: inherit;
+    color: var(--page-fg);
+    background: var(--page-card);
+    border: 1px solid var(--page-border);
+    border-radius: 8px;
+    outline: none;
+  }
+  .docs-search:focus { border-color: var(--page-accent); }
+  .docs-nav-section { margin-bottom: 4px; }
+  .docs-nav-section > a {
+    display: block;
+    padding: 6px 10px;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--page-fg);
+    text-decoration: none;
+    border-radius: 6px;
+  }
+  .docs-nav-entries { margin: 0 0 6px; }
+  .docs-nav-entries a {
+    display: block;
+    padding: 3px 10px 3px 22px;
+    font-size: 12.5px;
+    color: var(--page-muted);
+    text-decoration: none;
+    border-left: 2px solid var(--page-border);
+    margin-left: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .docs-nav-section > a:hover, .docs-nav-entries a:hover {
+    color: var(--page-accent);
+    background: rgba(33, 150, 243, 0.07);
+  }
+  .docs-nav-section > a.active, .docs-nav-entries a.active {
+    color: var(--page-accent);
+    border-left-color: var(--page-accent);
+  }
+  .docs-nav-section > a.active { background: rgba(33, 150, 243, 0.1); }
+  .docs-nav-hidden { display: none; }
+
+  /* ---- content ---- */
+  .docs-content { min-width: 0; }
+  .docs-meta { color: var(--page-muted); font-size: 12.5px; margin-bottom: 24px; }
+  .api-section { margin-bottom: 12px; }
+  .api-section > h2 {
+    font-size: 20px;
+    margin: 36px 0 10px;
+    padding-top: 14px;
+    border-top: 1px solid var(--page-border);
+    scroll-margin-top: 12px;
+  }
+  .api-section:first-child > h2 { border-top: none; margin-top: 0; padding-top: 0; }
+  .api-section .intro { color: var(--page-muted); max-width: 800px; line-height: 1.65; }
+  .api-section .intro code, .api-entry code {
+    background: rgba(33, 150, 243, 0.1);
+    color: var(--page-accent);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    font-size: 12.5px;
+  }
+  .api-section .intro a, .api-entry a { color: var(--page-accent); }
+
+  .api-group-label {
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--page-muted);
+    margin: 26px 0 2px;
+  }
+
+  .api-entry {
+    background: var(--page-card);
+    border: 1px solid var(--page-border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin: 12px 0;
+    scroll-margin-top: 12px;
+  }
+  .api-entry-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .api-entry-name {
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--page-fg);
+  }
+  .api-entry-name a { color: inherit; text-decoration: none; }
+  .api-entry-name a:hover::after { content: " #"; color: var(--page-accent); }
+  .api-badge {
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(33, 150, 243, 0.12);
+    color: var(--page-accent);
+  }
+  .api-badge.required { background: rgba(224, 37, 37, 0.1); color: #d02020; }
+  .api-type {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px;
+    color: var(--page-muted);
+  }
+  .api-default { font-size: 12px; color: var(--page-muted); }
+  .api-default code { background: none; padding: 0; color: inherit; }
+  .api-entry-desc { margin: 8px 0 0; line-height: 1.65; max-width: 800px; }
+  .api-signature {
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    font-size: 12.5px;
+    color: var(--page-muted);
+    margin-top: 2px;
+    word-break: break-all;
+  }
+
+  .api-example {
+    position: relative;
+    background: #14181a;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin: 12px 0 2px;
+    overflow-x: auto;
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: #e6edf3;
+  }
+  .api-example code { background: none; padding: 0; color: inherit; font-size: inherit; }
+  .hl-kw { color: #ff7b72; }
+  .hl-str { color: #a5d6ff; }
+  .hl-num { color: #79c0ff; }
+  .hl-com { color: #8b949e; font-style: italic; }
+  .hl-fn { color: #d2a8ff; }
+  .copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 3px 10px;
+    font-size: 11.5px;
+    font-family: inherit;
+    color: #e6edf3;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 6px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.12s;
+  }
+  .api-example:hover .copy-btn { opacity: 1; }
+  .copy-btn:hover { background: rgba(255, 255, 255, 0.2); }
+
+  .api-table { border-collapse: collapse; margin: 12px 0; width: 100%; max-width: 640px; }
+  .api-table th, .api-table td {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--page-border);
+    font-size: 13px;
+  }
+  .api-table th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--page-muted); }
+  kbd {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11.5px;
+    padding: 1px 6px;
+    border: 1px solid var(--page-border);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    background: var(--page-card);
+  }
+
+  .docs-no-results {
+    color: var(--page-muted);
+    padding: 40px 0;
+    text-align: center;
+    display: none;
+  }
+  mark { background: rgba(240, 160, 0, 0.35); color: inherit; border-radius: 2px; padding: 0 1px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="topnav">
+    <span class="brand"><span class="brand-mark">DG</span>DataGrid</span>
+    <nav>
+      <a href="../index.html">Template</a>
+      <a href="../examples/features.html">Features</a>
+      <a href="../examples/components.html">Components</a>
+      <a class="active" href="api.html">API Docs</a>
+    </nav>
+    <span class="spacer"></span>
+    <button class="tb-btn" id="themeToggle" type="button">🌙 Dark</button>
+  </header>
+
+  <div class="docs-layout">
+    <aside class="docs-sidebar">
+      <input class="docs-search" id="docsSearch" type="search" placeholder="API 검색… ( / )">
+      <div id="docsNav"></div>
+    </aside>
+
+    <main class="docs-content">
+      <h1 id="docsTitle">API Documentation</h1>
+      <p class="docs-meta" id="docsMeta"></p>
+      <div id="docsBody"></div>
+      <p class="docs-no-results" id="noResults">검색 결과가 없습니다.</p>
+    </main>
+  </div>
+
+</div>
+
+<script src="api-data.js"></script>
+<script>
+(function () {
+  'use strict';
+  var DATA = window.ApiDocs;
+
+  /* ------------------------------------------------------------------
+   * Helpers
+   * ---------------------------------------------------------------- */
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  /* 가벼운 JS 하이라이터: 이스케이프 후 토큰 순서대로 한 번에 치환 */
+  function highlight(code) {
+    var out = '';
+    var src = code;
+    var token = /(\/\*[\s\S]*?\*\/|\/\/[^\n]*)|('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")|\b(var|let|const|function|return|new|if|else|for|while|typeof|true|false|null|undefined|this)\b|\b(\d+(?:\.\d+)?)\b|([A-Za-z_$][\w$]*)(?=\s*\()/g;
+    var last = 0, m;
+    while ((m = token.exec(src))) {
+      out += esc(src.slice(last, m.index));
+      if (m[1]) out += '<span class="hl-com">' + esc(m[1]) + '</span>';
+      else if (m[2]) out += '<span class="hl-str">' + esc(m[2]) + '</span>';
+      else if (m[3]) out += '<span class="hl-kw">' + esc(m[3]) + '</span>';
+      else if (m[4]) out += '<span class="hl-num">' + esc(m[4]) + '</span>';
+      else if (m[5]) out += '<span class="hl-fn">' + esc(m[5]) + '</span>';
+      last = m.index + m[0].length;
+    }
+    return out + esc(src.slice(last));
+  }
+
+  function entryId(section, entry) {
+    return section.id + '-' + entry.name.replace(/[^\w-]+/g, '-').replace(/^-|-$/g, '');
+  }
+
+  function exampleBlock(code) {
+    return (
+      '<pre class="api-example"><button class="copy-btn" type="button">Copy</button><code>' +
+      highlight(code) + '</code></pre>'
+    );
+  }
+
+  /* ------------------------------------------------------------------
+   * Render
+   * ---------------------------------------------------------------- */
+  document.getElementById('docsMeta').textContent =
+    DATA.library + ' v' + DATA.version + ' · 마지막 수정 ' + DATA.updated;
+  document.title = DATA.library + ' — API Documentation';
+
+  var body = document.getElementById('docsBody');
+  var nav = document.getElementById('docsNav');
+  var navHtml = '';
+  var bodyHtml = '';
+
+  DATA.sections.forEach(function (section) {
+    /* --- nav --- */
+    navHtml += '<div class="docs-nav-section" data-section="' + section.id + '">' +
+      '<a href="#' + section.id + '">' + esc(section.title) + '</a>';
+    if (section.entries.length) {
+      navHtml += '<div class="docs-nav-entries">';
+      section.entries.forEach(function (e) {
+        navHtml += '<a href="#' + entryId(section, e) + '" data-entry>' + esc(e.name) + '</a>';
+      });
+      navHtml += '</div>';
+    }
+    navHtml += '</div>';
+
+    /* --- content --- */
+    bodyHtml += '<section class="api-section" id="' + section.id + '" data-section-block>' +
+      '<h2>' + esc(section.title) + '</h2>' +
+      (section.intro ? '<div class="intro">' + section.intro + '</div>' : '');
+
+    var lastGroup = null;
+    section.entries.forEach(function (e) {
+      if (e.group && e.group !== lastGroup) {
+        bodyHtml += '<div class="api-group-label">' + esc(e.group) + '</div>';
+        lastGroup = e.group;
+      }
+      var id = entryId(section, e);
+      bodyHtml += '<article class="api-entry" id="' + id + '" data-name="' + esc(e.name.toLowerCase()) + '">';
+      bodyHtml += '<div class="api-entry-head">';
+      bodyHtml += '<span class="api-entry-name"><a href="#' + id + '">' + esc(e.name) + '</a></span>';
+      if (e.kind) bodyHtml += '<span class="api-badge">' + esc(e.kind) + '</span>';
+      if (e.required) bodyHtml += '<span class="api-badge required">required</span>';
+      if (e.type) bodyHtml += '<span class="api-type">' + esc(e.type) + '</span>';
+      if (e.payload) bodyHtml += '<span class="api-type">' + esc(e.payload) + '</span>';
+      if (e.default !== undefined) {
+        bodyHtml += '<span class="api-default">기본값: <code>' + esc(e.default) + '</code></span>';
+      }
+      bodyHtml += '</div>';
+      if (e.signature) bodyHtml += '<div class="api-signature">' + esc(e.signature) + '</div>';
+      if (e.description) bodyHtml += '<p class="api-entry-desc">' + e.description + '</p>';
+      if (e.example) bodyHtml += exampleBlock(e.example);
+      bodyHtml += '</article>';
+    });
+    bodyHtml += '</section>';
+  });
+
+  nav.innerHTML = navHtml;
+  body.innerHTML = bodyHtml;
+
+  /* ------------------------------------------------------------------
+   * Copy buttons
+   * ---------------------------------------------------------------- */
+  body.addEventListener('click', function (e) {
+    var btn = e.target.closest('.copy-btn');
+    if (!btn) return;
+    var code = btn.parentNode.querySelector('code').textContent;
+    var done = function () {
+      btn.textContent = 'Copied!';
+      setTimeout(function () { btn.textContent = 'Copy'; }, 1200);
+    };
+    if (navigator.clipboard) navigator.clipboard.writeText(code).then(done);
+    else {
+      var ta = document.createElement('textarea');
+      ta.value = code;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      done();
+    }
+  });
+
+  /* ------------------------------------------------------------------
+   * Search — 이름/설명 매칭, 섹션 단위로 숨김
+   * ---------------------------------------------------------------- */
+  var searchInput = document.getElementById('docsSearch');
+  var noResults = document.getElementById('noResults');
+
+  function applySearch(q) {
+    q = q.trim().toLowerCase();
+    var any = false;
+    DATA.sections.forEach(function (section) {
+      var sectionEl = document.getElementById(section.id);
+      var navSection = nav.querySelector('[data-section="' + section.id + '"]');
+      var sectionMatch = !q || section.title.toLowerCase().indexOf(q) !== -1;
+      var visibleEntries = 0;
+
+      section.entries.forEach(function (e) {
+        var id = entryId(section, e);
+        var entryEl = document.getElementById(id);
+        var navLink = navSection.querySelector('a[href="#' + id + '"]');
+        var hay = (e.name + ' ' + (e.description || '') + ' ' + (e.signature || '') + ' ' + (e.type || '')).toLowerCase();
+        var match = !q || sectionMatch || hay.indexOf(q) !== -1;
+        entryEl.style.display = match ? '' : 'none';
+        if (navLink) navLink.classList.toggle('docs-nav-hidden', !match);
+        if (match) visibleEntries++;
+      });
+
+      var showSection = sectionMatch || visibleEntries > 0;
+      sectionEl.style.display = showSection ? '' : 'none';
+      navSection.classList.toggle('docs-nav-hidden', !showSection);
+      if (showSection) any = true;
+    });
+    noResults.style.display = any ? 'none' : 'block';
+  }
+
+  searchInput.addEventListener('input', function () { applySearch(this.value); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === '/' && document.activeElement !== searchInput &&
+        !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) {
+      e.preventDefault();
+      searchInput.focus();
+    }
+  });
+
+  /* ------------------------------------------------------------------
+   * Scrollspy — 현재 보이는 섹션/엔트리를 사이드바에 표시
+   * ---------------------------------------------------------------- */
+  var navLinks = {};
+  nav.querySelectorAll('a').forEach(function (a) {
+    navLinks[a.getAttribute('href').slice(1)] = a;
+  });
+  var spyTargets = Array.prototype.slice.call(
+    body.querySelectorAll('.api-section[id], .api-entry[id]')
+  );
+  var activeLink = null;
+
+  function updateSpy() {
+    var line = 90; /* 기준선(px) */
+    var current = null;
+    for (var i = 0; i < spyTargets.length; i++) {
+      var rect = spyTargets[i].getBoundingClientRect();
+      if (spyTargets[i].style.display === 'none') continue;
+      if (rect.top <= line) current = spyTargets[i];
+      else break;
+    }
+    var link = current ? navLinks[current.id] : null;
+    if (link !== activeLink) {
+      if (activeLink) activeLink.classList.remove('active');
+      if (link) {
+        link.classList.add('active');
+        /* 사이드바 스크롤 추적 */
+        var sb = document.querySelector('.docs-sidebar');
+        var lr = link.getBoundingClientRect();
+        var sr = sb.getBoundingClientRect();
+        if (lr.top < sr.top + 40 || lr.bottom > sr.bottom - 40) {
+          link.scrollIntoView({ block: 'center' });
+        }
+      }
+      activeLink = link;
+    }
+  }
+  window.addEventListener('scroll', updateSpy, { passive: true });
+  updateSpy();
+
+  /* ------------------------------------------------------------------
+   * Dark mode
+   * ---------------------------------------------------------------- */
+  var themeBtn = document.getElementById('themeToggle');
+  themeBtn.addEventListener('click', function () {
+    var dark = document.body.classList.toggle('dark');
+    themeBtn.textContent = dark ? '☀️ Light' : '🌙 Dark';
+  });
+})();
+</script>
+</body>
+</html>
