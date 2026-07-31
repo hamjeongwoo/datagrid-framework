@@ -66,6 +66,114 @@
   }
 
   /**
+   * column.dataType('number'|'date'|'bool')에 맞는 정렬 비교 함수를 반환한다.
+   * 'string'/미지정은 null을 반환해 defaultComparator를 쓰게 한다.
+   * 모든 타입에서 빈 값(null/undefined/'')과 해석 불가 값은 뒤로 보낸다.
+   */
+  function typeComparator(dataType) {
+    function nil(v) { return v === null || v === undefined || v === ''; }
+    if (dataType === 'number') {
+      return function (a, b) {
+        if (nil(a) && nil(b)) return 0;
+        if (nil(a)) return 1;
+        if (nil(b)) return -1;
+        var x = Number(a), y = Number(b);
+        if (isNaN(x) && isNaN(y)) return 0;
+        if (isNaN(x)) return 1;
+        if (isNaN(y)) return -1;
+        return x - y;
+      };
+    }
+    if (dataType === 'date') {
+      return function (a, b) {
+        if (nil(a) && nil(b)) return 0;
+        if (nil(a)) return 1;
+        if (nil(b)) return -1;
+        var x = a instanceof Date ? a.getTime() : new Date(a).getTime();
+        var y = b instanceof Date ? b.getTime() : new Date(b).getTime();
+        if (isNaN(x) && isNaN(y)) return 0;
+        if (isNaN(x)) return 1;
+        if (isNaN(y)) return -1;
+        return x - y;
+      };
+    }
+    if (dataType === 'bool') {
+      return function (a, b) {
+        if (nil(a) && nil(b)) return 0;
+        if (nil(a)) return 1;
+        if (nil(b)) return -1;
+        return a === b ? 0 : a ? -1 : 1; /* true 먼저 (defaultComparator와 동일) */
+      };
+    }
+    return null;
+  }
+
+  /**
+   * 숫자 포맷: '#,##0.00' 스타일 마스크 + 리터럴 접두/접미(예: '$#,##0.00', '#,##0 원').
+   * - ',' 포함 시 3자리 그룹핑
+   * - 소수부: 자릿수만큼 반올림, '0'은 필수(패딩), '#'은 뒤쪽 0 제거
+   * - 정수부 '0' 개수만큼 0 패딩
+   * 빈 값/숫자 해석 불가면 '' / 원본 문자열을 반환한다.
+   */
+  function formatNumber(value, pattern) {
+    if (value === null || value === undefined || value === '') return '';
+    var n = Number(value);
+    if (isNaN(n)) return String(value);
+    var m = String(pattern).match(/[#0][#0,.]*/);
+    if (!m) return String(value);
+    var mask = m[0].replace(/[,.]+$/, ''); /* 마스크 끝의 구분자는 리터럴 접미로 */
+    var prefix = String(pattern).slice(0, m.index);
+    var suffix = String(pattern).slice(m.index + mask.length);
+    var dot = mask.indexOf('.');
+    var intMask = dot === -1 ? mask : mask.slice(0, dot);
+    var decMask = dot === -1 ? '' : mask.slice(dot + 1);
+    var neg = n < 0;
+    var fixed = Math.abs(n).toFixed(decMask.length);
+    var parts = fixed.split('.');
+    var intStr = parts[0];
+    var decStr = parts[1] || '';
+    var minDec = (decMask.match(/0/g) || []).length;
+    while (decStr.length > minDec && decStr.charAt(decStr.length - 1) === '0') {
+      decStr = decStr.slice(0, -1);
+    }
+    var minInt = (intMask.match(/0/g) || []).length;
+    while (intStr.length < minInt) intStr = '0' + intStr;
+    if (intMask.indexOf(',') !== -1) {
+      intStr = intStr.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+    return (neg ? '-' : '') + prefix + intStr + (decStr ? '.' + decStr : '') + suffix;
+  }
+
+  /**
+   * 날짜 포맷: yyyy/yy/MM/dd/HH/mm/ss 토큰 치환. Date 인스턴스 또는
+   * Date로 해석 가능한 문자열/숫자를 받는다. 해석 불가면 원본 문자열 반환.
+   */
+  function formatDate(value, pattern) {
+    if (value === null || value === undefined || value === '') return '';
+    var d = value instanceof Date ? value : new Date(value);
+    if (isNaN(d.getTime())) return String(value);
+    function p2(x) { return x < 10 ? '0' + x : String(x); }
+    return String(pattern)
+      .replace(/yyyy/g, String(d.getFullYear()))
+      .replace(/yy/g, String(d.getFullYear()).slice(-2))
+      .replace(/MM/g, p2(d.getMonth() + 1))
+      .replace(/dd/g, p2(d.getDate()))
+      .replace(/HH/g, p2(d.getHours()))
+      .replace(/mm/g, p2(d.getMinutes()))
+      .replace(/ss/g, p2(d.getSeconds()));
+  }
+
+  /** column.format / DataGrid.format() 진입점 — '#'나 '0'이 있으면 숫자, 아니면 날짜 패턴. */
+  function formatValue(value, pattern) {
+    if (pattern === null || pattern === undefined || pattern === '') {
+      return value === null || value === undefined ? '' : String(value);
+    }
+    return /[#0]/.test(String(pattern))
+      ? formatNumber(value, pattern)
+      : formatDate(value, pattern);
+  }
+
+  /**
    * sortModel: [{ field, dir: 'asc'|'desc' }]
    * comparators: { field: fn(a, b, rowA, rowB) } (optional overrides)
    * Stable sort; returns a new array.
@@ -413,7 +521,20 @@
       for (k in def) col[k] = def[k];
       col.colId = col.colId || col.field || 'col-' + i;
       col.headerName = col.headerName !== undefined ? col.headerName : col.field || '';
-      if (col.filter === true) col.filter = 'text';
+      /* dataType이 filter:true의 필터 종류와 기본 align을 결정한다 */
+      if (col.filter === true) {
+        col.filter = col.dataType === 'number' ? 'number'
+          : col.dataType === 'bool' ? 'set'
+          : 'text';
+      }
+      var alignExplicit = ('align' in def) || (defaultColDef && 'align' in defaultColDef);
+      if (col.dataType === 'number' && !alignExplicit) col.align = 'right';
+      /* 선언적 format — valueFormatter가 없을 때만 합성 (CSV·집계·자동 폭에도 일괄 적용) */
+      if (col.format && !col.valueFormatter) {
+        col.valueFormatter = (function (pattern) {
+          return function (v) { return formatValue(v, pattern); };
+        })(col.format);
+      }
       return col;
     });
   }
@@ -643,7 +764,8 @@
   DataGrid.prototype._recomputeView = function () {
     var comparators = {};
     this._columns.forEach(function (c) {
-      if (c.comparator) comparators[c.field] = c.comparator;
+      var cmp = c.comparator || (c.dataType ? typeComparator(c.dataType) : null);
+      if (cmp) comparators[c.field] = cmp;
     });
     var fields = this._visibleColumns()
       .map(function (c) { return c.field; })
@@ -1634,7 +1756,8 @@
     var cellEl = hit.cellEl;
     cellEl.innerHTML = '';
 
-    var editorType = col.editor || (col.filter === 'number' ? 'number' : 'text');
+    var editorType = col.editor ||
+      (col.dataType === 'number' || col.filter === 'number' ? 'number' : 'text');
     var input;
     if (editorType === 'select') {
       input = document.createElement('select');
@@ -1837,7 +1960,8 @@
         var col = cols[startC + j];
         if (!col || !col.editable || col.field === undefined) return;
         var value = raw;
-        var editorType = col.editor || (col.filter === 'number' ? 'number' : 'text');
+        var editorType = col.editor ||
+          (col.dataType === 'number' || col.filter === 'number' ? 'number' : 'text');
         if (editorType === 'number') {
           var n = Number(value);
           if (value === '' || isNaN(n)) return;
@@ -2293,11 +2417,18 @@
     },
   };
 
+  /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
+  DataGrid.format = formatValue;
+
   DataGrid.version = '1.0.0';
 
   /* Internals exposed for headless unit tests (not part of the public API). */
   DataGrid._test = {
     defaultComparator: defaultComparator,
+    typeComparator: typeComparator,
+    formatNumber: formatNumber,
+    formatDate: formatDate,
+    formatValue: formatValue,
     sortRows: sortRows,
     buildFilterPredicate: buildFilterPredicate,
     filterRows: filterRows,

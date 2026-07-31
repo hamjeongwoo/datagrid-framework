@@ -339,6 +339,75 @@ suite('normalizeColumns', function () {
   assertEq(cols[0].colId, 'a', 'colId falls back to field');
 });
 
+/* ---------------- typeComparator ---------------- */
+suite('typeComparator', function () {
+  var num = T.typeComparator('number');
+  assert(num('9', '10') < 0, 'number: numeric strings compared numerically');
+  assert(num(100, '20') > 0, 'number: mixed number/string');
+  assert(num(null, 5) > 0, 'number: blank last');
+  assert(num('abc', 5) > 0, 'number: NaN last');
+  assert(num('abc', 'def') === 0, 'number: two NaN equal');
+
+  var date = T.typeComparator('date');
+  assert(date('2024-01-02', '2024-01-10') < 0, 'date: ISO strings');
+  assert(date(new Date(2024, 5, 1), '2024-01-01') > 0, 'date: Date vs string');
+  assert(date('', '2024-01-01') > 0, 'date: blank last');
+  assert(date('not-a-date', '2024-01-01') > 0, 'date: unparsable last');
+
+  var bool = T.typeComparator('bool');
+  assert(bool(true, false) < 0, 'bool: true first');
+  assert(bool(false, false) === 0, 'bool: equal');
+  assert(bool(null, false) > 0, 'bool: blank last');
+
+  assert(T.typeComparator('string') === null, 'string → null (default comparator)');
+  assert(T.typeComparator(undefined) === null, 'undefined → null');
+});
+
+/* ---------------- formatNumber / formatDate / formatValue ---------------- */
+suite('format', function () {
+  assertEq(T.formatNumber(1234567.891, '#,##0.00'), '1,234,567.89', 'grouping + 2 decimals');
+  assertEq(T.formatNumber(1234.5, '$#,##0.00'), '$1,234.50', 'prefix + zero-padded decimals');
+  assertEq(T.formatNumber(-1234.5, '$#,##0.00'), '-$1,234.50', 'negative before prefix');
+  assertEq(T.formatNumber(1234, '#,##0 원'), '1,234 원', 'literal suffix');
+  assertEq(T.formatNumber(0.5, '0.###'), '0.5', '# decimals trim trailing zeros');
+  assertEq(T.formatNumber(0.5, '0.00#'), '0.50', "min decimals from '0' count");
+  assertEq(T.formatNumber(3.14159, '0.00'), '3.14', 'rounds to mask decimals');
+  assertEq(T.formatNumber(3.999, '0.00'), '4.00', 'rounding carries');
+  assertEq(T.formatNumber(7, '000'), '007', 'integer zero padding');
+  assertEq(T.formatNumber(1234, '####'), '1234', 'no grouping without comma');
+  assertEq(T.formatNumber(null, '#,##0'), '', 'null → empty');
+  assertEq(T.formatNumber('abc', '#,##0'), 'abc', 'non-numeric passthrough');
+
+  assertEq(T.formatDate('2024-03-05T09:07:02', 'yyyy-MM-dd'), '2024-03-05', 'ISO date');
+  assertEq(T.formatDate(new Date(2024, 2, 5, 9, 7, 2), 'yyyy-MM-dd HH:mm:ss'), '2024-03-05 09:07:02', 'Date with time tokens');
+  assertEq(T.formatDate(new Date(2024, 11, 25), 'yy/MM/dd'), '24/12/25', 'two-digit year');
+  assertEq(T.formatDate('garbage', 'yyyy-MM-dd'), 'garbage', 'unparsable passthrough');
+  assertEq(T.formatDate(null, 'yyyy'), '', 'null → empty');
+
+  assertEq(T.formatValue(1234, '#,##0'), '1,234', 'dispatch to number on #/0');
+  assertEq(T.formatValue('2024-03-05', 'yyyy.MM.dd'), '2024.03.05', 'dispatch to date otherwise');
+  assertEq(T.formatValue(42, ''), '42', 'empty pattern → String(value)');
+});
+
+/* ---------------- normalizeColumns dataType/format ---------------- */
+suite('normalizeColumns (dataType/format)', function () {
+  var cols = T.normalizeColumns([
+    { field: 'n', dataType: 'number', filter: true },
+    { field: 'b', dataType: 'bool', filter: true },
+    { field: 'd', dataType: 'date', filter: true },
+    { field: 'x', dataType: 'number', align: 'center' },
+    { field: 'f', format: '#,##0.0' },
+    { field: 'g', format: '#,##0.0', valueFormatter: function () { return 'custom'; } },
+  ]);
+  assertEq(cols[0].filter, 'number', 'dataType number → number filter');
+  assertEq(cols[0].align, 'right', 'dataType number → right align');
+  assertEq(cols[1].filter, 'set', 'dataType bool → set filter');
+  assertEq(cols[2].filter, 'text', 'dataType date → text filter');
+  assertEq(cols[3].align, 'center', 'explicit align wins over dataType');
+  assertEq(cols[4].valueFormatter(1234.56), '1,234.6', 'format synthesizes valueFormatter');
+  assertEq(cols[5].valueFormatter(1), 'custom', 'explicit valueFormatter wins over format');
+});
+
 /* ---------------- applyColumnState ---------------- */
 suite('applyColumnState', function () {
   function cols() {

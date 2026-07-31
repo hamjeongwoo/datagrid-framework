@@ -295,8 +295,36 @@ window.ApiDocs = {
           type: "true | 'text' | 'number' | 'set'",
           default: 'false',
           description:
-            '헤더 메뉴에서 열 수 있는 컬럼 필터 종류. <code>true</code>는 <code>\'text\'</code>와 같습니다. ' +
+            '헤더 메뉴에서 열 수 있는 컬럼 필터 종류. <code>true</code>는 <code>dataType</code>에 맞는 종류' +
+            '(number → <code>\'number\'</code>, bool → <code>\'set\'</code>, 그 외 <code>\'text\'</code>)로 해석됩니다. ' +
             '필터 모델 구조는 <a href="#filter-model">Filter Model</a> 섹션 참고.',
+        },
+        {
+          name: 'dataType',
+          type: "'string' | 'number' | 'date' | 'bool'",
+          since: '1.1.0',
+          description:
+            '컬럼 값의 데이터 타입 선언. 지정하면 ① 정렬이 타입 기준 비교로 동작하고' +
+            '(문자열로 저장된 숫자·날짜도 올바르게 정렬, 해석 불가/빈 값은 마지막), ' +
+            '② <code>filter: true</code>의 필터 종류가 자동 결정되며, ' +
+            '③ <code>\'number\'</code>는 <code>align</code> 미지정 시 오른쪽 정렬 + 숫자 에디터가 기본이 됩니다. ' +
+            '<code>comparator</code>를 함께 주면 그것이 우선합니다.',
+          example: "{ field: 'hireDate', dataType: 'date', filter: true, format: 'yyyy-MM-dd' }",
+        },
+        {
+          name: 'format',
+          type: 'string',
+          since: '1.1.0',
+          description:
+            '선언적 표시 포맷 — <code>valueFormatter</code>의 간편판입니다. ' +
+            '<code>\'#\'</code>/<code>\'0\'</code>이 포함되면 숫자 마스크' +
+            '(<code>\',\'</code> 그룹핑, 소수 자릿수 반올림, <code>\'0\'</code> 필수 자리, 리터럴 접두/접미), ' +
+            '아니면 날짜 패턴(<code>yyyy MM dd HH mm ss</code> 토큰)으로 해석합니다. ' +
+            'CSV 내보내기·집계 표시·자동 폭 계산에도 적용되며, <code>valueFormatter</code>가 있으면 무시됩니다. ' +
+            '같은 패턴을 <a href="#api-methods-format"><code>DataGrid.format()</code></a> 유틸로 직접 쓸 수 있습니다.',
+          example:
+            "{ field: 'salary', dataType: 'number', format: '$#,##0.00' }\n" +
+            "{ field: 'hireDate', dataType: 'date', format: 'yyyy.MM.dd' }",
         },
         {
           name: 'aggFunc',
@@ -794,6 +822,22 @@ window.ApiDocs = {
           signature: 'destroy(): void',
           description:
             '그리드 DOM과 document 레벨 이벤트 리스너를 모두 제거합니다. 이후의 API 호출은 무시됩니다.',
+        },
+
+        /* ---- 유틸리티 (정적) ---- */
+        {
+          name: 'format',
+          group: 'Utility',
+          signature: 'DataGrid.format(value: any, pattern: string): string',
+          since: '1.1.0',
+          description:
+            '<code>column.format</code>과 동일한 선언적 포맷을 아무 값에나 적용하는 <strong>정적</strong> 유틸입니다. ' +
+            '패턴에 <code>#</code>/<code>0</code>이 있으면 숫자 마스크, 아니면 날짜 패턴으로 해석합니다. ' +
+            '빈 값(null/undefined/\'\')은 빈 문자열, 해석 불가 값은 원본 문자열을 반환합니다.',
+          example:
+            "DataGrid.format(1234567.891, '#,##0.00')        // '1,234,567.89'\n" +
+            "DataGrid.format(-1234.5, '$#,##0.00')           // '-$1,234.50'\n" +
+            "DataGrid.format('2026-07-31', 'yyyy년 MM월 dd일') // '2026년 07월 31일'",
         },
 
         /* ---- 이벤트 ---- */

@@ -636,6 +636,50 @@
     </script>
   </div>
 
+  <!-- ======================================================== dataType & format -->
+  <h2 class="section">Column Data Type &amp; Declarative Format</h2>
+  <p class="section-desc">
+    <code class="inline">dataType: 'number' | 'date' | 'bool'</code>은 정렬 비교·
+    <code class="inline">filter: true</code>의 필터 종류·기본 정렬 방향(숫자는 오른쪽)을 자동 결정합니다.
+    <code class="inline">format: '$#,##0.00'</code> / <code class="inline">'yyyy-MM-dd'</code> 선언적 포맷은
+    <code class="inline">valueFormatter</code>를 대신하며, 같은 패턴을
+    <code class="inline">DataGrid.format(value, pattern)</code> 유틸로도 쓸 수 있습니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn" id="fmtUtilBtn" type="button">DataGrid.format() 직접 호출</button>
+      </div>
+      <div id="gridFormat" class="grid-wrap-sm"></div>
+      <div class="status-line" id="fmtStatus">
+        Salary/Rating은 dataType: 'number' — 헤더 클릭 정렬이 숫자 기준이고 자동 우측 정렬됩니다.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridFormat'), {
+        rowData: DemoData.makeEmployees(60, 19),
+        columnDefs: [
+          { field: 'name', headerName: 'Name', width: 150 },
+          { field: 'hireDate', headerName: 'Hire Date', width: 130,
+            dataType: 'date', format: 'yyyy.MM.dd', filter: true },
+          { field: 'salary', headerName: 'Salary', width: 130,
+            dataType: 'number', format: '$#,##0', filter: true },
+          { field: 'rating', headerName: 'Rating', width: 110,
+            dataType: 'number', format: '0.0 ★' },
+          { field: 'remote', headerName: 'Remote', width: 110, align: 'center',
+            dataType: 'bool', filter: true,
+            cellRenderer: DataGrid.renderers.check() },
+        ],
+      });
+
+      document.getElementById('fmtUtilBtn').addEventListener('click', function () {
+        document.getElementById('fmtStatus').textContent =
+          "DataGrid.format(1234567.891, '#,##0.00') → " + DataGrid.format(1234567.891, '#,##0.00') +
+          "  |  DataGrid.format('2026-07-31', 'yyyy년 MM월 dd일') → " + DataGrid.format('2026-07-31', 'yyyy년 MM월 dd일');
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

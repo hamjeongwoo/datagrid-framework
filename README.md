@@ -77,6 +77,8 @@ python demo/server.py
 | `width` / `minWidth` / `flex` | 픽셀 폭 / 최소 폭 / 남은 공간 비율 |
 | `sortable` (기본 true) | 헤더 클릭 정렬, Shift+클릭 다중 정렬 |
 | `comparator(a, b, rowA, rowB)` | 커스텀 정렬 |
+| `dataType` | `'string'` \| `'number'` \| `'date'` \| `'bool'` — 정렬 비교·필터 종류·정렬 방향 자동 결정 |
+| `format` | `'$#,##0.00'` \| `'yyyy-MM-dd'` 선언적 포맷 (`DataGrid.format()` 유틸과 동일 패턴) |
 | `aggFunc` | `'sum'` \| `'avg'` \| `'min'` \| `'max'` \| `'count'` — 그룹/전체 요약 집계 |
 | `filter` | `'text'` \| `'number'` \| `'set'` (`true` = text) |
 | `editable` | 더블클릭/Enter로 인라인 편집 |
