@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DataGrid — Components</title>
+<link rel="stylesheet" href="../dist/datagrid.css">
+<link rel="stylesheet" href="../demo/demo.css">
+<style>
+  /* static specimens reuse framework classes inside a .dg-root shell */
+  .specimen { height: auto; min-height: 0; }
+  .specimen .dg-row { position: static; }
+  .specimen .dg-header-menu-btn { display: inline-flex; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="topnav">
+    <span class="brand"><span class="brand-mark">DG</span>DataGrid</span>
+    <nav>
+      <a href="../index.html">Template</a>
+      <a href="features.html">Features</a>
+      <a class="active" href="components.html">Components</a>
+    </nav>
+    <span class="spacer"></span>
+    <button class="tb-btn" id="themeToggle" type="button">🌙 Dark</button>
+  </header>
+
+  <h1>Components</h1>
+  <p class="subtitle">
+    디자인 시스템 갤러리 — 그리드를 구성하는 시각 요소와 상태.
+    모든 색·크기는 <code class="inline">.dg-root</code>의 CSS 커스텀 프로퍼티 토큰에서 나옵니다.
+  </p>
+
+  <!-- Color tokens -->
+  <h2 class="section">Design Tokens</h2>
+  <p class="section-desc">Quartz 라이트 테마 기본값. <code class="inline">.dg-theme-dark</code>가 전체 토큰을 재정의합니다.</p>
+  <div class="swatch-row" id="swatches"></div>
+
+  <!-- Header cells -->
+  <h2 class="section">Header Cell States</h2>
+  <p class="section-desc">기본 · 정렬(오름/내림, 다중 정렬 배지) · 필터 활성 · 메뉴 버튼.</p>
+  <div class="dg-root specimen">
+    <div class="dg-header">
+      <div class="dg-header-row">
+        <div class="dg-header-cell" style="width:160px"><span class="dg-header-cell-label">Default</span></div>
+        <div class="dg-header-cell dg-sortable dg-sort-asc" style="width:160px">
+          <span class="dg-header-cell-label">Sorted asc</span>
+          <svg class="dg-sort-icon" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M8 3L4 7M8 3l4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="dg-header-cell dg-sortable dg-sort-desc" style="width:180px">
+          <span class="dg-header-cell-label">Sorted desc (2nd)</span>
+          <svg class="dg-sort-icon" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M8 3L4 7M8 3l4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="dg-sort-order">2</span>
+        </div>
+        <div class="dg-header-cell dg-filter-active" style="width:190px">
+          <span class="dg-header-cell-label">Filter active</span>
+          <svg class="dg-filter-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M1.5 2.5h13l-5 6v4.2l-3 1.3V8.5l-5-6z"/></svg>
+          <button class="dg-header-menu-btn" type="button" aria-label="menu">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M2 4.5h12v1.4H2zM2 7.3h12v1.4H2zM2 10.1h12v1.4H2z"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row states -->
+  <h2 class="section">Row States</h2>
+  <p class="section-desc">기본 · 호버 · 선택 · 포커스 셀 · 얼룩말(zebra) 홀수 행.</p>
+  <div class="dg-root specimen dg-zebra">
+    <div class="dg-canvas" style="height:auto">
+      <div class="dg-row"><div class="dg-cell" style="width:200px">Default row</div><div class="dg-cell" style="width:200px">Cell</div><div class="dg-cell" style="width:180px">Cell</div></div>
+      <div class="dg-row dg-row-odd"><div class="dg-cell" style="width:200px">Odd (zebra) row</div><div class="dg-cell" style="width:200px">Cell</div><div class="dg-cell" style="width:180px">Cell</div></div>
+      <div class="dg-row" style="background:var(--dg-row-hover-color)"><div class="dg-cell" style="width:200px">Hovered row</div><div class="dg-cell" style="width:200px">Cell</div><div class="dg-cell" style="width:180px">Cell</div></div>
+      <div class="dg-row dg-row-selected"><div class="dg-cell" style="width:200px">Selected row</div><div class="dg-cell dg-cell-focused" style="width:200px">Focused cell</div><div class="dg-cell" style="width:180px">Cell</div></div>
+    </div>
+  </div>
+
+  <!-- Checkboxes -->
+  <h2 class="section">Checkbox</h2>
+  <p class="section-desc">unchecked · checked · indeterminate(헤더 전체 선택의 부분 상태) · disabled.</p>
+  <div class="card gallery-row">
+    <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" class="dg-checkbox"> Unchecked</label>
+    <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" class="dg-checkbox" checked> Checked</label>
+    <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" class="dg-checkbox" id="indet"> Indeterminate</label>
+    <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" class="dg-checkbox" disabled> Disabled</label>
+    <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" class="dg-checkbox" checked disabled> Checked disabled</label>
+  </div>
+
+  <!-- Tags -->
+  <h2 class="section">Tag / Badge Cell Renderer</h2>
+  <p class="section-desc"><code class="inline">DataGrid.renderers.tag(colorMap)</code> — 상태 값을 색상 배지로 표시.</p>
+  <div class="card gallery-row">
+    <span class="dg-tag dg-tag-green">Active</span>
+    <span class="dg-tag dg-tag-blue">Contract</span>
+    <span class="dg-tag dg-tag-yellow">On Leave</span>
+    <span class="dg-tag dg-tag-red">Overdue</span>
+    <span class="dg-tag dg-tag-gray">Inactive</span>
+  </div>
+
+  <!-- Filter menu -->
+  <h2 class="section">Filter Menu</h2>
+  <p class="section-desc">헤더 메뉴 버튼으로 여는 컬럼 필터 팝업(텍스트/숫자/셋 변형).</p>
+  <div class="gallery-row" style="align-items:flex-start">
+    <div class="dg-menu" style="position:static">
+      <div class="dg-menu-title">Name</div>
+      <select><option>Contains</option><option>Equals</option><option>Starts with</option></select>
+      <input type="text" placeholder="Filter…" value="kim">
+      <div class="dg-menu-actions">
+        <button class="dg-btn" type="button">Clear</button>
+        <button class="dg-btn dg-btn-primary" type="button">Apply</button>
+      </div>
+    </div>
+    <div class="dg-menu" style="position:static">
+      <div class="dg-menu-title">Department</div>
+      <div class="dg-menu-set-list">
+        <label class="dg-menu-set-item"><input type="checkbox" class="dg-checkbox" checked><span>Engineering</span></label>
+        <label class="dg-menu-set-item"><input type="checkbox" class="dg-checkbox" checked><span>Design</span></label>
+        <label class="dg-menu-set-item"><input type="checkbox" class="dg-checkbox"><span>Marketing</span></label>
+        <label class="dg-menu-set-item"><input type="checkbox" class="dg-checkbox"><span>Sales</span></label>
+      </div>
+      <div class="dg-menu-actions">
+        <button class="dg-btn" type="button">Clear</button>
+        <button class="dg-btn dg-btn-primary" type="button">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pagination -->
+  <h2 class="section">Pagination Panel</h2>
+  <p class="section-desc">페이지 크기 · 행 범위 요약 · 이동 버튼(현재 페이지 강조, 말줄임).</p>
+  <div class="dg-root specimen">
+    <div class="dg-paging-panel">
+      <div class="dg-paging-page-size">
+        <span>Page size:</span>
+        <select><option>10</option><option selected>20</option><option>50</option></select>
+      </div>
+      <span class="dg-paging-row-summary"><strong>21</strong> to <strong>40</strong> of <strong>5,000</strong></span>
+      <div class="dg-paging-buttons">
+        <button class="dg-paging-btn" type="button">«</button>
+        <button class="dg-paging-btn" type="button">‹</button>
+        <button class="dg-paging-btn" type="button">1</button>
+        <button class="dg-paging-btn dg-paging-current" type="button">2</button>
+        <button class="dg-paging-btn" type="button">3</button>
+        <button class="dg-paging-btn" type="button" disabled>…</button>
+        <button class="dg-paging-btn" type="button">250</button>
+        <button class="dg-paging-btn" type="button">›</button>
+        <button class="dg-paging-btn" type="button">»</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Overlays -->
+  <h2 class="section">Overlays</h2>
+  <p class="section-desc">로딩 스피너와 빈 상태 패널.</p>
+  <div class="card gallery-row">
+    <div class="dg-overlay-panel"><span class="dg-spinner"></span>Loading…</div>
+    <div class="dg-overlay-panel">No rows to show</div>
+  </div>
+
+  <!-- Inline editor -->
+  <h2 class="section">Inline Cell Editor</h2>
+  <p class="section-desc">편집 중인 셀 — 액센트 보더의 인라인 인풋.</p>
+  <div class="dg-root specimen">
+    <div class="dg-canvas" style="height:auto">
+      <div class="dg-row">
+        <div class="dg-cell" style="width:200px">Read-only cell</div>
+        <div class="dg-cell" style="width:220px;padding:0 6px"><input class="dg-cell-editor" value="편집 중…"></div>
+        <div class="dg-cell" style="width:160px">Cell</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Live mini grid -->
+  <h2 class="section">All Together — Live</h2>
+  <p class="section-desc">위 컴포넌트들이 실제 인스턴스에서 조합된 모습.</p>
+  <div class="card grid-wrap-sm" id="gridLive"></div>
+
+</div>
+
+<script src="../dist/datagrid.js"></script>
+<script src="../demo/data.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  document.getElementById('indet').indeterminate = true;
+
+  /* token swatches */
+  var tokens = [
+    ['--dg-accent-color', 'Accent'],
+    ['--dg-foreground-color', 'Foreground'],
+    ['--dg-secondary-foreground-color', 'Secondary FG'],
+    ['--dg-border-color', 'Border'],
+    ['--dg-header-background-color', 'Header BG'],
+    ['--dg-row-hover-color', 'Row hover'],
+    ['--dg-selected-row-background-color', 'Row selected'],
+    ['--dg-chip-background-color', 'Chip BG'],
+  ];
+  var probe = document.createElement('div');
+  probe.className = 'dg-root';
+  probe.style.display = 'none';
+  document.body.appendChild(probe);
+  var styles = getComputedStyle(probe);
+  var wrap = document.getElementById('swatches');
+  tokens.forEach(function (t) {
+    var val = styles.getPropertyValue(t[0]).trim();
+    var sw = document.createElement('div');
+    sw.className = 'swatch';
+    sw.innerHTML =
+      '<div class="chip" style="background:' + val + '"></div>' +
+      '<div class="meta"><strong>' + t[1] + '</strong><span>' + t[0] + '</span></div>';
+    wrap.appendChild(sw);
+  });
+  document.body.removeChild(probe);
+
+  /* live grid */
+  var money = function (v) { return '$' + Number(v).toLocaleString(); };
+  var live = new DataGrid(document.getElementById('gridLive'), {
+    rowData: DemoData.makeEmployees(40),
+    rowSelection: 'multiple',
+    pagination: true,
+    paginationPageSize: 10,
+    columnDefs: [
+      { colId: 'sel', headerName: '', width: 48, minWidth: 48, checkboxSelection: true,
+        headerCheckboxSelection: true, sortable: false, resizable: false },
+      { field: 'name', headerName: 'Name', width: 170, filter: 'text', editable: true },
+      { field: 'department', headerName: 'Department', width: 150, filter: 'set' },
+      { field: 'status', headerName: 'Status', width: 130, filter: 'set',
+        cellRenderer: DataGrid.renderers.tag({ 'Active': 'green', 'On Leave': 'yellow', 'Contract': 'blue', 'Inactive': 'gray' }) },
+      { field: 'salary', headerName: 'Salary', width: 130, align: 'right', filter: 'number', valueFormatter: money },
+      { field: 'progress', headerName: 'Progress', width: 150, cellRenderer: DataGrid.renderers.progress() },
+    ],
+  });
+
+  /* dark mode — specimens pick the theme up via the extra class on each .dg-root */
+  var themeBtn = document.getElementById('themeToggle');
+  themeBtn.addEventListener('click', function () {
+    var dark = document.body.classList.toggle('dark');
+    document.querySelectorAll('.dg-root').forEach(function (el) {
+      el.classList.toggle('dg-theme-dark', dark);
+    });
+    live.setTheme(dark ? 'dark' : 'light');
+    themeBtn.textContent = dark ? '☀️ Light' : '🌙 Dark';
+  });
+})();
+</script>
+</body>
+</html>
