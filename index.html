@@ -24,8 +24,8 @@
 
   <h1>Employee Directory</h1>
   <p class="subtitle">
-    10,000행 실데이터 템플릿 — 가상 스크롤, 정렬(Shift 멀티), 컬럼 필터 메뉴, 퀵 필터,
-    행 그룹핑·집계, 체크박스 선택, 페이지네이션, 인라인 편집, CSV 내보내기를 한 화면에서 사용합니다.
+    10,000행 실데이터 템플릿 — 가상 스크롤, 정렬(Shift 멀티), 컬럼 필터 메뉴, 헤더 필터 행,
+    퀵 필터, 행 그룹핑·집계, 체크박스 선택, 페이지네이션, 인라인 편집, CSV 내보내기를 한 화면에서 사용합니다.
     <strong>View Source</strong> 탭에서 전체 코드를 확인하세요.
   </p>
 
@@ -60,6 +60,7 @@
         paginationPageSize: 50,
         zebra: true,
         grandTotal: true,
+        floatingFilter: true,
         defaultColDef: { sortable: true, resizable: true },
         columnDefs: [
           { colId: 'sel', headerName: '', width: 48, minWidth: 48, pinned: 'left',
