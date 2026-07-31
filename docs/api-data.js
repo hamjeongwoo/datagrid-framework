@@ -247,6 +247,29 @@ window.ApiDocs = {
             '행 끝에서는 다음/이전 행으로 감쌉니다.',
         },
         {
+          name: 'trackChanges',
+          type: 'boolean',
+          default: 'false',
+          since: '1.2.0',
+          description:
+            '마지막 기준선(생성/<code>setRowData</code>/<code>commitChanges</code>) 이후의 변경을 추적합니다. ' +
+            '수정된 셀은 모서리 마커(dirty, 툴팁에 원래 값), 추가된 행은 배경색으로 표시되고 ' +
+            '<a href="#api-methods-getChanges"><code>getChanges()</code></a> / ' +
+            '<code>commitChanges()</code> / <code>rollbackChanges()</code>로 제어합니다. ' +
+            '값이 원래대로 돌아오면 dirty가 자동 해제됩니다.',
+        },
+        {
+          name: 'undoRedo',
+          type: 'boolean',
+          default: 'false',
+          since: '1.2.0',
+          description:
+            '셀 수정·행 추가·행 삭제의 실행 취소 스택을 활성화합니다 — ' +
+            '<kbd>Ctrl/⌘+Z</kbd>(undo), <kbd>Ctrl/⌘+Shift+Z</kbd> 또는 <kbd>Ctrl/⌘+Y</kbd>(redo), ' +
+            '<code>undo()</code> / <code>redo()</code> / <code>canUndo()</code> / <code>canRedo()</code>. ' +
+            '<code>trackChanges</code>와 독립적으로 사용할 수 있고 함께 켜면 추적 상태도 같이 되돌아갑니다.',
+        },
+        {
           name: 'getRowClass',
           type: '(row, index) => string',
           since: '1.2.0',
@@ -830,6 +853,58 @@ window.ApiDocs = {
           group: 'Pagination',
           signature: 'setPageSize(size: number): void',
           description: '페이지 크기를 변경합니다. 현재 보고 있던 첫 행이 포함된 페이지로 이동합니다.',
+        },
+
+        /* ---- 변경 추적 ---- */
+        {
+          name: 'getChanges',
+          group: 'Change Tracking',
+          signature: 'getChanges(): { added: object[], updated: object[], deleted: object[] }',
+          since: '1.2.0',
+          description:
+            '기준선 이후 추가/수정/삭제된 행 목록을 반환합니다(<code>trackChanges: true</code> 필요). ' +
+            '추가했다가 삭제한 행은 흔적이 남지 않고, 수정 후 삭제한 행은 <code>deleted</code>에만 나타납니다. ' +
+            '서버 저장 페이로드로 사용하세요.',
+          example:
+            'var ch = grid.getChanges();\n' +
+            "fetch('/api/save', { method: 'POST', body: JSON.stringify(ch) })\n" +
+            '  .then(function () { grid.commitChanges(); });',
+        },
+        {
+          name: 'isDirty',
+          group: 'Change Tracking',
+          signature: 'isDirty(): boolean',
+          since: '1.2.0',
+          description: '기준선 이후 변경이 하나라도 있는지 반환합니다.',
+        },
+        {
+          name: 'commitChanges',
+          group: 'Change Tracking',
+          signature: 'commitChanges(): void',
+          since: '1.2.0',
+          description:
+            '현재 상태를 새 기준선으로 확정합니다 — 변경 목록과 dirty 표시가 초기화됩니다. ' +
+            '서버 저장이 성공한 뒤 호출하세요.',
+        },
+        {
+          name: 'rollbackChanges',
+          group: 'Change Tracking',
+          signature: 'rollbackChanges(): void',
+          since: '1.2.0',
+          description:
+            '모든 변경을 기준선으로 되돌립니다: 수정 값 원복, 추가 행 제거, 삭제 행을 원래 위치에 복원. ' +
+            'undo/redo 스택도 함께 비워집니다(롤백을 가로지르는 undo는 지원하지 않음).',
+        },
+        {
+          name: 'undo',
+          group: 'Change Tracking',
+          signature: 'undo(): boolean',
+          since: '1.2.0',
+          description:
+            '마지막 변경(셀 수정·행 추가·행 삭제)을 되돌립니다(<code>undoRedo: true</code> 필요). ' +
+            '되돌릴 것이 없으면 <code>false</code>. <kbd>Ctrl/⌘+Z</kbd>와 동일합니다. ' +
+            '<code>redo()</code>는 반대로 다시 적용하며 <kbd>Ctrl/⌘+Y</kbd>와 동일합니다. ' +
+            '<code>canUndo()</code> / <code>canRedo()</code>로 버튼 상태를 동기화하세요.',
         },
 
         /* ---- 탐색 ---- */

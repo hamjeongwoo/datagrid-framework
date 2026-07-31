@@ -491,6 +491,22 @@
     return rows;
   }
 
+  /**
+   * rollbackChanges()의 행 목록 계산: 추가된 행을 제거하고, 삭제된 행을
+   * 기록된 인덱스에 다시 끼워 넣는다. 새 배열을 반환한다.
+   * deleted: [{ row, index }] — index는 삭제 당시 전체 행 기준 위치.
+   */
+  function rollbackRows(rows, added, deleted) {
+    var out = rows.filter(function (r) { return added.indexOf(r) === -1; });
+    deleted
+      .slice()
+      .sort(function (a, b) { return a.index - b.index; })
+      .forEach(function (d) {
+        out.splice(Math.min(d.index, out.length), 0, d.row);
+      });
+    return out;
+  }
+
   /** 뷰 행 배열 → field가 있는 컬럼만 담은 평범한 객체 배열 (getJson()용). */
   function buildJsonRows(rows, columns) {
     return rows.map(function (row) {
@@ -706,6 +722,14 @@
 
     this._rowHeight = options.rowHeight || 42;
     this._headerHeight = options.headerHeight || 48;
+
+    /* change tracking + undo/redo */
+    this._trackChanges = !!options.trackChanges;
+    this._undoRedo = !!options.undoRedo;
+    this._resetTracking();
+    this._undoStack = [];
+    this._redoStack = [];
+    this._historyMuted = false;
 
     this._pasteCount = 0; /* paste 이벤트/클립보드 API 폴백의 이중 실행 방지용 */
     this._docListeners = [];
@@ -1214,6 +1238,11 @@
         console.error('[DataGrid] getRowClass failed:', e);
       }
     }
+    var dirtyFields = null;
+    if (this._trackChanges) {
+      if (this._addedRows.indexOf(row) !== -1) rowEl.classList.add('dg-row-added');
+      else if (this._originals) dirtyFields = this._originals.get(row) || null;
+    }
 
     this._visibleColumns().forEach(function (col, cIdx) {
       var cell = el('div', 'dg-cell', rowEl);
@@ -1225,6 +1254,10 @@
       if (col.pinned === 'left') cell.classList.add('dg-pinned-left');
       if (col.pinned === 'right') cell.classList.add('dg-pinned-right');
       if (col.editable && self._editable) cell.classList.add('dg-cell-editable');
+      if (dirtyFields && col.field !== undefined && (col.field in dirtyFields)) {
+        cell.classList.add('dg-cell-dirty');
+        cell.title = 'Original: ' + dirtyFields[col.field];
+      }
       if (col.cellClass) {
         var cls = typeof col.cellClass === 'function' ? col.cellClass(row[col.field], row) : col.cellClass;
         if (cls) cell.classList.add.apply(cell.classList, String(cls).split(/\s+/));
@@ -1797,6 +1830,20 @@
   DataGrid.prototype._onKeyDown = function (e) {
     if (this._editing) return; /* editor handles its own keys */
 
+    /* undo/redo: Ctrl/⌘+Z, Ctrl/⌘+Shift+Z 또는 Ctrl/⌘+Y */
+    if (this._undoRedo && (e.ctrlKey || e.metaKey)) {
+      if (e.key === 'z' || e.key === 'Z') {
+        if (e.shiftKey) this.redo(); else this.undo();
+        e.preventDefault();
+        return;
+      }
+      if (e.key === 'y' || e.key === 'Y') {
+        this.redo();
+        e.preventDefault();
+        return;
+      }
+    }
+
     /* 클립보드: Ctrl/⌘+C 복사(선택 행 또는 포커스 셀), Ctrl/⌘+V 붙여넣기 */
     if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
       var tsv = this._selectionTsv();
@@ -2053,6 +2100,7 @@
           if (evt.cancel) { markInvalid(); return false; }
           clearInvalid();
           row[col.field] = evt.newValue;
+          self._recordUpdate(row, col.field, value, evt.newValue);
           newValue = evt.newValue;
           committed = true;
           self._emitter.emit('cellValueChanged', {
@@ -2066,6 +2114,14 @@
       /* re-render the cell in place */
       cellEl.innerHTML = '';
       self._renderCellValue(cellEl, col, row);
+      /* 제자리 재렌더링이라 dirty 표시도 여기서 갱신해야 한다 (refresh 없이) */
+      if (self._trackChanges && self._originals && col.field !== undefined) {
+        var orig = self._originals.get(row);
+        var dirtyNow = !!(orig && (col.field in orig));
+        cellEl.classList.toggle('dg-cell-dirty', dirtyNow);
+        if (dirtyNow) cellEl.title = 'Original: ' + orig[col.field];
+        else cellEl.removeAttribute('title');
+      }
       self._emitter.emit('editingStopped', {
         data: row,
         colDef: col,
@@ -2283,6 +2339,7 @@
         self._emitter.emit('beforeCellSave', evt);
         if (evt.cancel) return;
         row[col.field] = evt.newValue;
+        self._recordUpdate(row, col.field, oldValue, evt.newValue);
         updated++;
         self._emitter.emit('cellValueChanged', {
           data: row, colDef: col, oldValue: oldValue, newValue: evt.newValue,
@@ -2514,6 +2571,9 @@
     this._currentPage = 0;
     this._lastClickedViewIndex = -1;
     this._focusedCell = null;
+    this._resetTracking(); /* 새 데이터 = 새 기준선 */
+    this._undoStack = [];
+    this._redoStack = [];
     this.refresh();
     this._emitDataChanged();
   };
@@ -2524,6 +2584,7 @@
 
   DataGrid.prototype.addRows = function (rows) {
     this._rows = this._rows.concat(rows);
+    this._recordAdd(rows);
     this.refresh();
     this._emitDataChanged();
   };
@@ -2532,9 +2593,17 @@
   DataGrid.prototype.removeRows = function (rows) {
     var ids = {};
     var self = this;
-    rows.forEach(function (r) { ids[self._rowId(r)] = true; });
+    var entries = [];
+    rows.forEach(function (r) {
+      var idx = self._rows.indexOf(r);
+      if (idx !== -1) {
+        entries.push({ row: r, index: idx, wasAdded: self._addedRows.indexOf(r) !== -1 });
+      }
+      ids[self._rowId(r)] = true;
+    });
     this._rows = this._rows.filter(function (r) { return !ids[self._rowId(r)]; });
     rows.forEach(function (r) { delete self._selection[self._rowId(r)]; });
+    if (entries.length > 0) this._recordRemove(entries);
     this.refresh();
     this._emitDataChanged();
   };
@@ -2545,7 +2614,10 @@
   };
 
   DataGrid.prototype.updateRow = function (row, changes) {
-    for (var k in changes) row[k] = changes[k];
+    for (var k in changes) {
+      if (row[k] !== changes[k]) this._recordUpdate(row, k, row[k], changes[k]);
+      row[k] = changes[k];
+    }
     this.refresh();
     this._emitDataChanged();
   };
@@ -2562,6 +2634,185 @@
 
   DataGrid.prototype.setTheme = function (theme) {
     this._rootEl.classList.toggle('dg-theme-dark', theme === 'dark');
+  };
+
+  /* ---- change tracking (trackChanges) + undo/redo ---- */
+
+  DataGrid.prototype._resetTracking = function () {
+    this._originals = typeof WeakMap !== 'undefined' ? new WeakMap() : null;
+    this._updatedRows = [];
+    this._addedRows = [];
+    this._deletedRows = []; /* { row, index, wasAdded } */
+  };
+
+  /* -- 추적 상태만 갱신 (히스토리와 분리 — undo/redo도 재사용) -- */
+
+  DataGrid.prototype._trackUpdate = function (row, field, oldValue, newValue) {
+    if (!this._trackChanges || !this._originals) return;
+    if (this._addedRows.indexOf(row) !== -1) return; /* 새 행의 수정은 added로 충분 */
+    var orig = this._originals.get(row);
+    if (!orig) { orig = {}; this._originals.set(row, orig); }
+    if (!(field in orig)) orig[field] = oldValue;
+    else if (orig[field] === newValue) delete orig[field]; /* 원래 값 복귀 → dirty 해제 */
+    var hasDirty = false;
+    for (var k in orig) { hasDirty = true; break; }
+    var idx = this._updatedRows.indexOf(row);
+    if (hasDirty && idx === -1) this._updatedRows.push(row);
+    else if (!hasDirty && idx !== -1) this._updatedRows.splice(idx, 1);
+  };
+
+  DataGrid.prototype._trackAdd = function (rows) {
+    if (!this._trackChanges) return;
+    var self = this;
+    rows.forEach(function (r) {
+      if (self._addedRows.indexOf(r) === -1) self._addedRows.push(r);
+    });
+  };
+
+  DataGrid.prototype._trackRemove = function (entries) {
+    if (!this._trackChanges) return;
+    var self = this;
+    entries.forEach(function (en) {
+      var ai = self._addedRows.indexOf(en.row);
+      if (ai !== -1) self._addedRows.splice(ai, 1); /* 추가 후 삭제 = 흔적 없음 */
+      else self._deletedRows.push(en);
+      var ui = self._updatedRows.indexOf(en.row);
+      if (ui !== -1) self._updatedRows.splice(ui, 1); /* 수정 이력은 삭제에 흡수 */
+    });
+  };
+
+  DataGrid.prototype._untrackAdd = function (rows) {
+    if (!this._trackChanges) return;
+    var self = this;
+    rows.forEach(function (r) {
+      var i = self._addedRows.indexOf(r);
+      if (i !== -1) self._addedRows.splice(i, 1);
+    });
+  };
+
+  DataGrid.prototype._untrackRemove = function (entries) {
+    if (!this._trackChanges) return;
+    var self = this;
+    entries.forEach(function (en) {
+      if (en.wasAdded) {
+        if (self._addedRows.indexOf(en.row) === -1) self._addedRows.push(en.row);
+        return;
+      }
+      for (var i = 0; i < self._deletedRows.length; i++) {
+        if (self._deletedRows[i].row === en.row) { self._deletedRows.splice(i, 1); return; }
+      }
+    });
+  };
+
+  /* -- 기록 = 추적 + 히스토리 푸시 -- */
+
+  DataGrid.prototype._pushHistory = function (action) {
+    if (!this._undoRedo || this._historyMuted) return;
+    this._undoStack.push(action);
+    this._redoStack = [];
+  };
+
+  DataGrid.prototype._recordUpdate = function (row, field, oldValue, newValue) {
+    this._trackUpdate(row, field, oldValue, newValue);
+    this._pushHistory({ type: 'update', row: row, field: field, oldValue: oldValue, newValue: newValue });
+  };
+
+  DataGrid.prototype._recordAdd = function (rows) {
+    this._trackAdd(rows);
+    this._pushHistory({ type: 'add', rows: rows.slice() });
+  };
+
+  DataGrid.prototype._recordRemove = function (entries) {
+    this._pushHistory({ type: 'remove', entries: entries.slice() }); /* wasAdded는 추적 갱신 전에 캡처됨 */
+    this._trackRemove(entries);
+  };
+
+  /* -- 공개 API -- */
+
+  /** 마지막 commit/setRowData 이후의 변경 묶음. */
+  DataGrid.prototype.getChanges = function () {
+    return {
+      added: this._addedRows.slice(),
+      updated: this._updatedRows.slice(),
+      deleted: this._deletedRows.map(function (d) { return d.row; }),
+    };
+  };
+
+  DataGrid.prototype.isDirty = function () {
+    return this._addedRows.length > 0 || this._updatedRows.length > 0 || this._deletedRows.length > 0;
+  };
+
+  /** 현재 상태를 새 기준선으로 확정한다 (dirty 표시·변경 목록 초기화). */
+  DataGrid.prototype.commitChanges = function () {
+    this._resetTracking();
+    this.refresh();
+  };
+
+  /** 모든 변경을 기준선으로 되돌린다: 수정 값 원복, 추가 행 제거, 삭제 행 복원. */
+  DataGrid.prototype.rollbackChanges = function () {
+    var self = this;
+    if (this._originals) {
+      this._updatedRows.forEach(function (row) {
+        var orig = self._originals.get(row);
+        for (var f in orig) row[f] = orig[f];
+      });
+    }
+    this._addedRows.forEach(function (r) { delete self._selection[self._rowId(r)]; });
+    this._rows = rollbackRows(this._rows, this._addedRows, this._deletedRows);
+    this._resetTracking();
+    this._undoStack = []; /* 롤백을 가로지르는 undo는 지원하지 않는다 */
+    this._redoStack = [];
+    this.refresh();
+    this._emitDataChanged();
+  };
+
+  DataGrid.prototype.canUndo = function () { return this._undoStack.length > 0; };
+  DataGrid.prototype.canRedo = function () { return this._redoStack.length > 0; };
+
+  /** 마지막 변경(셀 수정·행 추가·행 삭제)을 되돌린다. 되돌렸으면 true. */
+  DataGrid.prototype.undo = function () {
+    if (!this._undoRedo || this._undoStack.length === 0) return false;
+    var a = this._undoStack.pop();
+    var self = this;
+    if (a.type === 'update') {
+      a.row[a.field] = a.oldValue;
+      this._trackUpdate(a.row, a.field, a.newValue, a.oldValue);
+    } else if (a.type === 'add') {
+      this._rows = this._rows.filter(function (r) { return a.rows.indexOf(r) === -1; });
+      a.rows.forEach(function (r) { delete self._selection[self._rowId(r)]; });
+      this._untrackAdd(a.rows);
+    } else if (a.type === 'remove') {
+      this._rows = rollbackRows(this._rows, [], a.entries);
+      this._untrackRemove(a.entries);
+    }
+    this._redoStack.push(a);
+    this.refresh();
+    this._emitDataChanged();
+    return true;
+  };
+
+  /** undo로 되돌린 변경을 다시 적용한다. 적용했으면 true. */
+  DataGrid.prototype.redo = function () {
+    if (!this._undoRedo || this._redoStack.length === 0) return false;
+    var a = this._redoStack.pop();
+    var self = this;
+    if (a.type === 'update') {
+      a.row[a.field] = a.newValue;
+      this._trackUpdate(a.row, a.field, a.oldValue, a.newValue);
+    } else if (a.type === 'add') {
+      this._rows = this._rows.concat(a.rows);
+      this._trackAdd(a.rows);
+    } else if (a.type === 'remove') {
+      var ids = {};
+      a.entries.forEach(function (en) { ids[self._rowId(en.row)] = true; });
+      this._rows = this._rows.filter(function (r) { return !ids[self._rowId(r)]; });
+      a.entries.forEach(function (en) { delete self._selection[self._rowId(en.row)]; });
+      this._trackRemove(a.entries);
+    }
+    this._undoStack.push(a);
+    this.refresh();
+    this._emitDataChanged();
+    return true;
   };
 
   /* ---- grid state save / restore ---- */
@@ -2763,6 +3014,7 @@
     buildCsv: buildCsv,
     buildJsonRows: buildJsonRows,
     applyValueGetters: applyValueGetters,
+    rollbackRows: rollbackRows,
     normalizeColumns: normalizeColumns,
     applyColumnState: applyColumnState,
     computeColumnWidths: computeColumnWidths,

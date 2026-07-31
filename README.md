@@ -71,6 +71,8 @@ python demo/server.py
 | `getRowClass(row, index)` | function | 행별 CSS 클래스 |
 | `editable` | boolean | 그리드 전체 편집 잠금 (`false`면 컬럼 설정 무시, `setEditable`로 전환) |
 | `editOnSingleClick` / `enterMovesDown` / `tabMovesRight` | boolean | 클릭 한 번 편집 / Enter·Tab 연속 편집 |
+| `trackChanges` | boolean | 변경 추적 — dirty 셀 표시 + `getChanges`/`commitChanges`/`rollbackChanges` |
+| `undoRedo` | boolean | Ctrl+Z/Y 실행 취소 스택 (`undo`/`redo`/`canUndo`/`canRedo`) |
 
 ## 컬럼 정의
 
@@ -114,6 +116,7 @@ cellRenderer: DataGrid.renderers.progress()   // 0–100 진행 바
 `removeRows(rows)` / `removeSelectedRows()` · `getSelectedRows()` · `selectAll()` / `deselectAll()` ·
 `startEdit(row, field)` / `stopEdit(commit)` / `isEditing()` · `setEditable(bool)` / `isEditable()` ·
 `copy()` / `pasteTsv(text)` (Ctrl+C/V 엑셀 호환 TSV) ·
+`getChanges()` / `isDirty()` / `commitChanges()` / `rollbackChanges()` · `undo()` / `redo()` / `canUndo()` / `canRedo()` ·
 `setQuickFilter(text)` · `applyColumnFilter(field, model)` · `getFilterModel()` · `clearFilters()` ·
 `setSortModel(model)` / `getSortModel()` · `setGroupBy(fields)` / `getGroupBy()` ·
 `expandAllGroups()` / `collapseAllGroups()` · `setPage(n)` / `setPageSize(n)` ·

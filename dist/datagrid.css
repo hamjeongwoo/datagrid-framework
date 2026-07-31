@@ -31,6 +31,8 @@
   --dg-menu-background-color: #ffffff;
   --dg-menu-shadow: 0 4px 16px rgba(24, 29, 31, 0.16);
   --dg-invalid-color: #e02525;
+  --dg-dirty-color: #e07c00;
+  --dg-added-row-background-color: rgba(13, 138, 68, 0.08);
   --dg-group-row-background-color: #f3f6fa;
   --dg-group-indent: 20px;
   --dg-floating-filter-height: 36px;
@@ -84,6 +86,8 @@
   --dg-input-border-color: rgba(255, 255, 255, 0.28);
   --dg-menu-background-color: #24292b;
   --dg-menu-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
+  --dg-dirty-color: #ffa940;
+  --dg-added-row-background-color: rgba(52, 199, 119, 0.12);
   --dg-group-row-background-color: #22282c;
 }
 
@@ -336,6 +340,25 @@
 .dg-cell-editor.dg-invalid {
   border-color: var(--dg-invalid-color);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--dg-invalid-color) 18%, transparent);
+}
+
+/* 변경 추적 (trackChanges): dirty 셀 모서리 마커 + 추가 행 배경 */
+.dg-cell.dg-cell-dirty:not(.dg-pinned-left):not(.dg-pinned-right) { position: relative; }
+.dg-cell.dg-cell-dirty::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 4px solid var(--dg-dirty-color);
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+}
+/* background-image로 겹쳐 고정 컬럼의 불투명 배경색을 보존한다 */
+.dg-row-added .dg-cell {
+  background-image: linear-gradient(
+    var(--dg-added-row-background-color),
+    var(--dg-added-row-background-color)
+  );
 }
 
 /* 커스텀 에디터({ init, getValue, destroy })가 열린 셀 */

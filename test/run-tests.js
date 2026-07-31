@@ -363,6 +363,41 @@ suite('applyValueGetters', function () {
   assertEq(same, [{ x: 1 }], 'no field or no getter → untouched');
 });
 
+/* ---------------- rollbackRows ---------------- */
+suite('rollbackRows', function () {
+  var a = { id: 'a' }, b = { id: 'b' }, c = { id: 'c' }, x = { id: 'x' }, y = { id: 'y' };
+
+  assertEq(
+    T.rollbackRows([a, x, b], [x], []).map(function (r) { return r.id; }),
+    ['a', 'b'],
+    'added rows removed'
+  );
+  assertEq(
+    T.rollbackRows([a, c], [], [{ row: b, index: 1 }]).map(function (r) { return r.id; }),
+    ['a', 'b', 'c'],
+    'deleted row restored at recorded index'
+  );
+  assertEq(
+    T.rollbackRows([a], [], [{ row: b, index: 99 }]).map(function (r) { return r.id; }),
+    ['a', 'b'],
+    'out-of-range index appends'
+  );
+  assertEq(
+    T.rollbackRows([c], [], [{ row: b, index: 1 }, { row: a, index: 0 }]).map(function (r) { return r.id; }),
+    ['a', 'b', 'c'],
+    'multiple deletions restored in index order'
+  );
+  assertEq(
+    T.rollbackRows([a, x, c], [x], [{ row: b, index: 1 }]).map(function (r) { return r.id; }),
+    ['a', 'b', 'c'],
+    'added removal + deletion restore combined'
+  );
+  var original = [a, x];
+  T.rollbackRows(original, [x], []);
+  assertEq(original.length, 2, 'input array not mutated');
+  assertEq(T.rollbackRows([], [], []), [], 'empty inputs');
+});
+
 /* ---------------- buildJsonRows ---------------- */
 suite('buildJsonRows', function () {
   var rows = [

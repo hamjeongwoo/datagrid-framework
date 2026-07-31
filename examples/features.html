@@ -954,6 +954,85 @@
     </script>
   </div>
 
+  <!-- ======================================================== 변경 추적 & undo/redo -->
+  <h2 class="section">Change Tracking &amp; Undo / Redo</h2>
+  <p class="section-desc">
+    <code class="inline">trackChanges: true</code>는 마지막 기준선 이후의 변경을 추적합니다 —
+    수정 셀은 모서리 마커(dirty), 추가 행은 배경으로 표시되고
+    <code class="inline">getChanges()</code> / <code class="inline">commitChanges()</code> /
+    <code class="inline">rollbackChanges()</code>로 제어합니다.
+    <code class="inline">undoRedo: true</code>는 <kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd>와
+    <code class="inline">undo()</code> / <code class="inline">redo()</code>를 활성화합니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn" id="tcAddBtn" type="button">행 추가</button>
+        <button class="tb-btn" id="tcRemoveBtn" type="button">선택 행 삭제</button>
+        <button class="tb-btn" id="tcUndoBtn" type="button">↶ undo()</button>
+        <button class="tb-btn" id="tcRedoBtn" type="button">↷ redo()</button>
+        <button class="tb-btn" id="tcChangesBtn" type="button">getChanges()</button>
+        <button class="tb-btn" id="tcCommitBtn" type="button">commitChanges()</button>
+        <button class="tb-btn" id="tcRollbackBtn" type="button">rollbackChanges()</button>
+      </div>
+      <div id="gridTrack" class="grid-wrap-sm"></div>
+      <div class="status-line" id="tcStatus">
+        셀을 더블클릭해 수정해 보세요 — 수정된 셀에 주황 마커가 생기고 undo로 되돌릴 수 있습니다.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var nextId = 1000;
+      var grid = new DataGrid(document.getElementById('gridTrack'), {
+        rowData: DemoData.makeEmployees(20, 53),
+        trackChanges: true,
+        undoRedo: true,
+        rowSelection: 'multiple',
+        columnDefs: [
+          { field: 'name', headerName: 'Name', width: 160, editable: true },
+          { field: 'department', headerName: 'Department', width: 150, editable: true, editor: 'select',
+            editorOptions: ['Engineering', 'Design', 'Marketing', 'Sales', 'Finance', 'Support'] },
+          { field: 'salary', headerName: 'Salary', dataType: 'number', format: '$#,##0',
+            width: 130, editable: true },
+        ],
+      });
+
+      var status = document.getElementById('tcStatus');
+      var report = function (prefix) {
+        var ch = grid.getChanges();
+        status.textContent = (prefix ? prefix + ' — ' : '') +
+          'added ' + ch.added.length + ' · updated ' + ch.updated.length +
+          ' · deleted ' + ch.deleted.length +
+          ' | canUndo: ' + grid.canUndo() + ' · canRedo: ' + grid.canRedo();
+      };
+
+      grid.on('cellValueChanged', function () { report('셀 수정'); });
+
+      document.getElementById('tcAddBtn').addEventListener('click', function () {
+        grid.addRow({ name: 'New Hire ' + (nextId++), department: 'Design', salary: 48000 });
+        report('행 추가');
+      });
+      document.getElementById('tcRemoveBtn').addEventListener('click', function () {
+        grid.removeSelectedRows();
+        report('행 삭제');
+      });
+      document.getElementById('tcUndoBtn').addEventListener('click', function () {
+        report(grid.undo() ? 'undo 적용' : 'undo 없음');
+      });
+      document.getElementById('tcRedoBtn').addEventListener('click', function () {
+        report(grid.redo() ? 'redo 적용' : 'redo 없음');
+      });
+      document.getElementById('tcChangesBtn').addEventListener('click', function () { report('현재 변경'); });
+      document.getElementById('tcCommitBtn').addEventListener('click', function () {
+        grid.commitChanges();
+        report('커밋 — 현재 상태가 새 기준선');
+      });
+      document.getElementById('tcRollbackBtn').addEventListener('click', function () {
+        grid.rollbackChanges();
+        report('롤백 — 기준선으로 복원');
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>
