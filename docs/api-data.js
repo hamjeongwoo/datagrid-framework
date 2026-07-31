@@ -178,6 +178,18 @@ window.ApiDocs = {
             '헤더 드래그로 컬럼 순서 변경을 허용합니다. 고정(pinned) 컬럼은 드래그 대상에서 제외됩니다.',
         },
         {
+          name: 'floatingFilter',
+          type: 'boolean',
+          default: 'false',
+          since: '1.1.0',
+          description:
+            '헤더 바로 아래에 컬럼별 인라인 필터 행을 표시합니다. <code>filter</code>가 지정된 컬럼마다 ' +
+            'text/number는 입력창(입력 즉시 250ms 디바운스로 적용, <kbd>Enter</kbd> 즉시 적용, <kbd>Esc</kbd> 해제), ' +
+            '<code>set</code>은 단일 값 드롭다운이 생깁니다. 필터 메뉴와 같은 필터 모델을 공유하며, ' +
+            '단일 입력으로 표현할 수 없는 <code>inRange</code>는 <code>equals</code>로 대체됩니다.',
+          example: 'floatingFilter: true',
+        },
+        {
           name: 'groupBy',
           type: 'string[]',
           default: '[]',
@@ -832,6 +844,7 @@ window.ApiDocs = {
         { name: '--dg-invalid-color', default: '#e02525', description: '오류 표시용(예약).' },
         { name: '--dg-group-row-background-color', default: '#f3f6fa', description: '그룹 헤더 행 배경.', since: '1.1.0' },
         { name: '--dg-group-indent', default: '20px', description: '중첩 그룹 레벨당 들여쓰기 폭.', since: '1.1.0' },
+        { name: '--dg-floating-filter-height', default: '36px', description: '헤더 필터 행(floatingFilter) 높이.', since: '1.1.0' },
         { name: '--dg-header-height', default: '48px', description: '헤더 높이 — JS 옵션 headerHeight로 설정하세요.' },
         { name: '--dg-row-height', default: '42px', description: '행 높이 — JS 옵션 rowHeight로 설정하세요(가상 스크롤 계산에 사용).' },
         { name: '--dg-cell-horizontal-padding', default: '16px', description: '셀 좌우 패딩.' },

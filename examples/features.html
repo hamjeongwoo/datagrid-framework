@@ -143,6 +143,40 @@
     </script>
   </div>
 
+  <!-- ======================================================== Floating filter -->
+  <h2 class="section">Floating Filter (헤더 필터 행)</h2>
+  <p class="section-desc">
+    <code class="inline">floatingFilter: true</code> — 헤더 바로 아래에 컬럼별 인라인 필터 입력을 표시합니다.
+    text/number는 입력하는 대로(250ms 디바운스) 필터링되고, set은 드롭다운으로 단일 값을 고릅니다.
+    필터 메뉴와 같은 필터 모델을 공유하므로 <kbd>Esc</kbd>로 지우거나 메뉴에서 바꾼 내용이 서로 반영됩니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div id="gridFloating" class="grid-wrap-sm"></div>
+      <div class="status-line" id="floatingStatus">헤더 아래 입력란에 바로 입력해 보세요.</div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridFloating'), {
+        rowData: DemoData.makeEmployees(80, 11),
+        floatingFilter: true,
+        columnDefs: [
+          { field: 'name', headerName: 'Name', width: 180, filter: 'text' },
+          { field: 'department', headerName: 'Department', width: 170, filter: 'set' },
+          { field: 'city', headerName: 'City', width: 150, filter: 'set' },
+          { field: 'salary', headerName: 'Salary', width: 150, align: 'right',
+            filter: 'number',
+            valueFormatter: function (v) { return '$' + v.toLocaleString(); } },
+        ],
+      });
+
+      grid.on('filterChanged', function () {
+        document.getElementById('floatingStatus').textContent =
+          grid.getDisplayedRowCount().toLocaleString() + '행 표시 중 — 필터 모델: ' +
+          JSON.stringify(grid.getFilterModel());
+      });
+    </script>
+  </div>
+
   <!-- ======================================================== Quick filter -->
   <h2 class="section">Quick Filter</h2>
   <p class="section-desc">모든 컬럼을 대상으로 한 전역 검색 — 공백으로 구분된 모든 단어가 일치해야 합니다.</p>

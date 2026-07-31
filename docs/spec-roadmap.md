@@ -133,7 +133,7 @@
 |---|---|---|---|
 | [ ] | `title / showTitle` | `title: '직원 목록'` 옵션 — 그리드 상단 타이틀 바 | **P2** |
 | [ ] | `toolbar / showToolbar / refreshToolbar` | `toolbar: { items: [...] }` 슬롯 또는 소비자 DOM 주입 — 우리는 데모처럼 외부 툴바 권장, 내장은 최소한으로 | **P2** |
-| [ ] | `filterModel`의 **헤더 필터 행** (`header: true`, 컬럼 아래 인라인 필터 입력) | `floatingFilter: true` — 헤더 아래 필터 행 (메뉴 방식과 병행) | **P1** |
+| [x] | `filterModel`의 **헤더 필터 행** (`header: true`, 컬럼 아래 인라인 필터 입력) | `floatingFilter: true` — 헤더 아래 필터 행, 메뉴와 필터 모델 공유 (text/number 입력 + set 드롭다운) — v1.1.0 | **P1** |
 | [ ] | `showHeader / showTop / showBottom` | `showHeader: false` 정도만 | P3 |
 
 ---

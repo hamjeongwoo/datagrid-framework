@@ -33,6 +33,7 @@
   --dg-invalid-color: #e02525;
   --dg-group-row-background-color: #f3f6fa;
   --dg-group-indent: 20px;
+  --dg-floating-filter-height: 36px;
   --dg-header-height: 48px;
   --dg-row-height: 42px;
   --dg-cell-horizontal-padding: 16px;
@@ -182,6 +183,45 @@
   background: var(--dg-chip-background-color);
   color: var(--dg-foreground-color);
 }
+
+/* Floating filter row (헤더 아래 인라인 필터) */
+.dg-floating-row {
+  display: flex;
+  height: var(--dg-floating-filter-height);
+  width: max-content;
+  min-width: 100%;
+  border-top: 1px solid var(--dg-row-border-color);
+  background: var(--dg-header-background-color);
+}
+
+.dg-floating-cell {
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  overflow: hidden;
+}
+.dg-floating-cell.dg-pinned-left,
+.dg-floating-cell.dg-pinned-right {
+  position: sticky;
+  z-index: 3;
+  background: var(--dg-header-background-color);
+}
+
+.dg-floating-input {
+  width: 100%;
+  height: calc(var(--dg-floating-filter-height) - 10px);
+  padding: 0 8px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--dg-foreground-color);
+  background: var(--dg-input-background-color);
+  border: 1px solid var(--dg-input-border-color);
+  border-radius: var(--dg-border-radius);
+  outline: none;
+}
+.dg-floating-input:focus { border-color: var(--dg-accent-color); }
+.dg-floating-input::placeholder { color: var(--dg-disabled-foreground-color); }
 
 /* Resize handle */
 .dg-header-resizer {

@@ -66,6 +66,26 @@
     </div>
   </div>
 
+  <!-- Floating filter row -->
+  <h2 class="section">Floating Filter Row</h2>
+  <p class="section-desc"><code class="inline">floatingFilter: true</code> — 헤더 아래 인라인 필터 행 (text 입력 · set 드롭다운 · number 입력).</p>
+  <div class="dg-root specimen">
+    <div class="dg-header">
+      <div class="dg-header-row">
+        <div class="dg-header-cell" style="width:180px"><span class="dg-header-cell-label">Name</span></div>
+        <div class="dg-header-cell" style="width:170px"><span class="dg-header-cell-label">Department</span></div>
+        <div class="dg-header-cell" style="width:150px"><span class="dg-header-cell-label">Salary</span></div>
+      </div>
+      <div class="dg-floating-row">
+        <div class="dg-floating-cell" style="width:180px"><input class="dg-floating-input" type="text" placeholder="Filter…" value="kim"></div>
+        <div class="dg-floating-cell" style="width:170px">
+          <select class="dg-floating-input"><option>(All)</option><option selected>Engineering</option><option>Design</option></select>
+        </div>
+        <div class="dg-floating-cell" style="width:150px"><input class="dg-floating-input" type="number" placeholder="Filter…"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Row states -->
   <h2 class="section">Row States</h2>
   <p class="section-desc">기본 · 호버 · 선택 · 포커스 셀 · 얼룩말(zebra) 홀수 행.</p>

@@ -142,6 +142,34 @@ suite('quickFilterRows', function () {
   assertEq(T.quickFilterRows(rows, '  ', fields).length, 3, 'blank text returns all');
 });
 
+/* ---------------- floating filter model ---------------- */
+suite('buildFloatingFilterModel', function () {
+  var f = T.buildFloatingFilterModel;
+  assertEq(f('text', null, null), null, 'null raw clears filter');
+  assertEq(f('text', '  ', null), null, 'blank text clears filter');
+  assertEq(f('number', '', null), null, 'empty number clears filter');
+  assertEq(f('text', 'abc', null), { type: 'text', op: 'contains', value: 'abc' }, 'text defaults to contains');
+  assertEq(
+    f('text', 'abc', { type: 'text', op: 'startsWith', value: 'a' }),
+    { type: 'text', op: 'startsWith', value: 'abc' },
+    'existing text op preserved'
+  );
+  assertEq(f('number', '42', null), { type: 'number', op: 'equals', value: '42' }, 'number defaults to equals');
+  assertEq(
+    f('number', '42', { type: 'number', op: 'greaterThan', value: '1' }),
+    { type: 'number', op: 'greaterThan', value: '42' },
+    'existing number op preserved'
+  );
+  assertEq(
+    f('number', '42', { type: 'number', op: 'inRange', value: '1', valueTo: '9' }).op,
+    'equals',
+    'inRange not expressible in single input -> equals'
+  );
+  assertEq(f('set', 'Sales', null), { type: 'set', values: ['Sales'] }, 'set single value');
+  assertEq(f('set', '', null), { type: 'set', values: [''] }, 'set blank value is a real filter');
+  assertEq(f('set', null, null), null, 'set null clears filter');
+});
+
 /* ---------------- aggregation ---------------- */
 suite('aggregateValues', function () {
   var rows = [{ v: 10 }, { v: 20 }, { v: 30 }, { v: null }, { v: '' }, { v: 'abc' }];

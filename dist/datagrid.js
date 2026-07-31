@@ -174,6 +174,27 @@
   }
 
   /**
+   * 헤더 필터 행(floatingFilter)의 입력값 → 컬럼 필터 모델.
+   * - raw가 null/undefined이거나 (set 제외) 공백뿐이면 null(필터 해제).
+   * - 이미 적용된 모델의 연산자는 유지하되, 단일 입력으로 표현할 수 없는
+   *   inRange는 equals로 대체한다. set은 단일 값 선택으로 동작.
+   */
+  function buildFloatingFilterModel(filterType, raw, currentModel) {
+    if (raw === null || raw === undefined) return null;
+    var value = String(raw);
+    if (filterType === 'set') return { type: 'set', values: [value] };
+    if (value.trim() === '') return null;
+    if (filterType === 'number') {
+      var op = currentModel && currentModel.type === 'number' && currentModel.op !== 'inRange'
+        ? currentModel.op
+        : 'equals';
+      return { type: 'number', op: op, value: value };
+    }
+    var textOp = currentModel && currentModel.type === 'text' ? currentModel.op : 'contains';
+    return { type: 'text', op: textOp, value: value };
+  }
+
+  /**
    * 그룹/전체 요약용 집계. func: 'sum'|'avg'|'min'|'max'|'count'
    * count는 모든 행을 세고, 나머지는 숫자로 해석 가능한 값만 집계한다.
    * 집계할 숫자가 하나도 없으면 null.
@@ -635,6 +656,118 @@
 
       self._headerCells[col.colId] = cell;
     });
+
+    this._renderFloatingFilters();
+  };
+
+  /* ---- floating filter row (헤더 아래 인라인 필터) ---- */
+
+  /* set 필터 select에서 빈 문자열 값을 '(All)'(value="")과 구분하기 위한 센티널 */
+  var FLOATING_BLANK = '__blank__';
+
+  DataGrid.prototype._renderFloatingFilters = function () {
+    var self = this;
+    if (this._floatingRowEl && this._floatingRowEl.parentNode) {
+      this._floatingRowEl.parentNode.removeChild(this._floatingRowEl);
+    }
+    this._floatingRowEl = null;
+    this._floatingCells = {};
+
+    var cols = this._visibleColumns();
+    var hasFilter = cols.some(function (c) { return c.filter && c.field; });
+    if (!this.options.floatingFilter || !hasFilter) return;
+
+    var row = el('div', 'dg-floating-row', this._headerEl);
+    row.setAttribute('role', 'row');
+    this._floatingRowEl = row;
+
+    cols.forEach(function (col) {
+      var cell = el('div', 'dg-floating-cell', row);
+      cell.dataset.colId = col.colId;
+      if (col.pinned === 'left') cell.classList.add('dg-pinned-left');
+      if (col.pinned === 'right') cell.classList.add('dg-pinned-right');
+      self._applyCellLayout(cell, col.colId);
+      self._floatingCells[col.colId] = cell;
+      if (!col.filter || !col.field) return;
+
+      var current = self._filterModel[col.field];
+
+      if (col.filter === 'set') {
+        var select = el('select', 'dg-floating-input', cell);
+        select.setAttribute('aria-label', col.headerName + ' filter');
+        var optAll = el('option', null, select);
+        optAll.value = '';
+        optAll.textContent = '(All)';
+        self._uniqueFieldValues(col.field).forEach(function (v) {
+          var opt = el('option', null, select);
+          opt.value = v === '' ? FLOATING_BLANK : v;
+          opt.textContent = v === '' ? '(Blanks)' : v;
+        });
+        if (current && current.type === 'set' && current.values && current.values.length === 1) {
+          var cv = String(current.values[0]);
+          select.value = cv === '' ? FLOATING_BLANK : cv;
+        }
+        select.addEventListener('change', function () {
+          var raw = select.value === '' ? null
+            : select.value === FLOATING_BLANK ? '' : select.value;
+          self._applyFloatingFilter(col, buildFloatingFilterModel('set', raw, null));
+        });
+        return;
+      }
+
+      var input = el('input', 'dg-floating-input', cell);
+      input.type = col.filter === 'number' ? 'number' : 'text';
+      input.placeholder = 'Filter…';
+      input.setAttribute('aria-label', col.headerName + ' filter');
+      if (current && current.value !== undefined) input.value = current.value;
+      var timer = null;
+      var apply = function () {
+        self._applyFloatingFilter(
+          col,
+          buildFloatingFilterModel(col.filter, input.value, self._filterModel[col.field])
+        );
+      };
+      input.addEventListener('input', function () {
+        clearTimeout(timer);
+        timer = setTimeout(apply, 250);
+      });
+      input.addEventListener('keydown', function (e) {
+        e.stopPropagation(); /* 그리드 키보드 내비게이션과 분리 */
+        if (e.key === 'Enter') { clearTimeout(timer); apply(); }
+        else if (e.key === 'Escape') {
+          clearTimeout(timer);
+          input.value = '';
+          self._applyFloatingFilter(col, null);
+        }
+      });
+    });
+  };
+
+  /* refresh()가 헤더 DOM을 재생성하므로, 필터 적용 후 입력 포커스·캐럿을 복원한다. */
+  DataGrid.prototype._applyFloatingFilter = function (col, model) {
+    var hadFocus = this._floatingCells[col.colId] &&
+      this._floatingCells[col.colId].contains(document.activeElement);
+    this.applyColumnFilter(col.field, model);
+    if (!hadFocus) return;
+    var cell = this._floatingCells[col.colId];
+    var input = cell && cell.querySelector('.dg-floating-input');
+    if (input) {
+      input.focus();
+      if (input.setSelectionRange && input.type === 'text') {
+        input.setSelectionRange(input.value.length, input.value.length);
+      }
+    }
+  };
+
+  DataGrid.prototype._uniqueFieldValues = function (field) {
+    var values = [];
+    var seen = Object.create(null);
+    this._rows.forEach(function (r) {
+      var v = String(r[field]);
+      if (!seen[v]) { seen[v] = true; values.push(v); }
+    });
+    values.sort();
+    return values;
   };
 
   /* ---- column layout (widths + pinned offsets) ---- */
@@ -689,6 +822,10 @@
     /* apply to header */
     for (var colId in this._headerCells) {
       this._applyCellLayout(this._headerCells[colId], colId);
+    }
+    /* apply to floating filter row */
+    for (var flColId in this._floatingCells) {
+      this._applyCellLayout(this._floatingCells[flColId], flColId);
     }
     /* apply to grand total footer */
     for (var fColId in this._footerCells) {
@@ -940,13 +1077,7 @@
     var getModel;
 
     if (col.filter === 'set') {
-      var values = [];
-      var seen = {};
-      this._rows.forEach(function (r) {
-        var v = String(r[col.field]);
-        if (!seen[v]) { seen[v] = true; values.push(v); }
-      });
-      values.sort();
+      var values = this._uniqueFieldValues(col.field);
       var active = {};
       (current.values || values).forEach(function (v) { active[v] = true; });
 
@@ -1763,6 +1894,7 @@
     buildFilterPredicate: buildFilterPredicate,
     filterRows: filterRows,
     quickFilterRows: quickFilterRows,
+    buildFloatingFilterModel: buildFloatingFilterModel,
     aggregateValues: aggregateValues,
     buildGroupView: buildGroupView,
     paginate: paginate,
