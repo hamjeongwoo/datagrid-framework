@@ -594,6 +594,7 @@
   flex: none;
   width: calc(var(--dg-icon-size) + 6px);
 }
+.dg-tree-checkbox { flex: none; margin-right: 8px; }
 .dg-group-count {
   color: var(--dg-secondary-foreground-color);
   font-weight: 500;

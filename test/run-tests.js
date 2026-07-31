@@ -725,6 +725,51 @@ suite('filterTreeNodes / sortTreeNodes / flattenTreeNodes', function () {
   assertEq(collapsed[0].hasChildren, true, 'flatten: hasChildren flag set');
 });
 
+/* ---------------- applyTreeCheck ---------------- */
+suite('applyTreeCheck', function () {
+  var data = [
+    { id: 'p', children: [{ id: 'a' }, { id: 'b' }, { id: 'c' }] },
+    { id: 'q', children: [{ id: 'x' }] },
+  ];
+  var roots = T.buildTreeNodes(data, {});
+  var getId = function (r) { return r.id; };
+  var rowById = {};
+  T.collectTreeNodes(roots).forEach(function (n) { rowById[n.row.id] = n.row; });
+
+  // 부모 체크 → 자손 전체 체크 (캐스케이드 다운)
+  var s1 = T.applyTreeCheck(roots, getId, {}, rowById.p, true, { cascade: true });
+  assertEq([s1.p, s1.a, s1.b, s1.c], [true, true, true, true], 'cascade down');
+  assertEq(s1.q || false, false, 'other branch untouched');
+
+  // 자식 하나 해제 → 부모 indeterminate (캐스케이드 업)
+  var s2 = T.applyTreeCheck(roots, getId, s1, rowById.b, false, { cascade: true });
+  assertEq(s2.p, 'indeterminate', 'mixed children → parent indeterminate');
+  assertEq([s2.a, s2.b, s2.c], [true, false, true], 'only target child changed');
+
+  // 나머지 자식도 해제 → 부모 false
+  var s3 = T.applyTreeCheck(roots, getId, s2, rowById.a, false, { cascade: true });
+  var s4 = T.applyTreeCheck(roots, getId, s3, rowById.c, false, { cascade: true });
+  assertEq(s4.p, false, 'all children false → parent false');
+
+  // 자식 전부 체크 → 부모 true
+  var s5 = T.applyTreeCheck(roots, getId, {}, rowById.a, true, { cascade: true });
+  s5 = T.applyTreeCheck(roots, getId, s5, rowById.b, true, { cascade: true });
+  s5 = T.applyTreeCheck(roots, getId, s5, rowById.c, true, { cascade: true });
+  assertEq(s5.p, true, 'all children true → parent true');
+
+  // cascade: false → 대상만
+  var s6 = T.applyTreeCheck(roots, getId, {}, rowById.p, true, { cascade: false });
+  assertEq([s6.p, s6.a || false], [true, false], 'no cascade: target only');
+
+  // disabled: 대상이 disabled면 무변경, 자손 중 disabled는 건너뜀
+  var dis = function (r) { return r.id === 'b'; };
+  var s7 = T.applyTreeCheck(roots, getId, {}, rowById.b, true, { cascade: true, isDisabled: dis });
+  assertEq(Object.keys(s7).length > 0 ? s7.b || false : false, false, 'disabled target unchanged');
+  var s8 = T.applyTreeCheck(roots, getId, {}, rowById.p, true, { cascade: true, isDisabled: dis });
+  assertEq(s8.b || false, false, 'disabled child skipped in cascade');
+  assertEq(s8.p, 'indeterminate', 'parent reflects skipped child (mixed)');
+});
+
 /* ---------------- fillSeries ---------------- */
 suite('fillSeries', function () {
   assertEq(T.fillSeries([1, 3], 3), [5, 7, 9], 'arithmetic extrapolation');

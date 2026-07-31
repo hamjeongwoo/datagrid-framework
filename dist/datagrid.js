@@ -795,6 +795,57 @@
   }
 
   /**
+   * 트리 체크박스 상태 계산 (원본 states 불변, 새 맵 반환).
+   * states: getId(row) → true | false | 'indeterminate'
+   * - targetRow를 checked로 설정. isDisabled(targetRow)면 아무것도 바꾸지 않는다.
+   * - cascade면 대상의 자손 전체를 함께 설정(disabled 행 제외)한 뒤,
+   *   모든 부모를 자식 상태 기반으로 재계산한다
+   *   (자식 전부 true → true, 전부 false → false, 혼합 → 'indeterminate').
+   */
+  function applyTreeCheck(roots, getId, states, targetRow, checked, opts) {
+    opts = opts || {};
+    var isDisabled = opts.isDisabled || function () { return false; };
+    var next = {};
+    for (var k in states) next[k] = states[k];
+    if (isDisabled(targetRow)) return next;
+    if (!opts.cascade) {
+      next[getId(targetRow)] = checked;
+      return next;
+    }
+
+    var setSubtree = function (node) {
+      if (!isDisabled(node.row)) next[getId(node.row)] = checked;
+      node.children.forEach(setSubtree);
+    };
+    (function findAndSet(list) {
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].row === targetRow) { setSubtree(list[i]); return true; }
+        if (findAndSet(list[i].children)) return true;
+      }
+      return false;
+    })(roots);
+
+    /* 부모 상태 재계산 (post-order) */
+    var recompute = function (node) {
+      if (node.children.length === 0) {
+        return next[getId(node.row)] === true;
+      }
+      var allTrue = true;
+      var allFalse = true;
+      node.children.forEach(function (c) {
+        var st = recompute(c);
+        if (st !== true) allTrue = false;
+        if (st !== false) allFalse = false;
+      });
+      var st2 = allTrue ? true : allFalse ? false : 'indeterminate';
+      next[getId(node.row)] = st2;
+      return st2;
+    };
+    roots.forEach(recompute);
+    return next;
+  }
+
+  /**
    * 펼침 평탄화: 조상이 모두 펼쳐진 노드만 표시 순서로 반환.
    * 항목: { row, level, hasChildren, expanded }
    */
@@ -1301,6 +1352,8 @@
     /* tree data — pagination/groupBy와 배타 (ParamQuery도 페이징 비호환 명시) */
     this._treeData = options.treeData || null;
     this._treeExpanded = {}; /* rowId -> bool */
+    this._treeChecked = {}; /* rowId -> true | false | 'indeterminate' (treeData.checkbox) */
+    this._treeRoots = null; /* 필터 전 전체 트리 (체크 캐스케이드용) — 뷰 계산 시 갱신 */
     this._treeInfo = null; /* rowId -> { level, hasChildren, expanded } — 뷰 계산 시 갱신 */
     this._treeColId = null; /* 트리 UI(들여쓰기+토글)를 그릴 컬럼 */
     if (this._treeData) {
@@ -1697,6 +1750,7 @@
     var self = this;
     var td = this._treeData;
     var roots = buildTreeNodes(this._rows, td);
+    this._treeRoots = roots; /* 필터 전 전체 트리 — 체크 캐스케이드가 사용 */
     applyValueGetters(
       collectTreeNodes(roots).map(function (n) { return n.row; }),
       this._columns
@@ -2491,6 +2545,27 @@
           } else {
             el('span', 'dg-tree-toggle-spacer', cell);
           }
+
+          /* treeData.checkbox: 토글과 값 사이에 3상태 체크박스 */
+          if (self._treeData.checkbox) {
+            var tcb = el('input', 'dg-checkbox dg-tree-checkbox', cell);
+            tcb.type = 'checkbox';
+            var tState = self._treeChecked[id];
+            tcb.checked = tState === true;
+            tcb.indeterminate = tState === 'indeterminate';
+            tcb.setAttribute('aria-label', 'Check node');
+            if (self._treeData.checkboxDisabled) {
+              try {
+                tcb.disabled = !!self._treeData.checkboxDisabled(row);
+              } catch (err) {
+                console.error('[DataGrid] checkboxDisabled failed:', err);
+              }
+            }
+            tcb.addEventListener('click', function (e) { e.stopPropagation(); });
+            tcb.addEventListener('change', function () {
+              self.setNodeChecked(row, tcb.checked);
+            });
+          }
         }
       }
 
@@ -2928,6 +3003,104 @@
       if (this._treeInfo[id].hasChildren) this._treeExpanded[id] = false;
     }
     this.refresh();
+  };
+
+  /* ---- tree checkbox (treeData.checkbox) ---- */
+
+  DataGrid.prototype._treeCheckOpts = function () {
+    var td = this._treeData;
+    var self = this;
+    return {
+      cascade: td.cascade !== false, /* 기본 켜짐 */
+      isDisabled: function (row) {
+        if (!td.checkboxDisabled) return false;
+        try {
+          return !!td.checkboxDisabled(row);
+        } catch (err) {
+          console.error('[DataGrid] checkboxDisabled failed:', err);
+          return false;
+        }
+      },
+    };
+  };
+
+  /**
+   * 노드 체크 설정. beforeNodeCheck(취소 가능) → 캐스케이드 반영 →
+   * nodeCheckChanged { data, checked, changedRows } 순. 상태가 바뀌면 true.
+   */
+  DataGrid.prototype.setNodeChecked = function (row, checked) {
+    if (!this._treeData || !this._treeData.checkbox || !row || !this._treeRoots) return false;
+    var self = this;
+    var ev = { data: row, checked: !!checked, cancel: false };
+    this._emitter.emit('beforeNodeCheck', ev);
+    if (ev.cancel) {
+      this.refreshRow(row); /* UI 체크박스를 원상 복구 */
+      return false;
+    }
+    var prev = this._treeChecked;
+    var next = applyTreeCheck(
+      this._treeRoots,
+      function (r) { return self._rowId(r); },
+      prev,
+      row,
+      !!checked,
+      this._treeCheckOpts()
+    );
+    var changed = [];
+    collectTreeNodes(this._treeRoots).forEach(function (n) {
+      var id = self._rowId(n.row);
+      if ((prev[id] || false) !== (next[id] || false)) changed.push(n.row);
+    });
+    if (changed.length === 0) return false;
+    this._treeChecked = next;
+    this.refresh();
+    this._emitter.emit('nodeCheckChanged', {
+      data: row,
+      checked: !!checked,
+      changedRows: changed,
+    });
+    return true;
+  };
+
+  /** true | false | 'indeterminate' (한 번도 체크되지 않았으면 false) */
+  DataGrid.prototype.isNodeChecked = function (row) {
+    if (!row) return false;
+    return this._treeChecked[this._rowId(row)] || false;
+  };
+
+  /** 체크 상태가 true인 행 전체(부모 포함)를 트리 표시 순서로 반환. */
+  DataGrid.prototype.getCheckedRows = function () {
+    if (!this._treeRoots) return [];
+    var self = this;
+    return collectTreeNodes(this._treeRoots)
+      .map(function (n) { return n.row; })
+      .filter(function (r) { return self._treeChecked[self._rowId(r)] === true; });
+  };
+
+  /** 전체 체크/해제 — 일괄 작업이므로 nodeCheckChanged는 1회(data: null)만 발생. */
+  DataGrid.prototype.checkAllNodes = function () { return this._checkAll(true); };
+  DataGrid.prototype.unCheckAllNodes = function () { return this._checkAll(false); };
+
+  DataGrid.prototype._checkAll = function (checked) {
+    if (!this._treeData || !this._treeData.checkbox || !this._treeRoots) return false;
+    var self = this;
+    var getId = function (r) { return self._rowId(r); };
+    var opts = this._treeCheckOpts();
+    var prev = this._treeChecked;
+    var next = prev;
+    this._treeRoots.forEach(function (n) {
+      next = applyTreeCheck(self._treeRoots, getId, next, n.row, checked, opts);
+    });
+    var changed = [];
+    collectTreeNodes(this._treeRoots).forEach(function (n) {
+      var id = getId(n.row);
+      if ((prev[id] || false) !== (next[id] || false)) changed.push(n.row);
+    });
+    if (changed.length === 0) return false;
+    this._treeChecked = next;
+    this.refresh();
+    this._emitter.emit('nodeCheckChanged', { data: null, checked: checked, changedRows: changed });
+    return true;
   };
 
   /* ---- pinned top rows ---- */
@@ -4258,6 +4431,7 @@
     this._lastClickedViewIndex = -1;
     this._focusedCell = null;
     this._treeExpanded = {}; /* 새 데이터 = 펼침 상태 초기화 (defaultExpandLevel 재적용) */
+    this._treeChecked = {};
     this._resetTracking(); /* 새 데이터 = 새 기준선 */
     this._undoStack = [];
     this._redoStack = [];
@@ -4770,6 +4944,7 @@
     filterTreeNodes: filterTreeNodes,
     sortTreeNodes: sortTreeNodes,
     flattenTreeNodes: flattenTreeNodes,
+    applyTreeCheck: applyTreeCheck,
     buildGroupHeaderRuns: buildGroupHeaderRuns,
     buildDataSourceRequest: buildDataSourceRequest,
     parseDataSourceResponse: parseDataSourceResponse,

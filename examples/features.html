@@ -1708,6 +1708,64 @@
     </script>
   </div>
 
+  <!-- ======================================================== 트리 체크박스 -->
+  <h2 class="section">Tree Checkbox — cascade (treeData.checkbox)</h2>
+  <p class="section-desc">
+    <code class="inline">treeData.checkbox: true</code>는 트리 컬럼에 3상태 체크박스를 표시합니다 —
+    부모를 체크하면 자손 전체가, 자식 일부만 체크되면 부모가 <code class="inline">indeterminate</code>가 됩니다
+    (<code class="inline">cascade: false</code>로 끌 수 있음). <code class="inline">getCheckedRows()</code>·
+    <code class="inline">checkAllNodes()/unCheckAllNodes()</code>·<code class="inline">nodeCheckChanged</code> 이벤트,
+    <code class="inline">checkboxDisabled(row)</code> 콜백을 제공합니다. 이 카드는 flat(<code class="inline">parentId</code>) 형식 데이터를 사용합니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button id="tcbCheckAll" class="btn">전부 체크</button>
+        <button id="tcbUncheckAll" class="btn">전부 해제</button>
+        <button id="tcbGetChecked" class="btn">체크된 행 보기</button>
+      </div>
+      <div id="gridTreeCheck" class="grid-wrap-md"></div>
+      <div class="status-line" id="tcbStatus">
+        폴더를 체크해 보세요 — 자손 전체가 함께 체크되고, license 파일은 비활성입니다.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridTreeCheck'), {
+        rowData: DemoData.makeFileTreeFlat(23),   // flat: 각 행이 id/parentId를 가짐
+        treeData: {
+          parentIdField: 'parentId',
+          idField: 'id',
+          treeField: 'name',
+          defaultExpandLevel: -1,                 // 전부 펼친 채 시작
+          checkbox: true,
+          cascade: true,
+          checkboxDisabled: function (row) {      // 조건부 비활성 체크박스
+            return row.name.indexOf('license') === 0;
+          },
+        },
+        columnDefs: [
+          { field: 'name', headerName: 'Name', flex: 2 },
+          { field: 'type', headerName: 'Type', width: 100 },
+          { field: 'size', headerName: 'Size (KB)', dataType: 'number', width: 110 },
+        ],
+      });
+
+      var status = document.getElementById('tcbStatus');
+      grid.on('nodeCheckChanged', function (e) {
+        status.textContent = (e.data ? '"' + e.data.name + '" ' + (e.checked ? '체크' : '해제') : '일괄 변경')
+          + ' — 함께 바뀐 행 ' + e.changedRows.length + '개, 현재 체크 '
+          + grid.getCheckedRows().length + '개';
+      });
+
+      document.getElementById('tcbCheckAll').addEventListener('click', function () { grid.checkAllNodes(); });
+      document.getElementById('tcbUncheckAll').addEventListener('click', function () { grid.unCheckAllNodes(); });
+      document.getElementById('tcbGetChecked').addEventListener('click', function () {
+        var names = grid.getCheckedRows().map(function (r) { return r.name; });
+        status.textContent = 'getCheckedRows(): ' + (names.length ? names.join(', ') : '(없음)');
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

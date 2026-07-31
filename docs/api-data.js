@@ -413,9 +413,11 @@ window.ApiDocs = {
             '모두 지원합니다. <code>treeField</code> 컬럼(생략 시 첫 데이터 컬럼)에 들여쓰기(<code>indent</code>px, 기본 20)와 ' +
             '펼침 토글이 그려지고, <code>defaultExpandLevel</code>(기본 0, <code>-1</code> = 전부) 깊이까지 펼친 채 시작합니다. ' +
             '정렬은 형제끼리, 필터는 매치된 노드의 조상을 유지하며 동작합니다(<code>filterKeepChildren: false</code>로 ' +
-            '매치된 부모의 자손 표시를 끌 수 있음). <code>pagination</code>/<code>groupBy</code>와는 함께 쓸 수 없습니다.',
+            '매치된 부모의 자손 표시를 끌 수 있음). <code>pagination</code>/<code>groupBy</code>와는 함께 쓸 수 없습니다. ' +
+            '<code>checkbox: true</code>는 트리 컬럼에 3상태 체크박스를 표시하고 <code>cascade</code>(기본 true)로 ' +
+            '부모↔자손 연동, <code>checkboxDisabled(row)</code>로 조건부 비활성을 제어합니다.',
           example:
-            "treeData: {\n  treeField: 'name',\n  indent: 20,\n  defaultExpandLevel: 1,\n  // flat 형식이면: parentIdField: 'parentId', idField: 'id'\n},",
+            "treeData: {\n  treeField: 'name',\n  indent: 20,\n  defaultExpandLevel: 1,\n  checkbox: true,        // 3상태 체크박스 + cascade\n  // flat 형식이면: parentIdField: 'parentId', idField: 'id'\n},",
         },
         {
           name: 'fillHandle',
@@ -1116,6 +1118,31 @@ window.ApiDocs = {
             '(예: <code>expandAllNodes(1)</code> = 루트만). <code>collapseAllNodes()</code>는 전부 접습니다. ' +
             '일괄 작업이므로 노드별 이벤트는 발생하지 않습니다.',
         },
+        {
+          name: 'setNodeChecked',
+          group: 'Tree',
+          signature: 'setNodeChecked(row: object, checked: boolean): boolean',
+          since: '2.1.0',
+          description:
+            '노드 체크박스를 설정합니다(<code>treeData.checkbox</code> 필요). <code>cascade</code>가 켜져 있으면 ' +
+            '자손 전체가 함께 바뀌고 부모는 자식 상태에 따라 true/false/<code>\'indeterminate\'</code>로 재계산됩니다. ' +
+            '<code>beforeNodeCheck</code>(취소 가능) → 반영 → <code>nodeCheckChanged</code> 순으로 이벤트가 발생합니다. ' +
+            '<code>isNodeChecked(row)</code>는 상태 조회(true/false/<code>\'indeterminate\'</code>), ' +
+            '<code>checkboxDisabled(row)</code>가 true인 행은 UI/API 모두에서 바뀌지 않습니다.',
+          example:
+            "grid.setNodeChecked(folder, true);\ngrid.isNodeChecked(folder); // true | false | 'indeterminate'",
+        },
+        {
+          name: 'getCheckedRows',
+          group: 'Tree',
+          signature: 'getCheckedRows(): object[]',
+          since: '2.1.0',
+          description:
+            '체크 상태가 <code>true</code>인 행 전체(부모 포함)를 트리 표시 순서로 반환합니다 — ' +
+            '<code>indeterminate</code>는 포함되지 않습니다. <code>checkAllNodes()</code> / ' +
+            '<code>unCheckAllNodes()</code>는 전체 체크/해제 일괄 작업으로, <code>nodeCheckChanged</code>를 ' +
+            '1회(<code>data: null</code>)만 발생시킵니다.',
+        },
 
         /* ---- 셀 선택 · 검색 ---- */
         {
@@ -1630,6 +1657,18 @@ window.ApiDocs = {
             '전환 후에는 <code>nodeExpanded</code> 또는 <code>nodeCollapsed</code>(payload <code>{ data }</code>)가 발생합니다.',
           example:
             "grid.on('beforeNodeToggle', function (e) {\n  if (e.data.locked) e.cancel = true;\n});",
+        },
+        {
+          name: 'nodeCheckChanged',
+          payload: '{ data, checked, changedRows }',
+          since: '2.1.0',
+          description:
+            '트리 체크박스 상태가 바뀐 뒤(<code>treeData.checkbox</code> 필요). <code>changedRows</code>는 ' +
+            '캐스케이드로 함께 바뀐 행 전체(indeterminate 전환 포함)입니다. ' +
+            '<code>checkAllNodes()/unCheckAllNodes()</code> 일괄 작업에서는 <code>data: null</code>로 1회 발생합니다. ' +
+            '직전에 <code>beforeNodeCheck</code>(<code>{ data, checked, cancel }</code>)로 취소할 수 있습니다.',
+          example:
+            "grid.on('nodeCheckChanged', function (e) {\n  console.log(grid.getCheckedRows().length + '개 체크됨');\n});",
         },
         {
           name: 'dataLoadError',
