@@ -142,6 +142,77 @@ suite('quickFilterRows', function () {
   assertEq(T.quickFilterRows(rows, '  ', fields).length, 3, 'blank text returns all');
 });
 
+/* ---------------- aggregation ---------------- */
+suite('aggregateValues', function () {
+  var rows = [{ v: 10 }, { v: 20 }, { v: 30 }, { v: null }, { v: '' }, { v: 'abc' }];
+  assertEq(T.aggregateValues(rows, 'v', 'sum'), 60, 'sum skips null/blank/NaN');
+  assertEq(T.aggregateValues(rows, 'v', 'avg'), 20, 'avg over numeric values only');
+  assertEq(T.aggregateValues(rows, 'v', 'min'), 10, 'min');
+  assertEq(T.aggregateValues(rows, 'v', 'max'), 30, 'max');
+  assertEq(T.aggregateValues(rows, 'v', 'count'), 6, 'count includes every row');
+  assertEq(T.aggregateValues([{ v: '5' }, { v: '7' }], 'v', 'sum'), 12, 'numeric strings coerced');
+  assertEq(T.aggregateValues([{ v: null }, { v: 'x' }], 'v', 'sum'), null, 'no numeric values -> null');
+  assertEq(T.aggregateValues([], 'v', 'sum'), null, 'empty rows -> null');
+  assertEq(T.aggregateValues([], 'v', 'count'), 0, 'empty rows count 0');
+  assertEq(T.aggregateValues([{ v: -5 }, { v: 3 }], 'v', 'min'), -5, 'negative min');
+});
+
+/* ---------------- row grouping ---------------- */
+suite('buildGroupView', function () {
+  var rows = [
+    { dept: 'Sales', team: 'A', pay: 100 },
+    { dept: 'Dev', team: 'X', pay: 300 },
+    { dept: 'Sales', team: 'B', pay: 200 },
+    { dept: 'Dev', team: 'X', pay: 500 },
+  ];
+  var expandAll = function () { return true; };
+  var collapseAll = function () { return false; };
+
+  assertEq(T.buildGroupView(rows, [], expandAll).length, 4, 'no group fields returns rows as-is');
+
+  /* single level, all expanded */
+  var out = T.buildGroupView(rows, ['dept'], expandAll, [{ field: 'pay', aggFunc: 'sum' }]);
+  assertEq(out.length, 6, '2 group headers + 4 leaves');
+  assertEq(out[0].__group, true, 'first item is a group header');
+  assertEq([out[0].value, out[0].leafCount, out[0].agg.pay], ['Sales', 2, 300], 'Sales group: first-seen order, count, sum');
+  assertEq(out[1].team, 'A', 'leaves follow their group header');
+  assertEq([out[3].value, out[3].agg.pay], ['Dev', 800], 'Dev group aggregate');
+
+  /* collapsed: leaves hidden, aggregates still computed */
+  var closed = T.buildGroupView(rows, ['dept'], collapseAll, [{ field: 'pay', aggFunc: 'sum' }]);
+  assertEq(closed.length, 2, 'collapsed groups hide leaves');
+  assertEq(closed[0].expanded, false, 'expanded flag false');
+  assertEq(closed[1].agg.pay, 800, 'aggregate computed over hidden children');
+
+  /* selective expansion by path */
+  var partial = T.buildGroupView(rows, ['dept'], function (path) {
+    return path.indexOf('Dev') !== -1;
+  });
+  assertEq(partial.length, 4, 'only Dev group expanded (2 headers + 2 leaves)');
+
+  /* two levels */
+  var nested = T.buildGroupView(rows, ['dept', 'team'], expandAll, [{ field: 'pay', aggFunc: 'count' }]);
+  var kinds = nested.map(function (it) { return it.__group ? 'g' + it.level : 'r'; });
+  assertEq(kinds, ['g0', 'g1', 'r', 'g1', 'r', 'g0', 'g1', 'r', 'r'], 'nested group/leaf layout');
+  var teamX = nested.filter(function (it) { return it.__group && it.value === 'X'; })[0];
+  assertEq([teamX.level, teamX.leafCount, teamX.agg.pay], [1, 2, 2], 'child group level/count/agg');
+  assert(teamX.path.indexOf('Dev') !== -1 && teamX.path.indexOf('team:X') !== -1, 'path includes ancestry');
+
+  /* non-contiguous values still form one group (bucketing, not run-length) */
+  assertEq(
+    T.buildGroupView(rows, ['dept'], expandAll).filter(function (it) { return it.__group; }).length,
+    2,
+    'interleaved rows produce one group per value'
+  );
+
+  /* null group values */
+  var withNull = T.buildGroupView([{ dept: null, pay: 1 }, { dept: null, pay: 2 }], ['dept'], expandAll);
+  assertEq([withNull[0].value, withNull[0].leafCount], [null, 2], 'null values grouped together, value preserved');
+
+  /* input not mutated */
+  assertEq(rows.length, 4, 'input rows untouched');
+});
+
 /* ---------------- pagination ---------------- */
 suite('paginate', function () {
   var p = T.paginate(103, 20, 0);

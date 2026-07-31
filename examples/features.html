@@ -57,6 +57,63 @@
     </script>
   </div>
 
+  <!-- ======================================================== Row grouping -->
+  <h2 class="section">Row Grouping &amp; Aggregation</h2>
+  <p class="section-desc">
+    <code class="inline">groupBy: ['department']</code>로 행을 그룹핑하고, 그룹 헤더 행을 클릭(또는 Enter)해 접고 펼칩니다.
+    <code class="inline">aggFunc: 'sum' | 'avg' | 'min' | 'max' | 'count'</code>를 컬럼에 지정하면
+    그룹 헤더와 <code class="inline">grandTotal</code> 요약 행에 집계값이 표시됩니다.
+    다단계 그룹핑(<code class="inline">['department', 'city']</code>)도 지원합니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <select class="tb-input" id="groupSel">
+          <option value="department">Group by: Department</option>
+          <option value="department,city">Group by: Department → City</option>
+          <option value="city">Group by: City</option>
+          <option value="">Group by: (없음)</option>
+        </select>
+        <button class="tb-btn" id="expandAllBtn" type="button">Expand all</button>
+        <button class="tb-btn" id="collapseAllBtn" type="button">Collapse all</button>
+      </div>
+      <div id="gridGroup" class="grid-wrap-md"></div>
+      <div class="status-line" id="groupStatus">그룹 헤더 행을 클릭해 접고 펼쳐 보세요.</div>
+    </div>
+    <script type="text/x-example">
+      var money = function (v) { return '$' + v.toLocaleString(); };
+
+      var grid = new DataGrid(document.getElementById('gridGroup'), {
+        rowData: DemoData.makeEmployees(60, 7),
+        groupBy: ['department'],          // 초기 그룹 필드
+        grandTotal: true,                 // 하단 전체 요약 행
+        columnDefs: [
+          { field: 'name', headerName: 'Name', width: 180 },
+          { field: 'department', headerName: 'Department', width: 150 },
+          { field: 'city', headerName: 'City', width: 130 },
+          { field: 'salary', headerName: 'Salary (sum)', width: 150, align: 'right',
+            aggFunc: 'sum', valueFormatter: money },
+          { field: 'hireDate', headerName: 'Hire Date', width: 130 },
+        ],
+      });
+
+      document.getElementById('groupSel').addEventListener('change', function () {
+        grid.setGroupBy(this.value ? this.value.split(',') : []);
+      });
+      document.getElementById('expandAllBtn').addEventListener('click', function () {
+        grid.expandAllGroups();
+      });
+      document.getElementById('collapseAllBtn').addEventListener('click', function () {
+        grid.collapseAllGroups();
+      });
+
+      grid.on('groupToggled', function (e) {
+        document.getElementById('groupStatus').textContent =
+          '"' + e.value + '" 그룹 ' + (e.expanded ? '펼침' : '접힘');
+      });
+    </script>
+  </div>
+
   <!-- ======================================================== Filters -->
   <h2 class="section">Column Filters</h2>
   <p class="section-desc">

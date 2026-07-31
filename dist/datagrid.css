@@ -31,6 +31,8 @@
   --dg-menu-background-color: #ffffff;
   --dg-menu-shadow: 0 4px 16px rgba(24, 29, 31, 0.16);
   --dg-invalid-color: #e02525;
+  --dg-group-row-background-color: #f3f6fa;
+  --dg-group-indent: 20px;
   --dg-header-height: 48px;
   --dg-row-height: 42px;
   --dg-cell-horizontal-padding: 16px;
@@ -81,6 +83,7 @@
   --dg-input-border-color: rgba(255, 255, 255, 0.28);
   --dg-menu-background-color: #24292b;
   --dg-menu-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
+  --dg-group-row-background-color: #22282c;
 }
 
 /* ==========================================================================
@@ -288,6 +291,66 @@
   border-radius: var(--dg-border-radius);
   outline: none;
 }
+
+/* ==========================================================================
+   Row grouping + summary rows
+   ========================================================================== */
+
+.dg-row.dg-group-row {
+  background: var(--dg-group-row-background-color);
+  font-weight: 600;
+  cursor: pointer;
+}
+.dg-row.dg-group-row:hover { background: var(--dg-row-hover-color); }
+
+/* 그룹 행의 고정 컬럼도 그룹 배경을 유지해야 스크롤 시 본문을 가린다 */
+.dg-row.dg-group-row .dg-cell.dg-pinned-left,
+.dg-row.dg-group-row .dg-cell.dg-pinned-right { background: var(--dg-group-row-background-color); }
+
+.dg-group-cell { gap: 6px; }
+.dg-group-indent { flex: none; }
+
+.dg-group-chevron {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--dg-icon-size);
+  height: var(--dg-icon-size);
+  color: var(--dg-secondary-foreground-color);
+  transition: transform 0.15s ease;
+}
+.dg-group-chevron.dg-expanded { transform: rotate(90deg); }
+
+.dg-group-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dg-group-count {
+  color: var(--dg-secondary-foreground-color);
+  font-weight: 500;
+}
+
+.dg-cell-agg { font-weight: 600; }
+
+/* Grand total footer (non-virtualized single row under the body) */
+.dg-footer {
+  flex: none;
+  overflow: hidden;
+  border-top: 1px solid var(--dg-border-color);
+  background: var(--dg-header-background-color);
+}
+.dg-footer-row {
+  display: flex;
+  height: var(--dg-row-height);
+  width: max-content;
+  min-width: 100%;
+  align-items: stretch;
+}
+.dg-footer .dg-cell { font-weight: 600; gap: 6px; }
+.dg-footer .dg-cell.dg-pinned-left,
+.dg-footer .dg-cell.dg-pinned-right { background: var(--dg-header-background-color); }
+.dg-footer-label { color: var(--dg-foreground-color); }
 
 /* ==========================================================================
    Checkboxes (custom, tri-state)

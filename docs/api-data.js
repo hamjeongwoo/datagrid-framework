@@ -177,6 +177,36 @@ window.ApiDocs = {
           description:
             '헤더 드래그로 컬럼 순서 변경을 허용합니다. 고정(pinned) 컬럼은 드래그 대상에서 제외됩니다.',
         },
+        {
+          name: 'groupBy',
+          type: 'string[]',
+          default: '[]',
+          since: '1.1.0',
+          description:
+            '행을 그룹핑할 필드 목록. 배열 순서대로 중첩 그룹이 만들어지고, 그룹 헤더 행을 클릭(또는 <kbd>Enter</kbd>)해 ' +
+            '접고 펼칠 수 있습니다. 그룹 순서는 정렬된 데이터에서의 첫 등장 순서를 따르므로, 그룹 컬럼을 정렬하면 ' +
+            '그룹 순서도 함께 바뀝니다. 런타임 변경은 <a href="#api-methods-setGroupBy"><code>setGroupBy()</code></a>.',
+          example:
+            "groupBy: ['department', 'city']  // 부서 → 도시 2단계 그룹핑",
+        },
+        {
+          name: 'groupDefaultExpanded',
+          type: 'boolean',
+          default: 'true',
+          since: '1.1.0',
+          description:
+            '그룹의 초기 펼침 상태. <code>false</code>면 모든 그룹이 접힌 채 시작합니다.',
+        },
+        {
+          name: 'grandTotal',
+          type: 'boolean',
+          default: 'false',
+          since: '1.1.0',
+          description:
+            '그리드 하단에 전체 요약 행을 고정 표시합니다. <code>aggFunc</code>가 지정된 컬럼의 집계값과 ' +
+            '전체 행 수(필터 적용 후)를 보여주며, <code>aggFunc</code> 컬럼이 하나도 없으면 표시되지 않습니다. ' +
+            '그룹핑 없이도 사용할 수 있습니다.',
+        },
       ],
     },
 
@@ -255,6 +285,19 @@ window.ApiDocs = {
           description:
             '헤더 메뉴에서 열 수 있는 컬럼 필터 종류. <code>true</code>는 <code>\'text\'</code>와 같습니다. ' +
             '필터 모델 구조는 <a href="#filter-model">Filter Model</a> 섹션 참고.',
+        },
+        {
+          name: 'aggFunc',
+          type: "'sum' | 'avg' | 'min' | 'max' | 'count'",
+          since: '1.1.0',
+          description:
+            '이 컬럼의 집계 함수. <a href="#grid-options-groupBy"><code>groupBy</code></a> 그룹 헤더 행과 ' +
+            '<a href="#grid-options-grandTotal"><code>grandTotal</code></a> 요약 행에 집계값이 표시됩니다. ' +
+            '<code>count</code>를 제외한 함수는 숫자로 해석 가능한 값만 집계하며(빈 값·문자 제외), ' +
+            '집계값에도 <code>valueFormatter</code>가 적용됩니다(이때 두 번째 인자 <code>row</code>는 <code>null</code>).',
+          example:
+            "{ field: 'salary', aggFunc: 'sum', align: 'right',\n" +
+            "  valueFormatter: function (v) { return '$' + v.toLocaleString(); } }",
         },
         {
           name: 'editable',
@@ -512,6 +555,33 @@ window.ApiDocs = {
           example: "grid.setSortModel([{ field: 'salary', dir: 'desc' }]);",
         },
 
+        /* ---- 그룹핑 ---- */
+        {
+          name: 'setGroupBy',
+          group: 'Grouping',
+          signature: 'setGroupBy(fields: string[]): void',
+          since: '1.1.0',
+          description:
+            '그룹핑 필드를 런타임에 변경합니다. 빈 배열(또는 <code>null</code>)이면 그룹핑을 해제합니다. ' +
+            '접힘/펼침 상태는 초기화되고 <a href="#events-groupChanged"><code>groupChanged</code></a> 이벤트가 발생합니다.',
+          example: "grid.setGroupBy(['department', 'city']);",
+        },
+        {
+          name: 'getGroupBy',
+          group: 'Grouping',
+          signature: 'getGroupBy(): string[]',
+          since: '1.1.0',
+          description: '현재 그룹핑 필드 목록(복사본)을 반환합니다.',
+        },
+        {
+          name: 'expandAllGroups',
+          group: 'Grouping',
+          signature: 'expandAllGroups(): void',
+          since: '1.1.0',
+          description:
+            '모든 그룹을 펼칩니다. <code>collapseAllGroups()</code>는 모든 그룹을 접습니다.',
+        },
+
         /* ---- 페이지네이션 ---- */
         {
           name: 'setPage',
@@ -649,6 +719,19 @@ window.ApiDocs = {
           description: '페이지 이동 또는 페이지 크기 변경 시.',
         },
         {
+          name: 'groupChanged',
+          payload: '{ groupBy: string[] }',
+          since: '1.1.0',
+          description: '<code>setGroupBy()</code>로 그룹핑 필드가 바뀌었을 때.',
+        },
+        {
+          name: 'groupToggled',
+          payload: '{ field, value, path, expanded }',
+          since: '1.1.0',
+          description:
+            '그룹 헤더 행이 접히거나 펼쳐졌을 때. <code>path</code>는 중첩 그룹까지 포함한 그룹 고유 경로입니다.',
+        },
+        {
           name: 'rowClicked',
           payload: '{ data, rowIndex }',
           description: '행 클릭 시. <code>rowIndex</code>는 현재 페이지 기준 인덱스입니다.',
@@ -747,6 +830,8 @@ window.ApiDocs = {
         { name: '--dg-input-border-color', default: '#c2c8d0', description: '입력·체크박스 테두리.' },
         { name: '--dg-menu-background-color', default: '#ffffff', description: '필터 메뉴 팝업 배경.' },
         { name: '--dg-invalid-color', default: '#e02525', description: '오류 표시용(예약).' },
+        { name: '--dg-group-row-background-color', default: '#f3f6fa', description: '그룹 헤더 행 배경.', since: '1.1.0' },
+        { name: '--dg-group-indent', default: '20px', description: '중첩 그룹 레벨당 들여쓰기 폭.', since: '1.1.0' },
         { name: '--dg-header-height', default: '48px', description: '헤더 높이 — JS 옵션 headerHeight로 설정하세요.' },
         { name: '--dg-row-height', default: '42px', description: '행 높이 — JS 옵션 rowHeight로 설정하세요(가상 스크롤 계산에 사용).' },
         { name: '--dg-cell-horizontal-padding', default: '16px', description: '셀 좌우 패딩.' },

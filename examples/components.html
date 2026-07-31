@@ -78,6 +78,57 @@
     </div>
   </div>
 
+  <!-- Group / summary rows -->
+  <h2 class="section">Group &amp; Summary Rows</h2>
+  <p class="section-desc">
+    행 그룹핑의 그룹 헤더 행(펼침/접힘, 중첩 들여쓰기, 집계값)과
+    <code class="inline">grandTotal</code> 전체 요약 행.
+  </p>
+  <div class="dg-root specimen">
+    <div class="dg-canvas" style="height:auto">
+      <div class="dg-row dg-group-row">
+        <div class="dg-cell dg-group-cell" style="width:280px">
+          <span class="dg-group-chevron dg-expanded"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M6 3.5L10.5 8L6 12.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span class="dg-group-label">Engineering</span>
+          <span class="dg-group-count">(24)</span>
+        </div>
+        <div class="dg-cell" style="width:160px"></div>
+        <div class="dg-cell dg-cell-agg dg-align-right" style="width:140px"><span class="dg-cell-value">$2,140,000</span></div>
+      </div>
+      <div class="dg-row">
+        <div class="dg-cell" style="width:280px">Alice Kim</div>
+        <div class="dg-cell" style="width:160px">Seoul</div>
+        <div class="dg-cell dg-align-right" style="width:140px">$98,000</div>
+      </div>
+      <div class="dg-row dg-group-row">
+        <div class="dg-cell dg-group-cell" style="width:280px">
+          <span class="dg-group-indent" style="width:20px"></span>
+          <span class="dg-group-chevron"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M6 3.5L10.5 8L6 12.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span class="dg-group-label">Busan</span>
+          <span class="dg-group-count">(6)</span>
+        </div>
+        <div class="dg-cell" style="width:160px"></div>
+        <div class="dg-cell dg-cell-agg dg-align-right" style="width:140px"><span class="dg-cell-value">$412,000</span></div>
+      </div>
+      <div class="dg-row dg-group-row">
+        <div class="dg-cell dg-group-cell" style="width:280px">
+          <span class="dg-group-chevron"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M6 3.5L10.5 8L6 12.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span class="dg-group-label">Design</span>
+          <span class="dg-group-count">(11)</span>
+        </div>
+        <div class="dg-cell" style="width:160px"></div>
+        <div class="dg-cell dg-cell-agg dg-align-right" style="width:140px"><span class="dg-cell-value">$860,500</span></div>
+      </div>
+    </div>
+    <div class="dg-footer">
+      <div class="dg-footer-row">
+        <div class="dg-cell" style="width:280px"><span class="dg-footer-label">Total</span><span class="dg-group-count">(35)</span></div>
+        <div class="dg-cell" style="width:160px"></div>
+        <div class="dg-cell dg-cell-agg dg-align-right" style="width:140px"><span class="dg-cell-value">$3,000,500</span></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Checkboxes -->
   <h2 class="section">Checkbox</h2>
   <p class="section-desc">unchecked · checked · indeterminate(헤더 전체 선택의 부분 상태) · disabled.</p>

@@ -51,10 +51,10 @@
 
 | | ParamQuery | 제안 API | 우선순위 |
 |---|---|---|---|
-| [ ] | **`groupModel`** (행 그룹핑: `dataIndx[]`, `collapsed`, `dir`, `title`, 그룹 헤더 행) | `groupBy: ['dept']` 옵션 + `setGroupBy()`, 그룹 헤더 행 접기/펼치기 | **P1** |
-| [ ] | `groupModel > showSummary · grandSummary`, `column > summary`, `summaryData`, util `aggregate` | `column.aggFunc: 'sum'\|'avg'\|'min'\|'max'\|'count'` + 그룹/전체 요약 행 | **P1** (그룹핑과 함께) |
-| [ ] | `collapse() / expand() / toggle()` (그룹 전체) | `expandAllGroups()` / `collapseAllGroups()` | **P1** (그룹핑과 함께) |
-| [ ] | `group` / `beforeGroupExpand` / `toggle` 이벤트 | `groupChanged` / `groupToggled` | **P1** (그룹핑과 함께) |
+| [x] | **`groupModel`** (행 그룹핑: `dataIndx[]`, `collapsed`, `dir`, `title`, 그룹 헤더 행) | `groupBy: ['dept']` 옵션 + `setGroupBy()`/`getGroupBy()`, `groupDefaultExpanded`, 그룹 헤더 행 접기/펼치기 — v1.1.0 | **P1** |
+| [x] | `groupModel > showSummary · grandSummary`, `column > summary`, `summaryData`, util `aggregate` | `column.aggFunc: 'sum'\|'avg'\|'min'\|'max'\|'count'` (그룹 헤더 행 집계) + `grandTotal: true` 전체 요약 행 — v1.1.0 | **P1** (그룹핑과 함께) |
+| [x] | `collapse() / expand() / toggle()` (그룹 전체) | `expandAllGroups()` / `collapseAllGroups()` — v1.1.0 | **P1** (그룹핑과 함께) |
+| [x] | `group` / `beforeGroupExpand` / `toggle` 이벤트 | `groupChanged` / `groupToggled` — v1.1.0 | **P1** (그룹핑과 함께) |
 | [ ] | **`dataModel`** (원격 데이터: `url · method · postData · getData · location:'remote'`, remote 정렬/필터/페이징) | `dataSource: { url, method, params, parse }` + `sortMode/filterMode/pageMode: 'client'\|'server'` | **P2** |
 | [ ] | `detailModel` + `rowExpand/rowCollapse` (마스터-디테일 행) | `rowDetail: { renderer }` + `expandRow()/collapseRow()` + `rowExpanded` 이벤트 | **P2** |
 | [ ] | `column > formula` (계산 컬럼) | `valueGetter(row)` — 파생 값 계산(정렬·필터에도 사용) | **P2** |

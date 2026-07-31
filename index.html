@@ -25,7 +25,7 @@
   <h1>Employee Directory</h1>
   <p class="subtitle">
     10,000행 실데이터 템플릿 — 가상 스크롤, 정렬(Shift 멀티), 컬럼 필터 메뉴, 퀵 필터,
-    체크박스 선택, 페이지네이션, 인라인 편집, CSV 내보내기를 한 화면에서 사용합니다.
+    행 그룹핑·집계, 체크박스 선택, 페이지네이션, 인라인 편집, CSV 내보내기를 한 화면에서 사용합니다.
     <strong>View Source</strong> 탭에서 전체 코드를 확인하세요.
   </p>
 
@@ -33,6 +33,12 @@
     <div class="example-html">
       <div class="toolbar">
         <input class="tb-input" id="quickFilter" type="text" placeholder="Quick filter — 모든 컬럼 검색…">
+        <select class="tb-input" id="groupBySel">
+          <option value="">Group by: (없음)</option>
+          <option value="department">Group by: Department</option>
+          <option value="department,city">Group by: Department → City</option>
+          <option value="status">Group by: Status</option>
+        </select>
         <span class="grow"></span>
         <button class="tb-btn" id="clearFilters" type="button">Clear filters</button>
         <button class="tb-btn" id="deleteSelected" type="button" disabled>Delete selected</button>
@@ -53,6 +59,7 @@
         pagination: true,
         paginationPageSize: 50,
         zebra: true,
+        grandTotal: true,
         defaultColDef: { sortable: true, resizable: true },
         columnDefs: [
           { colId: 'sel', headerName: '', width: 48, minWidth: 48, pinned: 'left',
@@ -70,7 +77,8 @@
               'Active': 'green', 'On Leave': 'yellow', 'Contract': 'blue', 'Inactive': 'gray',
             }) },
           { field: 'salary', headerName: 'Salary', width: 120, align: 'right',
-            filter: 'number', editable: true, editor: 'number', valueFormatter: money },
+            filter: 'number', editable: true, editor: 'number',
+            aggFunc: 'sum', valueFormatter: money },
           { field: 'progress', headerName: 'Onboarding', width: 150,
             cellRenderer: DataGrid.renderers.progress() },
           { field: 'remote', headerName: 'Remote', width: 90, align: 'center',
@@ -90,6 +98,13 @@
       document.getElementById('clearFilters').addEventListener('click', function () {
         document.getElementById('quickFilter').value = '';
         grid.clearFilters();
+      });
+
+      document.getElementById('groupBySel').addEventListener('change', function () {
+        grid.setGroupBy(this.value ? this.value.split(',') : []);
+        statusLine.textContent = this.value
+          ? '그룹핑: ' + this.value + ' — 그룹 헤더 행을 클릭해 접고 펼칠 수 있습니다.'
+          : '그룹핑 해제';
       });
 
       document.getElementById('exportCsv').addEventListener('click', function () {

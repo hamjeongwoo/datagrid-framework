@@ -45,6 +45,9 @@
   var MENU_ICON_SVG =
     '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true">' +
     '<path d="M2 4.5h12v1.4H2zM2 7.3h12v1.4H2zM2 10.1h12v1.4H2z"/></svg>';
+  var CHEVRON_SVG =
+    '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" aria-hidden="true">' +
+    '<path d="M6 3.5L10.5 8L6 12.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
   /* ---------------------------------------------------------------------------
    * Pure data logic (DOM-free, unit-testable in Node)
@@ -168,6 +171,81 @@
       }
       return true;
     });
+  }
+
+  /**
+   * 그룹/전체 요약용 집계. func: 'sum'|'avg'|'min'|'max'|'count'
+   * count는 모든 행을 세고, 나머지는 숫자로 해석 가능한 값만 집계한다.
+   * 집계할 숫자가 하나도 없으면 null.
+   */
+  function aggregateValues(rows, field, func) {
+    if (func === 'count') return rows.length;
+    var sum = 0, min = Infinity, max = -Infinity, n = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var raw = rows[i][field];
+      if (raw === null || raw === undefined || raw === '') continue;
+      var v = Number(raw);
+      if (isNaN(v)) continue;
+      n++;
+      sum += v;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    if (n === 0) return null;
+    switch (func) {
+      case 'sum': return sum;
+      case 'avg': return sum / n;
+      case 'min': return min;
+      case 'max': return max;
+      default: return null;
+    }
+  }
+
+  /**
+   * 필터·정렬이 끝난 행을 그룹 헤더 항목이 섞인 평면 표시 리스트로 변환한다.
+   * - 그룹 순서는 데이터에서의 첫 등장 순서 (버킷 방식이라 연속 정렬 불필요)
+   * - isExpanded(path)가 false인 그룹의 자식은 리스트에서 빠지지만,
+   *   집계(agg)는 항상 전체 자식 기준으로 계산된다.
+   * 그룹 항목: { __group, field, value, path, level, leafCount, expanded, agg }
+   */
+  function buildGroupView(rows, groupFields, isExpanded, aggColumns) {
+    if (!groupFields || groupFields.length === 0) return rows.slice();
+    aggColumns = aggColumns || [];
+    var items = [];
+    (function walk(subset, level, parentPath) {
+      var field = groupFields[level];
+      var order = [];
+      var buckets = Object.create(null);
+      subset.forEach(function (row) {
+        var key = String(row[field]);
+        if (!buckets[key]) { buckets[key] = []; order.push(key); }
+        buckets[key].push(row);
+      });
+      order.forEach(function (key) {
+        var children = buckets[key];
+        /* \u0001: 데이터 값에 등장할 일 없는 레벨 구분자 */
+        var path = parentPath + '\u0001' + field + ':' + key;
+        var expanded = !!isExpanded(path);
+        var agg = {};
+        aggColumns.forEach(function (c) {
+          agg[c.field] = aggregateValues(children, c.field, c.aggFunc);
+        });
+        items.push({
+          __group: true,
+          field: field,
+          value: children[0][field],
+          path: path,
+          level: level,
+          leafCount: children.length,
+          expanded: expanded,
+          agg: agg,
+        });
+        if (!expanded) return;
+        if (level + 1 < groupFields.length) walk(children, level + 1, path);
+        else children.forEach(function (r) { items.push(r); });
+      });
+    })(rows, 0, '');
+    return items;
   }
 
   function paginate(totalRows, pageSize, currentPage) {
@@ -315,6 +393,11 @@
     this._viewRows = [];
     this._pageRows = [];
 
+    /* grouping */
+    this._groupBy = (options.groupBy || []).slice();
+    this._groupDefaultExpanded = options.groupDefaultExpanded !== false;
+    this._groupToggled = {}; /* path -> expanded override */
+
     /* interaction state */
     this._sortModel = options.sortModel ? options.sortModel.slice() : [];
     this._filterModel = {};
@@ -361,6 +444,11 @@
     this._bodyEl = el('div', 'dg-body', root);
     this._canvasEl = el('div', 'dg-canvas', this._bodyEl);
 
+    this._footerEl = el('div', 'dg-footer', root);
+    this._footerRowEl = el('div', 'dg-footer-row', this._footerEl);
+    this._footerEl.hidden = true;
+    this._footerCells = {};
+
     this._overlayEl = el('div', 'dg-overlay', root);
     this._overlayEl.hidden = true;
 
@@ -379,6 +467,7 @@
 
     this._bodyEl.addEventListener('scroll', function () {
       self._headerEl.scrollLeft = self._bodyEl.scrollLeft;
+      self._footerEl.scrollLeft = self._bodyEl.scrollLeft;
       self._renderVisibleRows();
     });
 
@@ -437,14 +526,27 @@
     rows = sortRows(rows, this._sortModel, comparators);
     this._viewRows = rows;
 
+    /* 그룹핑: 리프 행(_viewRows)과 그룹 헤더가 섞인 표시 리스트(_displayRows)를 분리.
+     * 선택·CSV 등 데이터 API는 리프만, 렌더링·페이징은 표시 리스트를 쓴다. */
+    this._aggColumns = this._columns.filter(function (c) { return c.aggFunc && c.field; });
+    var display = rows;
+    if (this._groupBy.length > 0) {
+      var toggled = this._groupToggled;
+      var defaultExpanded = this._groupDefaultExpanded;
+      display = buildGroupView(rows, this._groupBy, function (path) {
+        return toggled[path] !== undefined ? toggled[path] : defaultExpanded;
+      }, this._aggColumns);
+    }
+    this._displayRows = display;
+
     if (this._pagination) {
-      var info = paginate(rows.length, this._pageSize, this._currentPage);
+      var info = paginate(display.length, this._pageSize, this._currentPage);
       this._currentPage = info.page;
       this._pageInfo = info;
-      this._pageRows = rows.slice(info.start, info.end);
+      this._pageRows = display.slice(info.start, info.end);
     } else {
       this._pageInfo = null;
-      this._pageRows = rows;
+      this._pageRows = display;
     }
   };
 
@@ -457,6 +559,7 @@
     this._renderHeader();
     this._layoutColumns();
     this._renderBody();
+    this._renderGrandTotal();
     this._renderPaging();
     this._updateOverlay();
   };
@@ -587,6 +690,10 @@
     for (var colId in this._headerCells) {
       this._applyCellLayout(this._headerCells[colId], colId);
     }
+    /* apply to grand total footer */
+    for (var fColId in this._footerCells) {
+      this._applyCellLayout(this._footerCells[fColId], fColId);
+    }
     /* apply to rendered rows */
     for (var idx in this._renderedRows) {
       var rowEl = this._renderedRows[idx];
@@ -650,6 +757,7 @@
   DataGrid.prototype._buildRowEl = function (pageIndex) {
     var self = this;
     var row = this._pageRows[pageIndex];
+    if (row && row.__group) return this._buildGroupRowEl(pageIndex, row);
     var id = this._rowId(row);
     var rowEl = el('div', 'dg-row');
     rowEl.setAttribute('role', 'row');
@@ -700,6 +808,73 @@
     });
 
     return rowEl;
+  };
+
+  /* 그룹 헤더 행: 일반 행과 같은 셀 레이아웃을 유지해 컬럼 폭·고정 컬럼과 정렬을 맞추고,
+   * 첫 콘텐츠 컬럼에 셰브론+라벨+건수, aggFunc 컬럼에 집계값을 표시한다. */
+  DataGrid.prototype._buildGroupRowEl = function (pageIndex, item) {
+    var self = this;
+    var rowEl = el('div', 'dg-row dg-group-row');
+    rowEl.setAttribute('role', 'row');
+    rowEl.setAttribute('aria-expanded', item.expanded ? 'true' : 'false');
+    rowEl.style.top = pageIndex * this._rowHeight + 'px';
+    rowEl.dataset.rowIndex = pageIndex;
+
+    var cols = this._visibleColumns();
+    var labelColId = null;
+    for (var i = 0; i < cols.length; i++) {
+      if (!cols[i].checkboxSelection) { labelColId = cols[i].colId; break; }
+    }
+
+    cols.forEach(function (col, cIdx) {
+      var cell = el('div', 'dg-cell', rowEl);
+      cell.setAttribute('role', 'gridcell');
+      cell.dataset.colId = col.colId;
+      cell.dataset.colIndex = cIdx;
+      if (col.pinned === 'left') cell.classList.add('dg-pinned-left');
+      if (col.pinned === 'right') cell.classList.add('dg-pinned-right');
+      self._applyCellLayout(cell, col.colId);
+
+      if (col.colId === labelColId) {
+        cell.classList.add('dg-group-cell');
+        if (item.level > 0) {
+          var indent = el('span', 'dg-group-indent', cell);
+          indent.style.width = 'calc(var(--dg-group-indent) * ' + item.level + ')';
+        }
+        var chevron = el('span', 'dg-group-chevron' + (item.expanded ? ' dg-expanded' : ''), cell);
+        chevron.innerHTML = CHEVRON_SVG;
+        var label = el('span', 'dg-group-label', cell);
+        label.textContent =
+          item.value === null || item.value === undefined || item.value === ''
+            ? '(Blanks)'
+            : String(item.value);
+        var count = el('span', 'dg-group-count', cell);
+        count.textContent = '(' + item.leafCount.toLocaleString() + ')';
+        return;
+      }
+
+      if (col.aggFunc && col.field && item.agg[col.field] !== null && item.agg[col.field] !== undefined) {
+        if (col.align === 'right') cell.classList.add('dg-align-right');
+        if (col.align === 'center') cell.classList.add('dg-align-center');
+        cell.classList.add('dg-cell-agg');
+        var holder = el('span', 'dg-cell-value', cell);
+        holder.textContent = self._formatAggValue(col, item.agg[col.field]);
+      }
+    });
+
+    return rowEl;
+  };
+
+  DataGrid.prototype._formatAggValue = function (col, value) {
+    if (value === null || value === undefined) return '';
+    if (col.valueFormatter && col.aggFunc !== 'count') {
+      try { return String(col.valueFormatter(value, null)); }
+      catch (e) { /* 집계 행에는 row가 없으므로 실패 시 원시 값으로 폴백 */ }
+    }
+    if (typeof value === 'number' && !Number.isInteger(value)) {
+      value = Math.round(value * 100) / 100;
+    }
+    return typeof value === 'number' ? value.toLocaleString() : String(value);
   };
 
   DataGrid.prototype._renderCellValue = function (cell, col, row) {
@@ -915,6 +1090,88 @@
     this._emitter.emit('filterChanged', { filterModel: this.getFilterModel(), quickFilter: this._quickFilter });
   };
 
+  /* ---- row grouping ---- */
+
+  DataGrid.prototype.setGroupBy = function (fields) {
+    this._groupBy = (fields || []).slice();
+    this._groupToggled = {};
+    this._groupDefaultExpanded = this.options.groupDefaultExpanded !== false;
+    this._currentPage = 0;
+    this._focusedCell = null;
+    this.refresh();
+    this._emitter.emit('groupChanged', { groupBy: this._groupBy.slice() });
+  };
+
+  DataGrid.prototype.getGroupBy = function () { return this._groupBy.slice(); };
+
+  DataGrid.prototype.expandAllGroups = function () {
+    this._groupDefaultExpanded = true;
+    this._groupToggled = {};
+    this.refresh();
+  };
+
+  DataGrid.prototype.collapseAllGroups = function () {
+    this._groupDefaultExpanded = false;
+    this._groupToggled = {};
+    this._currentPage = 0;
+    this.refresh();
+  };
+
+  DataGrid.prototype._toggleGroup = function (item) {
+    var expanded = !item.expanded;
+    this._groupToggled[item.path] = expanded;
+    this.refresh();
+    this._emitter.emit('groupToggled', {
+      field: item.field,
+      value: item.value,
+      path: item.path,
+      expanded: expanded,
+    });
+  };
+
+  /* ---- grand total footer ---- */
+
+  DataGrid.prototype._renderGrandTotal = function () {
+    var self = this;
+    this._footerRowEl.innerHTML = '';
+    this._footerCells = {};
+    var show = !!this.options.grandTotal && this._aggColumns.length > 0;
+    this._footerEl.hidden = !show;
+    if (!show) return;
+
+    var rows = this._viewRows;
+    var cols = this._visibleColumns();
+    var labelColId = null;
+    for (var i = 0; i < cols.length; i++) {
+      if (!cols[i].checkboxSelection && !cols[i].aggFunc) { labelColId = cols[i].colId; break; }
+    }
+
+    cols.forEach(function (col) {
+      var cell = el('div', 'dg-cell', self._footerRowEl);
+      cell.dataset.colId = col.colId;
+      if (col.pinned === 'left') cell.classList.add('dg-pinned-left');
+      if (col.pinned === 'right') cell.classList.add('dg-pinned-right');
+      self._applyCellLayout(cell, col.colId);
+      self._footerCells[col.colId] = cell;
+
+      if (col.colId === labelColId) {
+        var label = el('span', 'dg-footer-label', cell);
+        label.textContent = 'Total';
+        var count = el('span', 'dg-group-count', cell);
+        count.textContent = '(' + rows.length.toLocaleString() + ')';
+        return;
+      }
+      if (col.aggFunc && col.field) {
+        if (col.align === 'right') cell.classList.add('dg-align-right');
+        if (col.align === 'center') cell.classList.add('dg-align-center');
+        cell.classList.add('dg-cell-agg');
+        var holder = el('span', 'dg-cell-value', cell);
+        holder.textContent = self._formatAggValue(col, aggregateValues(rows, col.field, col.aggFunc));
+      }
+    });
+    this._footerEl.scrollLeft = this._bodyEl.scrollLeft;
+  };
+
   /* ---- selection ---- */
 
   DataGrid.prototype._setRowSelected = function (row, selected, emit) {
@@ -989,6 +1246,11 @@
     var hit = this._cellFromEvent(e);
     if (!hit || !hit.row) return;
 
+    if (hit.row.__group) {
+      this._toggleGroup(hit.row);
+      return;
+    }
+
     this._setFocusedCell(hit.r, hit.c);
 
     var mode = this.options.rowSelection;
@@ -1000,7 +1262,7 @@
         if (!e.ctrlKey && !e.metaKey) this._selection = {};
         for (var i = from; i <= to; i++) {
           var row = this._pageRows[i];
-          if (row) this._selection[this._rowId(row)] = row;
+          if (row && !row.__group) this._selection[this._rowId(row)] = row;
         }
         this._syncSelectionDom();
         this._emitSelection();
@@ -1023,7 +1285,7 @@
 
   DataGrid.prototype._onCellDblClick = function (e) {
     var hit = this._cellFromEvent(e);
-    if (!hit || !hit.row) return;
+    if (!hit || !hit.row || hit.row.__group) return;
     this._emitter.emit('rowDoubleClicked', { data: hit.row, rowIndex: hit.r });
     if (hit.col && hit.col.editable) this._startEdit(hit);
   };
@@ -1054,8 +1316,9 @@
       case 'ArrowLeft': c = Math.max(0, c - 1); break;
       case 'ArrowRight': c = Math.min(maxC, c + 1); break;
       case 'Enter': {
-        var col = this._visibleColumns()[c];
         var row = this._pageRows[r];
+        if (row && row.__group) { this._toggleGroup(row); break; }
+        var col = this._visibleColumns()[c];
         if (col && col.editable && row) {
           var rowEl = this._renderedRows[r];
           var cellEl = rowEl && rowEl.querySelector('[data-col-index="' + c + '"]');
@@ -1065,7 +1328,7 @@
       }
       case ' ': {
         var srow = this._pageRows[r];
-        if (srow && this.options.rowSelection) {
+        if (srow && !srow.__group && this.options.rowSelection) {
           this._setRowSelected(srow, !this._selection[this._rowId(srow)], true);
         }
         break;
@@ -1500,6 +1763,8 @@
     buildFilterPredicate: buildFilterPredicate,
     filterRows: filterRows,
     quickFilterRows: quickFilterRows,
+    aggregateValues: aggregateValues,
+    buildGroupView: buildGroupView,
     paginate: paginate,
     pageButtonModel: pageButtonModel,
     csvEscape: csvEscape,

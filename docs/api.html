@@ -139,6 +139,8 @@
     color: var(--page-accent);
   }
   .api-badge.required { background: rgba(224, 37, 37, 0.1); color: #d02020; }
+  .api-badge.since { background: rgba(22, 160, 78, 0.12); color: #0d8a44; text-transform: none; }
+  body.dark .api-badge.since { color: #4cd587; }
   .api-type {
     font-family: ui-monospace, Consolas, monospace;
     font-size: 12px;
@@ -282,6 +284,7 @@
       bodyHtml += '<span class="api-entry-name"><a href="#' + id + '">' + esc(e.name) + '</a></span>';
       if (e.kind) bodyHtml += '<span class="api-badge">' + esc(e.kind) + '</span>';
       if (e.required) bodyHtml += '<span class="api-badge required">required</span>';
+      if (e.since) bodyHtml += '<span class="api-badge since">since v' + esc(e.since) + '</span>';
       if (e.type) bodyHtml += '<span class="api-type">' + esc(e.type) + '</span>';
       if (e.payload) bodyHtml += '<span class="api-type">' + esc(e.payload) + '</span>';
       if (e.default !== undefined) {
