@@ -1940,6 +1940,17 @@
 
     var widths = computeColumnWidths(cols, this._colWidths, available);
     this._computedWidths = widths;
+
+    /* 캔버스에 전체 컬럼 폭을 직접 고정한다 (BUG-003).
+     * 행은 전부 absolute 배치라 캔버스 자체 폭에 기여하지 못하므로, 행 DOM을
+     * 비웠다 다시 만드는 사이 강제 레이아웃이 끼면 scrollWidth가 뷰포트 폭으로
+     * 붕괴해 브라우저가 scrollLeft를 0으로 클램프한다 (virtualX 가로 스크롤바
+     * 드래그가 제자리로 튕기는 증상). 캔버스 min-width를 고정하면 행 유무와
+     * 무관하게 가로 스크롤 폭이 안정된다. */
+    var totalW = 0;
+    cols.forEach(function (c) { totalW += widths[c.colId] || 0; });
+    this._canvasEl.style.minWidth = 'max(100%, ' + totalW + 'px)';
+
     if (this.options.virtualX) this._updateColWindow();
 
     /* pinned offsets */
