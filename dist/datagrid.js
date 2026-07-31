@@ -846,6 +846,34 @@
   }
 
   /**
+   * 대상 노드의 서브트리에서 "체크 가능한 리프"(비활성 아닌 리프)가 모두
+   * 선택돼 있는지. indeterminate 부모 클릭의 의도 판정에 쓴다 — 브라우저는
+   * indeterminate 체크박스 클릭에 항상 checked=true를 주므로, 더 체크할
+   * 리프가 없다면(비활성 리프 때문에 완전 체크가 불가능한 상태) 사용자의
+   * 의도를 "해제"로 해석해야 체크박스가 indeterminate에 갇히지 않는다 (BUG-004).
+   */
+  function subtreeFullyChecked(roots, targetRow, isSelected, isDisabled) {
+    var node = null;
+    (function find(list) {
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].row === targetRow) { node = list[i]; return true; }
+        if (find(list[i].children)) return true;
+      }
+      return false;
+    })(roots);
+    if (!node) return false;
+    var all = true;
+    (function walk(n) {
+      if (n.children.length === 0) {
+        if (!isDisabled(n.row) && !isSelected(n.row)) all = false;
+        return;
+      }
+      n.children.forEach(walk);
+    })(node);
+    return all;
+  }
+
+  /**
    * 행 선택 상태로부터 트리 체크박스 표시 상태를 유도한다 (checkboxSelection 연동).
    * 리프 = isSelected(row), 부모 = 자식 전부 true → true / 전부 false → false /
    * 혼합 → 'indeterminate'. 선택이 어떤 경로(체크박스·행 클릭·API)로 바뀌어도
@@ -1405,8 +1433,9 @@
     /* tree data — pagination/groupBy와 배타 (ParamQuery도 페이징 비호환 명시) */
     this._treeData = options.treeData || null;
     this._treeExpanded = {}; /* rowId -> bool */
-    /* checkboxSelection 컬럼 연동 트리 체크박스: 선택 상태에서 유도되는 표시 캐시 */
-    this._treeChecked = null; /* rowId -> true | false | 'indeterminate' */
+    /* checkboxSelection 컬럼 연동 트리 체크박스 */
+    this._treeCheckboxMode = false; /* treeData + checkboxSelection 컬럼 — 뷰 계산 시 갱신 */
+    this._treeChecked = null; /* rowId -> true|false|'indeterminate' — cascade일 때만 유도 */
     this._treeRoots = null; /* 필터 전 전체 트리 (체크 캐스케이드용) — 뷰 계산 시 갱신 */
     this._treeInfo = null; /* rowId -> { level, hasChildren, expanded } — 뷰 계산 시 갱신 */
     this._treeColId = null; /* 트리 UI(들여쓰기+토글)를 그릴 컬럼 */
@@ -1890,9 +1919,12 @@
 
     this._aggColumns = this._columns.filter(function (c) { return c.aggFunc && c.field; });
 
-    /* checkboxSelection 컬럼이 있으면 트리 체크박스 모드 — 선택에서 3상태 유도 */
+    /* checkboxSelection 컬럼이 있으면 트리 체크박스 모드.
+     * 3상태 유도 표시는 cascade일 때만 — 비캐스케이드에서 부모 표시를 자식에서
+     * 유도하면 부모 자신의 선택과 어긋나 토글이 갇힌다 (BUG-004) */
     this._treeChecked = null;
-    if (this._hasTreeCheckbox()) {
+    this._treeCheckboxMode = this._hasTreeCheckbox();
+    if (this._treeCheckboxMode && this._treeCheckOpts().cascade) {
       this._treeChecked = deriveTreeCheckStates(
         this._treeRoots,
         function (r) { return self._rowId(r); },
@@ -2623,9 +2655,9 @@
         cell.classList.add('dg-checkbox-cell');
         var cb = el('input', 'dg-checkbox', cell);
         cb.type = 'checkbox';
-        if (self._treeChecked) {
-          /* 트리 모드: 선택 연동 3상태 체크박스 — 캐스케이드는 _treeCheckToggle이 처리 */
-          var tState = self._treeChecked[id];
+        if (self._treeCheckboxMode) {
+          /* 트리 모드: 선택 연동 체크박스 — cascade면 3상태(유도), 아니면 자기 선택 */
+          var tState = self._treeChecked ? self._treeChecked[id] : !!self._selection[id];
           cb.checked = tState === true;
           cb.indeterminate = tState === 'indeterminate';
           cb.disabled = self._treeCheckOpts().isDisabled(row);
@@ -3196,6 +3228,16 @@
     var getId = function (r) { return self._rowId(r); };
     var opts = this._treeCheckOpts();
     if (opts.isDisabled(row)) return;
+    /* indeterminate에서 출발한 클릭은 브라우저가 항상 checked=true를 준다.
+     * 체크 가능한 리프가 이미 전부 선택돼 있으면(비활성 리프 때문에 완전
+     * 체크 불가) "체크"는 무의미하므로 해제 의도로 해석한다 (BUG-004). */
+    if (checked && opts.cascade && subtreeFullyChecked(
+      this._treeRoots, row,
+      function (r) { return !!self._selection[self._rowId(r)]; },
+      opts.isDisabled
+    )) {
+      checked = false;
+    }
     var next = {};
     if (opts.cascade) {
       var states = applyTreeCheck(
@@ -3391,7 +3433,7 @@
     if (this._headerSelectAllEl) {
       var count;
       var total;
-      if (this._treeChecked && this._treeRoots) {
+      if (this._treeCheckboxMode && this._treeRoots) {
         /* 트리 모드: 체크 가능한(비활성 아닌) 행만 기준으로 전체/일부 판단.
          * 캐스케이드에서는 부모 선택이 자식에서 유도되고, 비활성 자손을 가진
          * 부모는 결코 true가 될 수 없으므로 리프만 센다 — 아니면 헤더가
@@ -5125,6 +5167,7 @@
     flattenTreeNodes: flattenTreeNodes,
     applyTreeCheck: applyTreeCheck,
     deriveTreeCheckStates: deriveTreeCheckStates,
+    subtreeFullyChecked: subtreeFullyChecked,
     computeTreeSummary: computeTreeSummary,
     buildGroupHeaderRuns: buildGroupHeaderRuns,
     buildDataSourceRequest: buildDataSourceRequest,

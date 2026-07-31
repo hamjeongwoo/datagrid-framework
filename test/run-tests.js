@@ -795,6 +795,33 @@ suite('applyTreeCheck', function () {
   assertEq(s8.p, 'indeterminate', 'parent reflects skipped child (mixed)');
 });
 
+/* ---------------- subtreeFullyChecked ---------------- */
+suite('subtreeFullyChecked', function () {
+  var data = [
+    {
+      id: 'f',
+      children: [{ id: 'a' }, { id: 'lic' }, { id: 'sub', children: [{ id: 'b' }] }],
+    },
+  ];
+  var roots = T.buildTreeNodes(data, {});
+  var byId = {};
+  T.collectTreeNodes(roots).forEach(function (n) { byId[n.row.id] = n.row; });
+  var sel = function (ids) { return function (r) { return ids.indexOf(r.id) !== -1; }; };
+  var disLic = function (r) { return r.id === 'lic'; };
+  var noneDis = function () { return false; };
+  var S = T.subtreeFullyChecked;
+
+  assertEq(S(roots, byId.f, sel(['a', 'lic', 'b']), noneDis), true, 'all leaves selected → true');
+  assertEq(S(roots, byId.f, sel(['a', 'b']), noneDis), false, 'unselected leaf → false');
+  // BUG-004 핵심 케이스: 비활성 리프만 미선택이면 "완전 체크"로 간주 → 클릭 의도 = 해제
+  assertEq(S(roots, byId.f, sel(['a', 'b']), disLic), true, 'disabled leaf excluded from check');
+  assertEq(S(roots, byId.f, sel(['a']), disLic), false, 'checkable leaf missing → false');
+  assertEq(S(roots, byId.sub, sel(['b']), disLic), true, 'works on nested subtree');
+  assertEq(S(roots, byId.a, sel([]), noneDis), false, 'leaf target unselected → false');
+  assertEq(S(roots, byId.a, sel(['a']), noneDis), true, 'leaf target selected → true');
+  assertEq(S(roots, { id: 'ghost' }, sel([]), noneDis), false, 'unknown row → false');
+});
+
 /* ---------------- deriveTreeCheckStates ---------------- */
 suite('deriveTreeCheckStates', function () {
   var data = [

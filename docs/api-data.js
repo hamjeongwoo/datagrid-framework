@@ -789,7 +789,8 @@ window.ApiDocs = {
           description:
             '셀 앞에 선택 체크박스를 표시합니다. 보통 <code>field</code> 없는 전용 컬럼으로 만듭니다. ' +
             '<code>treeData</code> 그리드에서는 3상태 캐스케이드 체크박스(부모↔자손 선택 연동, ' +
-            'indeterminate 표시)로 동작합니다.',
+            'indeterminate 표시)로 동작합니다. indeterminate 부모를 클릭하면 남은 체크 가능 리프가 ' +
+            '있을 때는 전부 체크하고, 없을 때(비활성 리프만 미체크)는 해제합니다.',
           example:
             "{ colId: 'sel', headerName: '', width: 48, minWidth: 48,\n" +
             '  checkboxSelection: true, headerCheckboxSelection: true,\n' +

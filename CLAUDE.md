@@ -145,6 +145,7 @@
 4. Windows 환경: PowerShell 5.1 (`&&` 없음), git 커밋 메시지는 here-string(`@'...'@`) 사용. here-string 파싱이 깨지면 스크래치패드에 메시지 파일을 쓰고 `git commit -F <파일>`로 우회.
 5. **버튼으로 여는 팝업의 토글 (BUG-002)**: ① 같은 버튼 재클릭 = 닫기 분기, ② 바깥클릭(mousedown) 핸들러에서 그 버튼 제외 — 두 가지를 세트로. 빠지면 mousedown이 닫고 click이 재오픈해서 토글이 침묵 실패한다. 팝업 검증은 열기·재클릭 토글·다른 트리거 전환·바깥 클릭을 실제 이벤트 시퀀스(mousedown→mouseup→click)로 할 것 — `element.click()`만으론 mousedown 단계가 재현 안 됨.
 6. **가상화와 scrollWidth (BUG-003)**: 스크롤 컨테이너의 scrollWidth/scrollHeight를 가상화로 제거되는 콘텐츠(absolute 행/셀)에 의존시키지 말 것 — 전체 크기를 컨테이너 치수로 명시한다(세로 `_canvasEl.style.height`, 가로 `_canvasEl.style.minWidth = max(100%, 전체폭)`). 스크롤 중 DOM을 비웠다 재구성하는 사이 강제 레이아웃이 끼면 scrollWidth가 붕괴해 브라우저가 scrollLeft를 0으로 클램프한다(스크롤바 드래그가 제자리로 튕김). 또, 프리뷰 팬이 숨겨진 상태에선 scroll 이벤트가 발화하지 않으니 스크롤 핸들러 검증은 `dispatchEvent(new Event('scroll'))`로 수동 발화할 것.
+7. **3상태 체크박스의 클릭 의도 (BUG-004)**: 브라우저는 indeterminate 체크박스 클릭에 항상 `checked=true`를 준다. "완전 체크가 불가능한 상태"(비활성 자손 등)가 존재하면 checked를 그대로 믿는 핸들러는 해제 경로를 잃고 indeterminate에 갇힌다 — 클릭 의도는 도메인 상태에서 도출할 것(체크할 것이 안 남았으면 해제로 해석). 유도(derived) 표시는 유도 규칙이 성립하는 모드에서만 쓰고, 아니면 원본 상태 표시로 폴백. 3상태 UI 검증은 체크→해제→재체크 왕복 + 비활성 포함 케이스를 반드시 돌릴 것.
 
 ## 버전 정책
 
