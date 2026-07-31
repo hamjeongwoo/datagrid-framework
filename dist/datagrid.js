@@ -3702,6 +3702,11 @@
     var hit = this._cellFromEvent(e);
     if (!hit || !hit.row || hit.row.__detail) return;
 
+    /* 편집 중인 셀 내부 클릭(에디터 상호작용)은 그대로 둔다 — 편집을
+     * 재시작하면 에디터 DOM이 교체되어 select 드롭다운 같은 네이티브
+     * UI가 열리자마자 닫힌다 (BUG-005) */
+    if (this._editing && this._editing.row === hit.row && this._editing.col === hit.col) return;
+
     if (hit.row.__group) {
       this._toggleGroup(hit.row);
       return;
@@ -3763,6 +3768,8 @@
   DataGrid.prototype._onCellDblClick = function (e) {
     var hit = this._cellFromEvent(e);
     if (!hit || !hit.row || hit.row.__group) return;
+    /* 편집 중인 셀 내부 더블클릭도 재시작 금지 (BUG-005 — _onCellClick과 동일) */
+    if (this._editing && this._editing.row === hit.row && this._editing.col === hit.col) return;
     this._emitter.emit('cellDoubleClicked', {
       data: hit.row,
       colDef: hit.col,
