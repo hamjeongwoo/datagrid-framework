@@ -1095,6 +1095,47 @@
     </script>
   </div>
 
+  <!-- ======================================================== 중첩 컬럼 헤더 -->
+  <h2 class="section">Column Group Headers</h2>
+  <p class="section-desc">
+    <code class="inline">columnGroups: [{ headerName, children: ['field'...] }]</code>는
+    헤더 위에 그룹 스팬 행을 추가합니다. 같은 그룹의 연속된 컬럼이 하나의 스팬으로 묶이고,
+    컬럼을 드래그해 그룹 밖으로 옮기면 스팬이 자동으로 갈라집니다.
+    고정(pinned) 컬럼 경계에서는 스팬이 끊겨 스크롤과 어긋나지 않습니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div id="gridColGroup" class="grid-wrap-sm"></div>
+      <div class="status-line" id="colGroupStatus">
+        컬럼 헤더를 드래그해 순서를 바꿔 보세요 — 그룹 스팬이 실시간으로 재계산됩니다.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridColGroup'), {
+        rowData: DemoData.makeEmployees(40, 61),
+        columnGroups: [
+          { headerName: '인적사항 (Person)', children: ['name', 'email'] },
+          { headerName: '근무 (Work)', children: ['department', 'city'] },
+          { headerName: '보상 (Compensation)', children: ['salary', 'rating'] },
+        ],
+        columnDefs: [
+          { field: 'id', headerName: 'ID', width: 70, pinned: 'left' },
+          { field: 'name', headerName: 'Name', width: 150 },
+          { field: 'email', headerName: 'Email', width: 210 },
+          { field: 'department', headerName: 'Department', width: 140 },
+          { field: 'city', headerName: 'City', width: 120 },
+          { field: 'salary', headerName: 'Salary', dataType: 'number', format: '$#,##0', width: 120 },
+          { field: 'rating', headerName: 'Rating', dataType: 'number', format: '0.0', width: 100 },
+        ],
+      });
+
+      grid.on('columnMoved', function (e) {
+        document.getElementById('colGroupStatus').textContent =
+          'columnMoved: ' + e.colId + ' → 그룹 스팬이 재계산되었습니다.';
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

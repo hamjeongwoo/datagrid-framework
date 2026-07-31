@@ -492,6 +492,39 @@
   }
 
   /**
+   * columnGroups 옵션 → 그룹 헤더 행의 스팬 목록.
+   * 표시 컬럼 순서를 따라가며 같은 그룹의 연속 컬럼을 하나의 스팬으로 묶는다.
+   * 그룹이 없는 연속 컬럼도 빈 스팬 하나로 합친다. 고정(pinned) 상태가 다르면
+   * 스팬을 끊어 고정 컬럼 스티키 배치와 어긋나지 않게 한다.
+   * children은 colId 또는 field로 컬럼을 지칭한다.
+   */
+  function buildGroupHeaderRuns(visibleCols, groups) {
+    var groupOf = {};
+    (groups || []).forEach(function (g, gi) {
+      (g.children || []).forEach(function (id) { groupOf[id] = gi; });
+    });
+    var runs = [];
+    visibleCols.forEach(function (c) {
+      var gi = groupOf[c.colId] !== undefined ? groupOf[c.colId]
+        : groupOf[c.field] !== undefined ? groupOf[c.field]
+        : -1;
+      var pinned = c.pinned === 'left' || c.pinned === 'right' ? c.pinned : null;
+      var last = runs[runs.length - 1];
+      if (last && last.group === gi && last.pinned === pinned) {
+        last.colIds.push(c.colId);
+      } else {
+        runs.push({
+          group: gi,
+          headerName: gi === -1 ? '' : groups[gi].headerName || '',
+          colIds: [c.colId],
+          pinned: pinned,
+        });
+      }
+    });
+    return runs;
+  }
+
+  /**
    * findNext()의 다음 매치 탐색. rows에는 그룹 헤더 항목이 섞여 있을 수 있다
    * (건너뜀). cursor: { index, col } 직전 매치 위치 또는 null(처음부터).
    * 끝에 닿으면 처음으로 감싸서 계속 찾고, 없으면 null.
@@ -995,6 +1028,7 @@
 
   DataGrid.prototype._renderHeader = function () {
     var self = this;
+    this._renderGroupHeader();
     this._headerRowEl.innerHTML = '';
     this._headerCells = {};
 
@@ -1074,6 +1108,37 @@
     });
 
     this._renderFloatingFilters();
+  };
+
+  /* ---- column group header (columnGroups — 2단 헤더) ---- */
+
+  DataGrid.prototype._renderGroupHeader = function () {
+    if (this._groupHeaderRowEl && this._groupHeaderRowEl.parentNode) {
+      this._groupHeaderRowEl.parentNode.removeChild(this._groupHeaderRowEl);
+    }
+    this._groupHeaderRowEl = null;
+    this._groupHeaderCells = [];
+    var groups = this.options.columnGroups;
+    if (!groups || groups.length === 0) return;
+
+    var row = el('div', 'dg-header-group-row');
+    row.setAttribute('role', 'row');
+    this._headerEl.insertBefore(row, this._headerEl.firstChild);
+    this._groupHeaderRowEl = row;
+
+    var self = this;
+    buildGroupHeaderRuns(this._visibleColumns(), groups).forEach(function (run) {
+      var cell = el('div', 'dg-header-group-cell', row);
+      if (run.group === -1) {
+        cell.classList.add('dg-header-group-empty');
+      } else {
+        var label = el('span', 'dg-header-group-label', cell);
+        label.textContent = run.headerName;
+      }
+      if (run.pinned === 'left') cell.classList.add('dg-pinned-left');
+      if (run.pinned === 'right') cell.classList.add('dg-pinned-right');
+      self._groupHeaderCells.push({ el: cell, colIds: run.colIds, pinned: run.pinned });
+    });
   };
 
   /* ---- floating filter row (헤더 아래 인라인 필터) ---- */
@@ -1223,6 +1288,21 @@
     /* apply to floating filter row */
     for (var flColId in this._floatingCells) {
       this._applyCellLayout(this._floatingCells[flColId], flColId);
+    }
+    /* apply to column group header (스팬 폭 = 멤버 폭 합) */
+    if (this._groupHeaderCells) {
+      var ghOffsets = offsets;
+      this._groupHeaderCells.forEach(function (gh) {
+        var w = 0;
+        gh.colIds.forEach(function (id) { w += widths[id] || 0; });
+        gh.el.style.width = w + 'px';
+        if (gh.pinned === 'left' && ghOffsets[gh.colIds[0]]) {
+          gh.el.style.left = ghOffsets[gh.colIds[0]].left + 'px';
+        }
+        if (gh.pinned === 'right' && ghOffsets[gh.colIds[gh.colIds.length - 1]]) {
+          gh.el.style.right = ghOffsets[gh.colIds[gh.colIds.length - 1]].right + 'px';
+        }
+      });
     }
     /* apply to grand total footer */
     for (var fColId in this._footerCells) {
@@ -3215,6 +3295,7 @@
     applyValueGetters: applyValueGetters,
     rollbackRows: rollbackRows,
     findNextMatch: findNextMatch,
+    buildGroupHeaderRuns: buildGroupHeaderRuns,
     normalizeColumns: normalizeColumns,
     applyColumnState: applyColumnState,
     computeColumnWidths: computeColumnWidths,

@@ -363,6 +363,55 @@ suite('applyValueGetters', function () {
   assertEq(same, [{ x: 1 }], 'no field or no getter → untouched');
 });
 
+/* ---------------- buildGroupHeaderRuns ---------------- */
+suite('buildGroupHeaderRuns', function () {
+  var cols = [
+    { colId: 'a', field: 'a' },
+    { colId: 'b', field: 'b' },
+    { colId: 'c', field: 'c' },
+    { colId: 'd', field: 'd' },
+  ];
+  var groups = [
+    { headerName: 'AB', children: ['a', 'b'] },
+    { headerName: 'D', children: ['d'] },
+  ];
+  var runs = T.buildGroupHeaderRuns(cols, groups);
+  assertEq(
+    runs.map(function (r) { return { name: r.headerName, ids: r.colIds }; }),
+    [
+      { name: 'AB', ids: ['a', 'b'] },
+      { name: '', ids: ['c'] },
+      { name: 'D', ids: ['d'] },
+    ],
+    'contiguous groups spanned, ungrouped as filler'
+  );
+
+  /* 순서가 바뀌어 그룹이 끊기면 스팬도 끊긴다 */
+  var reordered = [cols[0], cols[2], cols[1], cols[3]];
+  runs = T.buildGroupHeaderRuns(reordered, groups);
+  assertEq(
+    runs.map(function (r) { return r.headerName; }),
+    ['AB', '', 'AB', 'D'],
+    'non-contiguous same group becomes separate runs'
+  );
+
+  /* pinned 경계에서 스팬이 끊긴다 */
+  var pinnedCols = [
+    { colId: 'a', field: 'a', pinned: 'left' },
+    { colId: 'b', field: 'b' },
+  ];
+  runs = T.buildGroupHeaderRuns(pinnedCols, [{ headerName: 'AB', children: ['a', 'b'] }]);
+  assertEq(runs.length, 2, 'pinned boundary splits run');
+  assertEq(runs[0].pinned, 'left', 'pinned flag carried');
+
+  /* field로도 컬럼을 지칭할 수 있다 */
+  runs = T.buildGroupHeaderRuns([{ colId: 'col-0', field: 'x' }], [{ headerName: 'X', children: ['x'] }]);
+  assertEq(runs[0].headerName, 'X', 'children matched by field');
+
+  assertEq(T.buildGroupHeaderRuns(cols, []).length, 1, 'no groups → single filler run');
+  assertEq(T.buildGroupHeaderRuns([], groups), [], 'no columns → empty');
+});
+
 /* ---------------- findNextMatch ---------------- */
 suite('findNextMatch', function () {
   var rows = [

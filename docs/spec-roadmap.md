@@ -87,7 +87,7 @@
 
 | | ParamQuery | 제안 API | 우선순위 |
 |---|---|---|---|
-| [ ] | **`column > colModel`** (중첩 컬럼 = 헤더 그룹 2단) | `columnGroups: [{ headerName, children: [...] }]` | **P2** |
+| [x] | **`column > colModel`** (중첩 컬럼 = 헤더 그룹 2단) | `columnGroups: [{ headerName, children: [colId\|field...] }]` — 연속 컬럼 스팬, pinned 경계 분리 — v1.2.0 | **P2** |
 | [x] | `column > dataType/type` (`string·integer·float·date·bool`) | `column.dataType: 'string'\|'number'\|'date'\|'bool'` — 정렬 비교·필터 종류·기본 정렬(align)·기본 에디터 자동 결정 — v1.1.0 | **P1** |
 | [x] | `column > format` (`#,###.00`, 날짜 포맷) + util `formatNumber` | `column.format: '#,##0.00' \| 'yyyy-MM-dd'` 선언적 포맷 (valueFormatter의 간편판) + `DataGrid.format()` 유틸 — v1.1.0 | **P1** |
 | [x] | `numberCell` (행 번호 컬럼) | `rowNumbers: true` 옵션 (좌측 고정, 표시 순서 기준) — v1.1.0 | **P1** (쉬움) |

@@ -37,6 +37,7 @@
   --dg-group-row-background-color: #f3f6fa;
   --dg-group-indent: 20px;
   --dg-floating-filter-height: 36px;
+  --dg-group-header-height: 34px;
   --dg-header-height: 48px;
   --dg-row-height: 42px;
   --dg-cell-horizontal-padding: 16px;
@@ -109,6 +110,44 @@
   height: var(--dg-header-height);
   width: max-content;
   min-width: 100%;
+}
+
+/* 2단 컬럼 그룹 헤더 (columnGroups) */
+.dg-header-group-row {
+  display: flex;
+  height: var(--dg-group-header-height);
+  width: max-content;
+  min-width: 100%;
+  border-bottom: 1px solid var(--dg-border-color);
+  background: var(--dg-header-background-color);
+}
+
+.dg-header-group-cell {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--dg-header-foreground-color);
+}
+.dg-header-group-cell:not(.dg-header-group-empty) {
+  border-right: 1px solid var(--dg-border-color);
+  border-left: 1px solid var(--dg-border-color);
+  margin-left: -1px; /* 이웃 스팬과 경계선 중복 방지 */
+}
+.dg-header-group-cell.dg-pinned-left,
+.dg-header-group-cell.dg-pinned-right {
+  position: sticky;
+  z-index: 3;
+  background: var(--dg-header-background-color);
+}
+.dg-header-group-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 8px;
 }
 
 .dg-header-cell {

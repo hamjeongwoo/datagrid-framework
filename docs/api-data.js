@@ -247,6 +247,22 @@ window.ApiDocs = {
             '행 끝에서는 다음/이전 행으로 감쌉니다.',
         },
         {
+          name: 'columnGroups',
+          type: '{ headerName: string, children: string[] }[]',
+          since: '1.2.0',
+          description:
+            '헤더 위에 2단 그룹 스팬 행을 추가합니다. <code>children</code>은 <code>colId</code> 또는 ' +
+            '<code>field</code>로 컬럼을 지칭하며, <strong>연속으로 배치된</strong> 같은 그룹 컬럼이 ' +
+            '하나의 스팬으로 묶입니다(드래그로 떨어뜨리면 스팬도 갈라짐). 그룹에 속하지 않은 컬럼 위는 ' +
+            '빈 스팬으로 채워지고, 고정(pinned) 컬럼 경계에서는 스팬이 끊깁니다. ' +
+            '높이는 <code>--dg-group-header-height</code> 토큰으로 조절합니다.',
+          example:
+            "columnGroups: [\n" +
+            "  { headerName: 'Person', children: ['name', 'email'] },\n" +
+            "  { headerName: 'Compensation', children: ['salary', 'rating'] },\n" +
+            ']',
+        },
+        {
           name: 'cellSelection',
           type: 'boolean',
           default: 'false',

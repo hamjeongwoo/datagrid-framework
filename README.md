@@ -74,6 +74,7 @@ python demo/server.py
 | `trackChanges` | boolean | 변경 추적 — dirty 셀 표시 + `getChanges`/`commitChanges`/`rollbackChanges` |
 | `undoRedo` | boolean | Ctrl+Z/Y 실행 취소 스택 (`undo`/`redo`/`canUndo`/`canRedo`) |
 | `cellSelection` | boolean | 셀/블록 범위 선택 (드래그·Shift+화살표, Ctrl+C 블록 복사) |
+| `columnGroups` | array | 2단 컬럼 그룹 헤더 `[{ headerName, children }]` |
 
 ## 컬럼 정의
 
