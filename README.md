@@ -102,8 +102,8 @@ python demo/server.py
 | `aggFunc` | `'sum'` \| `'avg'` \| `'min'` \| `'max'` \| `'count'` — 그룹/전체 요약 집계 |
 | `filter` | `'text'` \| `'number'` \| `'set'` (`true` = text) |
 | `editable` | 더블클릭/Enter로 인라인 편집 — `editor` 선언 시 생략 가능 (명시적 `false`가 우선) |
-| `editor` | `'text'` \| `'number'` \| `'select'` (+ `editorOptions`) 또는 `{ init, getValue, destroy }` 커스텀 객체 |
-| `editorOptions` | select 선택지 — `['a', 'b']` 또는 `[{ label: '한국', value: 'kr' }]` (label 표시, value 저장·타입 보존) |
+| `editor` | `'text'` \| `'number'` \| `'select'` \| `'multiselect'`(배열 값) \| `'radio'` \| `'checkbox'` 또는 `{ init, getValue, destroy }` 커스텀 객체 |
+| `editorOptions` | select/multiselect/radio 선택지 — `['a', 'b']` 또는 `[{ label: '한국', value: 'kr' }]` (label 표시, value 저장·타입 보존) |
 | `validator(value, row)` | `true` 또는 오류 메시지 반환 — 거부 시 커밋 차단 + 빨간 표시 |
 | `suppressCopy` | 클립보드 복사에서 제외 (CSV에는 영향 없음) |
 | `exportFormatter(value, row)` | CSV/Excel 내보내기 전용 포맷 (화면과 분리) |
@@ -126,6 +126,9 @@ cellRenderer: DataGrid.renderers.tag({ Active: 'green', Overdue: 'red' })  // �
 cellRenderer: DataGrid.renderers.check()      // 불리언 ✓ / –
 cellRenderer: DataGrid.renderers.progress()   // 0–100 진행 바
 cellRenderer: DataGrid.renderers.select()     // 저장된 value를 editorOptions의 label로 표시
+cellRenderer: DataGrid.renderers.radio()      // select와 동일 (radio 에디터 짝꿍)
+cellRenderer: DataGrid.renderers.multiselect() // 값 배열을 label 칩 목록으로
+cellRenderer: DataGrid.renderers.checkbox()   // 불리언을 체크박스 모양으로 (표시 전용)
 ```
 
 ## API

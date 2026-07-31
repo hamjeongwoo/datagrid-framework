@@ -11,6 +11,16 @@
   .specimen { height: auto; min-height: 0; }
   .specimen .dg-row { position: static; }
   .specimen .dg-header-menu-btn { display: inline-flex; }
+  /* 그리드 셸이 아닌 낱개 견본 행 — 토큰만 받도록 dg-root의 시각 효과를 중화
+   * (토큰 블록 셀렉터가 .dg-root, .dg-menu라 dg-root 클래스 없이는 토큰이 안 풀린다) */
+  .gallery-row.dg-root {
+    flex-direction: row;
+    border: none;
+    background: none;
+    overflow: visible;
+    height: auto;
+    min-height: 0;
+  }
 </style>
 </head>
 <body>
@@ -184,7 +194,7 @@
   <!-- Checkboxes -->
   <h2 class="section">Checkbox</h2>
   <p class="section-desc">unchecked · checked · indeterminate(헤더 전체 선택의 부분 상태) · disabled.</p>
-  <div class="card gallery-row">
+  <div class="card gallery-row dg-root">
     <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" class="dg-checkbox"> Unchecked</label>
     <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" class="dg-checkbox" checked> Checked</label>
     <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" class="dg-checkbox" id="indet"> Indeterminate</label>
@@ -192,15 +202,38 @@
     <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" class="dg-checkbox" checked disabled> Checked disabled</label>
   </div>
 
+  <!-- Radio -->
+  <h2 class="section">Radio</h2>
+  <p class="section-desc"><code class="inline">editor: 'radio'</code>가 셀 안에 그리는 라디오 그룹. unchecked · checked · focus 링은 체크박스와 동일한 토큰을 씁니다.</p>
+  <div class="card gallery-row dg-root">
+    <label style="display:flex;align-items:center;gap:5px"><input type="radio" name="specRadio" class="dg-radio"> Junior</label>
+    <label style="display:flex;align-items:center;gap:5px"><input type="radio" name="specRadio" class="dg-radio" checked> Middle</label>
+    <label style="display:flex;align-items:center;gap:5px"><input type="radio" name="specRadio" class="dg-radio"> Senior</label>
+  </div>
+
+  <!-- Multiselect editor panel -->
+  <h2 class="section">Multiselect Editor Panel</h2>
+  <p class="section-desc"><code class="inline">editor: 'multiselect'</code>가 셀 아래(공간이 없으면 위)에 펼치는 체크리스트 패널. 메뉴와 같은 배경/그림자 토큰을 씁니다.</p>
+  <div class="gallery-row dg-root" style="align-items:flex-start">
+    <div class="dg-editor-multiselect" style="position:static;min-width:200px">
+      <label><input type="checkbox" class="dg-checkbox" checked> JavaScript</label>
+      <label><input type="checkbox" class="dg-checkbox" checked> CSS</label>
+      <label><input type="checkbox" class="dg-checkbox"> Python</label>
+      <label><input type="checkbox" class="dg-checkbox"> SQL</label>
+    </div>
+  </div>
+
   <!-- Tags -->
   <h2 class="section">Tag / Badge Cell Renderer</h2>
-  <p class="section-desc"><code class="inline">DataGrid.renderers.tag(colorMap)</code> — 상태 값을 색상 배지로 표시.</p>
-  <div class="card gallery-row">
+  <p class="section-desc"><code class="inline">DataGrid.renderers.tag(colorMap)</code> — 상태 값을 색상 배지로 표시. 점 없는 <code class="inline">dg-tag-plain</code>은 <code class="inline">renderers.multiselect()</code>의 label 칩입니다.</p>
+  <div class="card gallery-row dg-root">
     <span class="dg-tag dg-tag-green">Active</span>
     <span class="dg-tag dg-tag-blue">Contract</span>
     <span class="dg-tag dg-tag-yellow">On Leave</span>
     <span class="dg-tag dg-tag-red">Overdue</span>
     <span class="dg-tag dg-tag-gray">Inactive</span>
+    <span class="dg-tag dg-tag-plain">JavaScript</span>
+    <span class="dg-tag dg-tag-plain">CSS</span>
   </div>
 
   <!-- Filter menu -->

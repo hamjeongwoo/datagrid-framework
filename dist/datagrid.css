@@ -541,14 +541,94 @@
   );
 }
 
-/* 커스텀 에디터({ init, getValue, destroy })가 열린 셀 */
+/* 커스텀/인라인(checkbox·radio·multiselect) 에디터가 열린 셀.
+ * position: relative는 multiselect 패널의 앵커, z-index는 이웃 행 위로. */
 .dg-cell.dg-cell-editing {
   box-shadow: inset 0 0 0 2px var(--dg-accent-color);
   overflow: visible;
+  position: relative;
+  z-index: 4;
 }
 .dg-cell.dg-cell-editing.dg-invalid {
   box-shadow: inset 0 0 0 2px var(--dg-invalid-color);
 }
+
+/* 라디오 에디터 — 셀 안 가로 라디오 그룹 */
+.dg-radio {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 1.5px solid var(--dg-input-border-color);
+  border-radius: 50%;
+  background: var(--dg-input-background-color);
+  cursor: pointer;
+  position: relative;
+  transition: background 0.12s, border-color 0.12s;
+}
+.dg-radio:hover { border-color: var(--dg-accent-color); }
+.dg-radio:focus-visible {
+  outline: 2px solid var(--dg-accent-color);
+  outline-offset: 1px;
+}
+.dg-radio:checked { border-color: var(--dg-accent-color); }
+.dg-radio:checked::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dg-accent-color);
+}
+.dg-editor-radio {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 100%;
+  white-space: nowrap;
+}
+.dg-editor-radio label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+/* multiselect 에디터 — 셀에 앵커된 체크리스트 패널 */
+.dg-editor-multiselect {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  z-index: 30;
+  min-width: max(100%, 180px);
+  max-height: 208px;
+  overflow: auto;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--dg-menu-background-color);
+  border: 1px solid var(--dg-border-color);
+  border-radius: var(--dg-wrapper-border-radius);
+  box-shadow: var(--dg-menu-shadow);
+  outline: none;
+}
+.dg-editor-multiselect label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: var(--dg-border-radius);
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.dg-editor-multiselect label:hover { background: var(--dg-row-hover-color); }
 
 /* ==========================================================================
    Row grouping + summary rows
@@ -718,6 +798,15 @@
   background: currentColor;
   opacity: 0.9;
 }
+/* 점 없는 일반 칩 — multiselect 렌더러 등 */
+.dg-tag-plain::before { display: none; }
+
+/* 표시 전용 체크박스 (renderers.checkbox) — disabled 흐림 없이 */
+.dg-checkbox.dg-checkbox-display:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
 .dg-tag-green  { background: rgba(22, 160, 78, 0.14);  color: #0d8a44; }
 .dg-tag-red    { background: rgba(224, 37, 37, 0.12);  color: #d02020; }
 .dg-tag-blue   { background: rgba(33, 150, 243, 0.14); color: #1180d8; }

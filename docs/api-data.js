@@ -706,23 +706,31 @@ window.ApiDocs = {
         },
         {
           name: 'editor',
-          type: "'text' | 'number' | 'select'",
+          type: "'text' | 'number' | 'select' | 'multiselect' | 'radio' | 'checkbox'",
           default: "'text'",
           description:
             '인라인 에디터 종류. <code>\'number\'</code>는 커밋 시 숫자로 변환하고 숫자가 아니면 이전 값으로 되돌립니다. ' +
-            '<code>\'select\'</code>는 <code>editorOptions</code>의 선택지를 보여줍니다. ' +
+            '<code>\'select\'</code>·<code>\'radio\'</code>는 <code>editorOptions</code>에서 단일 선택 ' +
+            '(select는 드롭다운, radio는 셀 안 라디오 그룹). ' +
+            '<code>\'multiselect\'</code>(v2.2.0)는 셀 아래에 체크리스트 패널을 펼치고 <strong>배열</strong>을 ' +
+            '<code>editorOptions</code> 순서로 커밋합니다 — 내용이 같으면 커밋하지 않습니다. ' +
+            '<code>\'checkbox\'</code>(v2.2.0)는 불리언 체크박스입니다. ' +
+            '모두 <kbd>Enter</kbd>/바깥 클릭으로 커밋, <kbd>Esc</kbd>로 취소하며, ' +
             'editor를 선언하면 <code>editable: true</code>는 생략할 수 있습니다 (v2.2.0).',
           example:
-            "{ field: 'department', editor: 'select',   // editable 생략 가능\n" +
-            "  editorOptions: ['Engineering', 'Design', 'Sales'] }",
+            "{ field: 'skills', editor: 'multiselect',   // 값은 ['js', 'css'] 같은 배열\n" +
+            "  editorOptions: [{ label: 'JavaScript', value: 'js' }, { label: 'CSS', value: 'css' }],\n" +
+            '  cellRenderer: DataGrid.renderers.multiselect() }',
         },
         {
           name: 'editorOptions',
           type: 'Array<string | { label, value }>',
           description:
-            "<code>editor: 'select'</code>일 때의 선택지 목록. 문자열 배열이면 표시와 저장에 같은 값을 쓰고, " +
-            '<code>{ label, value }</code> 객체 배열이면 드롭다운에는 <code>label</code>이 표시되고 ' +
-            '선택 시 <code>value</code>가 데이터에 저장됩니다 (셀에는 저장된 value가 보입니다). ' +
+            "<code>editor: 'select' | 'multiselect' | 'radio'</code>의 선택지 목록. " +
+            '문자열 배열이면 표시와 저장에 같은 값을 쓰고, ' +
+            '<code>{ label, value }</code> 객체 배열이면 편집 UI에는 <code>label</code>이 표시되고 ' +
+            '선택 시 <code>value</code>가 데이터에 저장됩니다 (셀에는 저장된 value가 보입니다 — ' +
+            'label로 표시하려면 짝꿍 렌더러 <code>DataGrid.renderers.select()/radio()/multiselect()</code>를 쓰세요). ' +
             '<code>value</code>의 원본 타입은 보존됩니다 — 숫자 value를 고르면 숫자로 커밋됩니다. ' +
             '객체 형식은 v2.2.0부터 지원.',
           example:
@@ -1767,6 +1775,36 @@ window.ApiDocs = {
             "{ field: 'country', editor: 'select',\n" +
             "  editorOptions: [{ label: '한국', value: 'kr' }, { label: '일본', value: 'jp' }],\n" +
             '  cellRenderer: DataGrid.renderers.select() }',
+        },
+        {
+          name: 'radio',
+          signature: 'DataGrid.renderers.radio(options?: Array<string | { label, value }>)',
+          since: '2.2.0',
+          description:
+            "radio 에디터의 짝꿍 렌더러 — 동작은 <a href='#renderers-select'><code>select</code></a>와 동일하게 " +
+            '저장된 value를 label로 표시합니다.',
+          example: "{ field: 'level', editor: 'radio',\n" +
+            "  editorOptions: [{ label: 'Junior', value: 1 }, { label: 'Senior', value: 3 }],\n" +
+            '  cellRenderer: DataGrid.renderers.radio() }',
+        },
+        {
+          name: 'multiselect',
+          signature: 'DataGrid.renderers.multiselect(options?: Array<string | { label, value }>)',
+          since: '2.2.0',
+          description:
+            'multiselect 에디터의 짝꿍 렌더러 — 값 <strong>배열</strong>을 label 칩 목록으로 표시합니다. ' +
+            '<code>options</code>를 생략하면 그 컬럼의 <code>editorOptions</code>를 사용하고, ' +
+            '목록에 없는 값은 문자열 그대로 칩이 되며 빈 배열/null은 빈 셀입니다. label은 HTML 이스케이프됩니다.',
+          example: "cellRenderer: DataGrid.renderers.multiselect()   // ['js','css'] → 'JavaScript' 'CSS' 칩",
+        },
+        {
+          name: 'checkbox',
+          signature: 'DataGrid.renderers.checkbox()',
+          since: '2.2.0',
+          description:
+            'checkbox 에디터의 짝꿍 렌더러 — 불리언 값을 실제 체크박스 모양으로 표시합니다(표시 전용, 클릭 불가). ' +
+            "✓/– 텍스트 표시를 원하면 <a href='#renderers-check'><code>check()</code></a>를 쓰세요.",
+          example: "{ field: 'remote', editor: 'checkbox', cellRenderer: DataGrid.renderers.checkbox() }",
         },
       ],
     },

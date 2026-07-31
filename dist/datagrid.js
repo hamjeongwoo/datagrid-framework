@@ -385,6 +385,36 @@
     return null;
   }
 
+  /** multiselect 값 정규화: 배열 그대로, null/undefined → [], 단일 값 → [값]. */
+  function normalizeMultiValue(value) {
+    if (Array.isArray(value)) return value;
+    if (value === null || value === undefined) return [];
+    return [value];
+  }
+
+  /** 두 배열의 얕은 동등성 (길이·순서 포함 엄격 비교). 배열이 아니면 false. */
+  function shallowArrayEquals(a, b) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
+  }
+
+  /**
+   * 다중 값 → label 배열 (multiselect 렌더러용).
+   * 목록에서 못 찾은 값은 문자열 그대로, null/undefined 항목은 건너뛴다.
+   */
+  function lookupOptionLabels(options, values) {
+    var out = [];
+    normalizeMultiValue(values).forEach(function (v) {
+      if (v === null || v === undefined) return;
+      var label = lookupOptionLabel(options, v);
+      out.push(label !== null ? label : String(v));
+    });
+    return out;
+  }
+
   /**
    * 헤더 필터 행(floatingFilter)의 입력값 → 컬럼 필터 모델.
    * - raw가 null/undefined이거나 (set 제외) 공백뿐이면 null(필터 해제).
@@ -4043,6 +4073,8 @@
 
   /* ---- editing ---- */
 
+  var editorSeq = 0; /* radio 에디터의 name 그룹 유일성 보장용 */
+
   DataGrid.prototype._startEdit = function (hit) {
     this._cancelEdit();
     var col = hit.col;
@@ -4087,6 +4119,83 @@
       invalidEl = cellEl;
       var focusable = cellEl.querySelector('input, select, textarea, [tabindex]');
       if (focusable) focusable.focus();
+    } else if (editorType === 'checkbox') {
+      /* 불리언 인라인 체크박스 — 셀 자체가 편집 프레임(dg-cell-editing) */
+      input = document.createElement('input');
+      input.type = 'checkbox';
+      input.className = 'dg-checkbox';
+      input.checked = !!value;
+      cellEl.classList.add('dg-cell-editing');
+      cleanup = function () { cellEl.classList.remove('dg-cell-editing'); };
+      cellEl.appendChild(input);
+      input.focus();
+      getValue = function () { return input.checked; };
+      invalidEl = cellEl;
+    } else if (editorType === 'radio') {
+      /* 인라인 라디오 그룹 — editorOptions에서 단일 선택 */
+      var radioOptions = normalizeEditorOptions(col.editorOptions);
+      var radioWrap = el('div', 'dg-editor-radio', cellEl);
+      var radioName = 'dg-radio-' + (editorSeq++);
+      radioOptions.forEach(function (o) {
+        var lab = el('label', '', radioWrap);
+        var rb = document.createElement('input');
+        rb.type = 'radio';
+        rb.name = radioName;
+        rb.className = 'dg-radio';
+        rb.__dgValue = o.value;
+        rb.checked = o.value === value ||
+          (value !== null && value !== undefined && String(o.value) === String(value));
+        lab.appendChild(rb);
+        lab.appendChild(document.createTextNode(o.label));
+      });
+      cellEl.classList.add('dg-cell-editing');
+      cleanup = function () { cellEl.classList.remove('dg-cell-editing'); };
+      var checkedRadio = radioWrap.querySelector('input:checked') || radioWrap.querySelector('input');
+      if (checkedRadio) checkedRadio.focus();
+      getValue = function () {
+        var picked = radioWrap.querySelector('input:checked');
+        return picked ? picked.__dgValue : value; /* 아무것도 안 고르면 이전 값 유지 */
+      };
+      invalidEl = cellEl;
+    } else if (editorType === 'multiselect') {
+      /* 체크리스트 패널 — 값은 배열, editorOptions 순서로 커밋 */
+      var msOptions = normalizeEditorOptions(col.editorOptions);
+      var msCurrent = normalizeMultiValue(value);
+      var panel = el('div', 'dg-editor-multiselect', cellEl);
+      panel.tabIndex = -1; /* 패널 배경 클릭 시에도 포커스가 셀 안에 머물게 */
+      msOptions.forEach(function (o) {
+        var lab = el('label', '', panel);
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.className = 'dg-checkbox';
+        cb.__dgValue = o.value;
+        cb.checked = msCurrent.indexOf(o.value) !== -1 ||
+          msCurrent.some(function (v) {
+            return v !== null && v !== undefined && String(v) === String(o.value);
+          });
+        lab.appendChild(cb);
+        lab.appendChild(document.createTextNode(o.label));
+      });
+      cellEl.classList.add('dg-cell-editing');
+      /* 아래 공간이 부족하고 위가 더 넉넉하면 위로 펼침 */
+      var bodyRect = this._bodyEl.getBoundingClientRect();
+      var cellRect = cellEl.getBoundingClientRect();
+      if (cellRect.bottom + panel.offsetHeight + 4 > bodyRect.bottom &&
+          cellRect.top - panel.offsetHeight - 4 > bodyRect.top) {
+        panel.style.top = 'auto';
+        panel.style.bottom = 'calc(100% + 2px)';
+      }
+      cleanup = function () { cellEl.classList.remove('dg-cell-editing'); };
+      var firstCb = panel.querySelector('input');
+      (firstCb || panel).focus();
+      getValue = function () {
+        var out = [];
+        panel.querySelectorAll('input').forEach(function (cb) {
+          if (cb.checked) out.push(cb.__dgValue);
+        });
+        return out;
+      };
+      invalidEl = cellEl;
     } else {
       if (editorType === 'select') {
         input = document.createElement('select');
@@ -4142,7 +4251,13 @@
           var n = Number(newValue);
           newValue = newValue === '' || isNaN(n) ? value : n;
         }
-        if (newValue !== value) {
+        /* 배열 값(multiselect)은 참조가 아니라 내용으로 변경 여부를 판정.
+         * 원본이 null/단일 값이어도 배열로 정규화해 비교한다 (열었다 그냥
+         * 닫았을 때 null → [] 스퓨리어스 커밋 방지). */
+        var changed = editorType === 'multiselect'
+          ? !shallowArrayEquals(newValue, normalizeMultiValue(value))
+          : newValue !== value;
+        if (changed) {
           if (col.validator) {
             var result;
             try { result = col.validator(newValue, row); }
@@ -5154,6 +5269,17 @@
    * Built-in cell renderers
    * ------------------------------------------------------------------------- */
 
+  /* select/radio 렌더러 공용 팩토리 — 저장된 value를 editorOptions의 label로 */
+  function optionLabelRenderer(options) {
+    return function (params) {
+      var label = lookupOptionLabel(
+        options || (params.colDef && params.colDef.editorOptions), params.value);
+      if (label !== null) return escapeHtml(label);
+      var v = params.formatted;
+      return v === null || v === undefined ? '' : escapeHtml(String(v));
+    };
+  }
+
   DataGrid.renderers = {
     /**
      * Colored status tag/badge. colorMap: { 'Paid': 'green', 'Overdue': 'red' }
@@ -5194,13 +5320,27 @@
      * Usage: { editor: 'select', editorOptions: [{ label: '한국', value: 'kr' }],
      *          cellRenderer: DataGrid.renderers.select() }
      */
-    select: function (options) {
+    select: optionLabelRenderer,
+    /** radio 에디터 짝꿍 — select와 동일하게 value → label. */
+    radio: optionLabelRenderer,
+    /**
+     * multiselect 에디터 짝꿍 — 값 배열을 label 칩 목록으로 표시.
+     * 목록에 없는 값은 문자열 그대로 칩이 되고, 빈 배열/null은 빈 셀.
+     */
+    multiselect: function (options) {
       return function (params) {
-        var label = lookupOptionLabel(
+        var labels = lookupOptionLabels(
           options || (params.colDef && params.colDef.editorOptions), params.value);
-        if (label !== null) return escapeHtml(label);
-        var v = params.formatted;
-        return v === null || v === undefined ? '' : escapeHtml(String(v));
+        return labels.map(function (l) {
+          return '<span class="dg-tag dg-tag-plain">' + escapeHtml(l) + '</span>';
+        }).join(' ');
+      };
+    },
+    /** checkbox 에디터 짝꿍 — 불리언을 실제 체크박스 모양으로 표시 (표시 전용). */
+    checkbox: function () {
+      return function (params) {
+        return '<input type="checkbox" class="dg-checkbox dg-checkbox-display" disabled' +
+          (params.value ? ' checked' : '') + '>';
       };
     },
   };
@@ -5225,6 +5365,9 @@
     validationMessage: validationMessage,
     normalizeEditorOptions: normalizeEditorOptions,
     lookupOptionLabel: lookupOptionLabel,
+    lookupOptionLabels: lookupOptionLabels,
+    normalizeMultiValue: normalizeMultiValue,
+    shallowArrayEquals: shallowArrayEquals,
     buildTsv: buildTsv,
     parseTsv: parseTsv,
     aggregateValues: aggregateValues,

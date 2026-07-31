@@ -178,6 +178,7 @@
 - `editorOptions`가 문자열 배열 외에 `{ label, value }` 객체 배열 지원 — 드롭다운은 label 표시, 커밋은 value(원본 타입 보존). 셀에는 저장된 value가 표시된다.
 - `editor`를 선언한 컬럼은 `editable: true` 생략 가능 — editor 선언 자체가 편집 의도. 명시적 `editable: false`(컬럼 또는 defaultColDef)가 우선.
 - `DataGrid.renderers.select(options?)` — select 에디터 짝꿍 렌더러. 저장된 value를 editorOptions의 label로 표시 (options 생략 시 컬럼 editorOptions 사용, 목록 밖 값은 폴백).
+- `editor: 'multiselect' | 'radio' | 'checkbox'` + 짝꿍 렌더러 `renderers.multiselect()/radio()/checkbox()` — multiselect는 셀에 앵커된 체크리스트 패널(아래 공간 부족 시 위로 펼침)에서 배열 값을 editorOptions 순서로 커밋(내용 동일하면 미커밋), radio는 인라인 라디오 그룹, checkbox는 불리언. 렌더러는 각각 label 칩 목록 / value→label / 표시 전용 체크박스.
 
 ---
 

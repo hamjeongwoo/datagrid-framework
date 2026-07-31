@@ -1971,6 +1971,66 @@
     </script>
   </div>
 
+  <!-- ======================================================== multiselect/radio/checkbox 에디터 -->
+  <h2 class="section">Multiselect · Radio · Checkbox Editors &amp; Renderers</h2>
+  <p class="section-desc">
+    <code class="inline">editor</code>에 <code class="inline">'multiselect'</code>(체크리스트 패널, 값은 배열)·
+    <code class="inline">'radio'</code>(인라인 라디오 그룹)·<code class="inline">'checkbox'</code>(불리언 체크박스)를
+    지정할 수 있고, 각각 짝꿍 렌더러 <code class="inline">DataGrid.renderers.multiselect()</code>(label 칩 목록)·
+    <code class="inline">renderers.radio()</code>(value → label)·<code class="inline">renderers.checkbox()</code>(표시 전용 체크박스)가
+    있습니다. multiselect는 <code class="inline">editorOptions</code> 순서대로 배열을 커밋하며 내용이 같으면 커밋하지 않습니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div id="gridMultiEd" class="grid-wrap-md"></div>
+      <div class="status-line" id="multiEdStatus">
+        Skills(더블클릭 → 체크리스트)·Level(라디오)·Remote(체크박스) 셀을 편집해 보세요. Enter/바깥 클릭 = 커밋, Esc = 취소.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var skillOptions = [
+        { label: 'JavaScript', value: 'js' },
+        { label: 'CSS', value: 'css' },
+        { label: 'Python', value: 'py' },
+        { label: 'SQL', value: 'sql' },
+        { label: 'Go', value: 'go' },
+      ];
+      var levelOptions = [
+        { label: 'Junior', value: 1 },
+        { label: 'Middle', value: 2 },
+        { label: 'Senior', value: 3 },
+      ];
+      var pool = ['js', 'css', 'py', 'sql', 'go'];
+      var rows = DemoData.makeEmployees(40, 67).map(function (r, i) {
+        r.skills = pool.filter(function (_, k) { return (i + k) % 3 !== 0; });  // 시드 고정 조합
+        r.level = (i % 3) + 1;
+        r.remote = i % 2 === 0;
+        return r;
+      });
+
+      var grid = new DataGrid(document.getElementById('gridMultiEd'), {
+        rowData: rows,
+        columnDefs: [
+          { field: 'name', headerName: 'Name', flex: 1 },
+          { field: 'skills', headerName: 'Skills (multiselect)', width: 240,
+            editor: 'multiselect', editorOptions: skillOptions,
+            cellRenderer: DataGrid.renderers.multiselect() },
+          { field: 'level', headerName: 'Level (radio)', width: 220,
+            editor: 'radio', editorOptions: levelOptions,
+            cellRenderer: DataGrid.renderers.radio() },
+          { field: 'remote', headerName: 'Remote (checkbox)', width: 130, align: 'center',
+            editor: 'checkbox',
+            cellRenderer: DataGrid.renderers.checkbox() },
+        ],
+      });
+
+      grid.on('cellValueChanged', function (e) {
+        document.getElementById('multiEdStatus').textContent =
+          e.colDef.field + ': ' + JSON.stringify(e.oldValue) + ' → ' + JSON.stringify(e.newValue);
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

@@ -230,6 +230,41 @@ suite('lookupOptionLabel', function () {
     '문자영', 'strict match wins before loose stringified match');
 });
 
+suite('normalizeMultiValue', function () {
+  var n = T.normalizeMultiValue;
+  assertEq(n(['a', 'b']), ['a', 'b'], 'array passes through');
+  assertEq(n([]), [], 'empty array passes through');
+  assertEq(n(null), [], 'null → empty');
+  assertEq(n(undefined), [], 'undefined → empty');
+  assertEq(n('a'), ['a'], 'single value wrapped');
+  assertEq(n(0), [0], 'falsy single value (0) wrapped');
+  assertEq(n(''), [''], 'falsy single value (empty string) wrapped');
+});
+
+suite('shallowArrayEquals', function () {
+  var eq = T.shallowArrayEquals;
+  assertEq(eq(['a', 'b'], ['a', 'b']), true, 'same elements/order');
+  assertEq(eq([], []), true, 'empty arrays equal');
+  assertEq(eq(['a', 'b'], ['b', 'a']), false, 'order matters');
+  assertEq(eq(['a'], ['a', 'b']), false, 'length differs');
+  assertEq(eq([1], ['1']), false, 'strict comparison (1 vs "1")');
+  assertEq(eq(null, []), false, 'null vs empty array');
+  assertEq(eq('a', ['a']), false, 'non-array vs array');
+});
+
+suite('lookupOptionLabels', function () {
+  var l = T.lookupOptionLabels;
+  var opts = [{ label: 'JS', value: 'js' }, { label: 'CSS', value: 'css' }, { label: '레벨3', value: 3 }];
+  assertEq(l(opts, ['js', 'css']), ['JS', 'CSS'], 'values → labels, order kept');
+  assertEq(l(opts, []), [], 'empty array → empty');
+  assertEq(l(opts, null), [], 'null → empty');
+  assertEq(l(opts, 'js'), ['JS'], 'single value normalized to array');
+  assertEq(l(opts, ['js', 'xx']), ['JS', 'xx'], 'unknown value falls back to String(value)');
+  assertEq(l(opts, [3]), ['레벨3'], 'number value matched');
+  assertEq(l(opts, ['js', null, 'css']), ['JS', 'CSS'], 'null entries skipped');
+  assertEq(l(undefined, ['js']), ['js'], 'no options → raw strings');
+});
+
 /* ---------------- floating filter model ---------------- */
 suite('buildFloatingFilterModel', function () {
   var f = T.buildFloatingFilterModel;
