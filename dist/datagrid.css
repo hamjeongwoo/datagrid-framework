@@ -4,7 +4,10 @@
    re-theme without touching JavaScript.
    ========================================================================== */
 
-.dg-root {
+/* 토큰은 .dg-root 밖에 렌더링될 수 있는 팝업(.dg-menu)에도 직접 선언한다 —
+   메뉴가 그리드 밖(예: 정적 갤러리)에 있어도 스타일이 깨지지 않도록. */
+.dg-root,
+.dg-menu {
   /* ---- Design tokens (Quartz light) ---- */
   --dg-font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
     Roboto, "Helvetica Neue", Arial, "Noto Sans KR", sans-serif;
@@ -34,7 +37,9 @@
   --dg-wrapper-border-radius: 8px;
   --dg-border-radius: 4px;
   --dg-icon-size: 16px;
+}
 
+.dg-root {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -55,8 +60,11 @@
 .dg-root *::before,
 .dg-root *::after { box-sizing: border-box; }
 
-/* ---- Dark theme (Quartz dark) ---- */
-.dg-theme-dark {
+/* ---- Dark theme (Quartz dark) ----
+   .dg-menu는 토큰을 직접 선언받으므로(위 블록) 다크 오버라이드도
+   후손 셀렉터로 직접 걸어야 상속보다 우선순위가 유지된다. */
+.dg-theme-dark,
+.dg-theme-dark .dg-menu {
   --dg-background-color: #181d1f;
   --dg-foreground-color: #ffffff;
   --dg-secondary-foreground-color: rgba(255, 255, 255, 0.62);

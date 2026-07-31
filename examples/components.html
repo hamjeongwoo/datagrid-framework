@@ -239,7 +239,7 @@
   var themeBtn = document.getElementById('themeToggle');
   themeBtn.addEventListener('click', function () {
     var dark = document.body.classList.toggle('dark');
-    document.querySelectorAll('.dg-root').forEach(function (el) {
+    document.querySelectorAll('.dg-root, .dg-menu').forEach(function (el) {
       el.classList.toggle('dg-theme-dark', dark);
     });
     live.setTheme(dark ? 'dark' : 'light');

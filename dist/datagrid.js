@@ -861,7 +861,9 @@
       if (e.key === 'Escape') self._closeMenu();
     });
 
-    document.body.appendChild(menu);
+    /* 메뉴는 .dg-root 안에 두어야 --dg-* 토큰과 다크 테마를 상속받는다.
+     * (position:fixed이므로 위치는 뷰포트 기준 그대로 동작) */
+    this._rootEl.appendChild(menu);
     var rect = headerCell.getBoundingClientRect();
     var menuW = menu.offsetWidth;
     menu.style.top = rect.bottom + 4 + 'px';
