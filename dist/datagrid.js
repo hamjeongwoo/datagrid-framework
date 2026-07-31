@@ -418,6 +418,35 @@
     });
   }
 
+  /**
+   * getState()의 컬럼 상태를 현재 컬럼 목록에 적용한 결과를 계산한다.
+   * - stateColumns 순서대로 재배열, 목록에 없는 colId는 무시
+   * - state에 빠진 컬럼은 원래 상대 순서를 유지한 채 뒤에 붙인다
+   * 입력을 변형하지 않고 { columns, widths, hidden }을 반환한다.
+   */
+  function applyColumnState(columns, stateColumns) {
+    var result = { columns: columns.slice(), widths: {}, hidden: {} };
+    if (!stateColumns || stateColumns.length === 0) return result;
+    var byId = {};
+    columns.forEach(function (c) { byId[c.colId] = c; });
+    var ordered = [];
+    var seen = {};
+    stateColumns.forEach(function (sc) {
+      if (!sc || sc.colId === undefined) return;
+      var col = byId[sc.colId];
+      if (!col || seen[sc.colId]) return;
+      seen[sc.colId] = true;
+      ordered.push(col);
+      if (typeof sc.width === 'number' && sc.width > 0) result.widths[sc.colId] = sc.width;
+      if (sc.hide !== undefined) result.hidden[sc.colId] = !!sc.hide;
+    });
+    columns.forEach(function (c) {
+      if (!seen[c.colId]) ordered.push(c);
+    });
+    result.columns = ordered;
+    return result;
+  }
+
   /* ---------------------------------------------------------------------------
    * Event emitter
    * ------------------------------------------------------------------------- */
@@ -2102,6 +2131,99 @@
     this._rootEl.classList.toggle('dg-theme-dark', theme === 'dark');
   };
 
+  /* ---- grid state save / restore ---- */
+
+  /**
+   * 현재 그리드 상태(컬럼 순서·숨김·사용자 지정 폭, 정렬, 필터, 퀵 필터,
+   * 그룹핑, 페이지)를 JSON 직렬화 가능한 객체로 반환한다.
+   * localStorage 등에 저장했다가 setState()로 복원한다.
+   */
+  DataGrid.prototype.getState = function () {
+    var self = this;
+    var state = {
+      columns: this._columns.map(function (c) {
+        var entry = { colId: c.colId, hide: !!c.hide };
+        if (self._colWidths[c.colId] !== undefined) entry.width = self._colWidths[c.colId];
+        return entry;
+      }),
+      sortModel: this._sortModel.slice(),
+      filterModel: this.getFilterModel(),
+      quickFilter: this._quickFilter,
+      groupBy: this._groupBy.slice(),
+    };
+    if (this._pagination) {
+      state.pagination = { page: this._currentPage, pageSize: this._pageSize };
+    }
+    return state;
+  };
+
+  /**
+   * getState()가 반환한 상태를 복원한다. 상태에 포함된 부분만 적용하며
+   * (부분 상태 허용), 알 수 없는 colId는 무시한다. 마지막에 refresh() 1회.
+   */
+  DataGrid.prototype.setState = function (state) {
+    if (!state) return;
+    var self = this;
+    if (state.columns) {
+      var applied = applyColumnState(this._columns, state.columns);
+      this._columns = applied.columns;
+      this._columns.forEach(function (c) {
+        if (applied.hidden[c.colId] !== undefined) c.hide = applied.hidden[c.colId];
+      });
+      for (var colId in applied.widths) this._colWidths[colId] = applied.widths[colId];
+    }
+    if (state.sortModel) this._sortModel = state.sortModel.slice();
+    if (state.filterModel) {
+      this._filterModel = {};
+      for (var f in state.filterModel) this._filterModel[f] = state.filterModel[f];
+    }
+    if (state.quickFilter !== undefined) this._quickFilter = state.quickFilter || '';
+    if (state.groupBy) {
+      this._groupBy = state.groupBy.slice();
+      this._groupToggled = {};
+    }
+    if (state.pagination && this._pagination) {
+      if (state.pagination.pageSize) this._pageSize = state.pagination.pageSize;
+      if (state.pagination.page !== undefined) this._currentPage = state.pagination.page;
+    }
+    this._focusedCell = null;
+    this.refresh();
+    this._emitter.emit('stateChanged', { state: this.getState() });
+  };
+
+  /**
+   * 상태를 생성 시점 옵션 기준으로 되돌린다. 인자가 없으면 전체 리셋,
+   * { filter, sort, group, columns, page } 중 true인 부분만 선택 리셋.
+   */
+  DataGrid.prototype.resetState = function (parts) {
+    var all = !parts;
+    parts = parts || {};
+    if (all || parts.sort) {
+      this._sortModel = this.options.sortModel ? this.options.sortModel.slice() : [];
+    }
+    if (all || parts.filter) {
+      this._filterModel = {};
+      this._quickFilter = '';
+      this._currentPage = 0;
+    }
+    if (all || parts.group) {
+      this._groupBy = (this.options.groupBy || []).slice();
+      this._groupToggled = {};
+      this._groupDefaultExpanded = this.options.groupDefaultExpanded !== false;
+    }
+    if (all || parts.columns) {
+      this._columns = normalizeColumns(this.options.columnDefs, this.options.defaultColDef);
+      this._colWidths = {};
+    }
+    if (all || parts.page) {
+      this._currentPage = 0;
+      this._pageSize = this.options.paginationPageSize || 20;
+    }
+    this._focusedCell = null;
+    this.refresh();
+    this._emitter.emit('stateChanged', { state: this.getState() });
+  };
+
   /* ---- CSV export ---- */
 
   DataGrid.prototype.getCsv = function () {
@@ -2191,6 +2313,7 @@
     csvEscape: csvEscape,
     buildCsv: buildCsv,
     normalizeColumns: normalizeColumns,
+    applyColumnState: applyColumnState,
     escapeHtml: escapeHtml,
   };
 

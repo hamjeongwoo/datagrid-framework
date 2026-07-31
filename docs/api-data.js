@@ -686,6 +686,46 @@ window.ApiDocs = {
           description: '페이지 크기를 변경합니다. 현재 보고 있던 첫 행이 포함된 페이지로 이동합니다.',
         },
 
+        /* ---- 상태 저장/복원 ---- */
+        {
+          name: 'getState',
+          group: 'State',
+          signature: 'getState(): GridState',
+          since: '1.1.0',
+          description:
+            '현재 그리드 상태를 JSON 직렬화 가능한 객체로 반환합니다: 컬럼 순서·숨김·사용자 지정 폭' +
+            '(<code>columns: [{ colId, hide, width? }]</code>), <code>sortModel</code>, <code>filterModel</code>, ' +
+            '<code>quickFilter</code>, <code>groupBy</code>, 페이지네이션 사용 시 <code>pagination: { page, pageSize }</code>. ' +
+            'localStorage 등에 저장했다가 <code>setState()</code>로 복원하세요.',
+          example:
+            "localStorage.setItem('grid-state', JSON.stringify(grid.getState()));",
+        },
+        {
+          name: 'setState',
+          group: 'State',
+          signature: 'setState(state: GridState): void',
+          since: '1.1.0',
+          description:
+            '<code>getState()</code>가 반환한 상태를 복원합니다. 상태 객체에 포함된 부분만 적용하므로 ' +
+            '<code>setState({ sortModel: [...] })</code>처럼 부분 상태도 허용됩니다. ' +
+            '알 수 없는 <code>colId</code>는 무시되고, 상태에 없는 컬럼은 원래 상대 순서를 유지합니다. ' +
+            '적용 후 <code>stateChanged</code> 이벤트가 발생합니다.',
+          example:
+            "var saved = localStorage.getItem('grid-state');\n" +
+            'if (saved) grid.setState(JSON.parse(saved));',
+        },
+        {
+          name: 'resetState',
+          group: 'State',
+          signature: 'resetState(parts?: { filter?, sort?, group?, columns?, page? }): void',
+          since: '1.1.0',
+          description:
+            '상태를 <strong>생성 시점 옵션 기준</strong>으로 되돌립니다. 인자가 없으면 전체 리셋, ' +
+            '<code>{ sort: true }</code>처럼 넘기면 해당 부분만 리셋합니다. ' +
+            '<code>columns</code>는 순서·숨김·폭을 <code>columnDefs</code> 정의대로 재정규화합니다.',
+          example: 'grid.resetState({ filter: true, sort: true });',
+        },
+
         /* ---- 컬럼 ---- */
         {
           name: 'setColumnVisible',
@@ -872,6 +912,14 @@ window.ApiDocs = {
           name: 'columnMoved',
           payload: '{ colId, toIndex }',
           description: '헤더 드래그로 컬럼 순서가 바뀌었을 때.',
+        },
+        {
+          name: 'stateChanged',
+          payload: '{ state: GridState }',
+          since: '1.1.0',
+          description:
+            '<code>setState()</code> 또는 <code>resetState()</code>로 상태가 복원/리셋되었을 때. ' +
+            '<code>state</code>는 적용 후의 <code>getState()</code> 결과입니다.',
         },
       ],
     },

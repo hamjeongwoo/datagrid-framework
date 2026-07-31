@@ -579,6 +579,63 @@
     </script>
   </div>
 
+  <!-- ======================================================== 상태 저장/복원 -->
+  <h2 class="section">Grid State Save &amp; Restore</h2>
+  <p class="section-desc">
+    <code class="inline">getState()</code>는 컬럼 순서·숨김·폭, 정렬, 필터, 퀵 필터, 그룹핑,
+    페이지 상태를 JSON 직렬화 가능한 객체로 반환합니다. localStorage 등에 저장했다가
+    <code class="inline">setState(state)</code>로 복원하고,
+    <code class="inline">resetState()</code>로 생성 시점 옵션 기준으로 되돌립니다
+    (<code class="inline">resetState({ sort: true })</code>처럼 부분 리셋도 가능).
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn" id="stateSaveBtn" type="button">getState() — 저장</button>
+        <button class="tb-btn" id="stateLoadBtn" type="button">setState() — 복원</button>
+        <button class="tb-btn" id="stateResetBtn" type="button">resetState() — 초기화</button>
+      </div>
+      <div id="gridState" class="grid-wrap-sm"></div>
+      <div class="status-line" id="stateStatus">
+        정렬·필터·컬럼 폭·순서를 바꾼 뒤 저장 → 다시 흐트러뜨리고 복원해 보세요.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridState'), {
+        rowData: DemoData.makeEmployees(80, 11),
+        pagination: true,
+        paginationPageSize: 10,
+        columnDefs: [
+          { field: 'name', headerName: 'Name', width: 160, filter: 'text' },
+          { field: 'department', headerName: 'Department', width: 150, filter: 'set' },
+          { field: 'city', headerName: 'City', width: 130 },
+          { field: 'salary', headerName: 'Salary', width: 130, align: 'right', filter: 'number',
+            valueFormatter: function (v) { return '$' + v.toLocaleString(); } },
+        ],
+      });
+
+      var status = document.getElementById('stateStatus');
+      var saved = null;
+
+      document.getElementById('stateSaveBtn').addEventListener('click', function () {
+        saved = JSON.stringify(grid.getState());   // 실제 앱에선 localStorage.setItem(...)
+        status.textContent = '상태 저장됨 (' + saved.length + ' bytes JSON): ' +
+          saved.slice(0, 80) + '…';
+      });
+
+      document.getElementById('stateLoadBtn').addEventListener('click', function () {
+        if (!saved) { status.textContent = '저장된 상태가 없습니다 — 먼저 getState()로 저장하세요.'; return; }
+        grid.setState(JSON.parse(saved));
+        status.textContent = '저장 시점의 정렬·필터·컬럼·페이지 상태로 복원했습니다.';
+      });
+
+      document.getElementById('stateResetBtn').addEventListener('click', function () {
+        grid.resetState();   // resetState({ sort: true }) 처럼 부분 리셋도 가능
+        status.textContent = '생성 시점 옵션 기준으로 전체 리셋했습니다.';
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

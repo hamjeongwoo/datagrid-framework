@@ -78,7 +78,7 @@
 | | ParamQuery | 제안 API | 우선순위 |
 |---|---|---|---|
 | [x] | **`copy()` / `paste()` / `pasteModel` / `column > copy`** (엑셀 호환 TSV 클립보드) | 선택 행 <kbd>Ctrl+C</kbd> 복사(원시 값, `copy()` 메서드), 포커스 셀에 <kbd>Ctrl+V</kbd> 붙여넣기(`pasteTsv(text)`, editable+validator+beforeCellSave 통과 셀만), `column.suppressCopy` — v1.1.0 | **P1** |
-| [ ] | **`saveState()` / `loadState()`** (컬럼 폭·순서·정렬·필터·페이지 저장/복원) | `getState()` / `setState(state)` — JSON 직렬화 가능 | **P1** |
+| [x] | **`saveState()` / `loadState()`** (컬럼 폭·순서·정렬·필터·페이지 저장/복원) | `getState()` / `setState(state)` — JSON 직렬화 가능, `stateChanged` 이벤트 — v1.1.0 | **P1** |
 | [ ] | `exportData({format:'json'\|'html'})` | `getJson()` — 뷰 데이터 JSON 내보내기 | **P1** (쉬움) |
 | [ ] | `exportExcel` / `exportData({format:'xlsx'})` | `exportExcel()` — 의존성 없이 가능한 SpreadsheetML/xlsx 최소 구현 검토 | **P2** |
 | [ ] | `beforeExport` 이벤트, `column > exportRender` | `beforeExport`(취소·가공 가능), `column.exportFormatter` | **P2** |
@@ -125,7 +125,7 @@
 | [ ] | `option(name, value)` (런타임 옵션 변경) | `setOptions({ ... })` — 재생성 없이 주요 옵션 갱신 | **P2** |
 | [ ] | `one(event, fn)` | `once(event, fn)` | P3 |
 | [ ] | `disable() / enable()` | `setEnabled(bool)` — 전체 인터랙션 잠금 오버레이 | P3 |
-| [ ] | `reset({filter, group, sort})` | `resetState({ filter, sort, group, columns })` 통합 리셋 | **P1** (쉬움) |
+| [x] | `reset({filter, group, sort})` | `resetState({ filter, sort, group, columns, page })` 통합 리셋 (인자 없으면 전체) — v1.1.0 | **P1** (쉬움) |
 
 ### 2.7 툴바 · 표시 요소
 

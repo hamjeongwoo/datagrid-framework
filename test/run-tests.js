@@ -339,6 +339,51 @@ suite('normalizeColumns', function () {
   assertEq(cols[0].colId, 'a', 'colId falls back to field');
 });
 
+/* ---------------- applyColumnState ---------------- */
+suite('applyColumnState', function () {
+  function cols() {
+    return [
+      { colId: 'a', hide: false },
+      { colId: 'b', hide: false },
+      { colId: 'c', hide: true },
+    ];
+  }
+
+  var r = T.applyColumnState(cols(), [{ colId: 'c' }, { colId: 'a' }, { colId: 'b' }]);
+  assertEq(r.columns.map(function (c) { return c.colId; }), ['c', 'a', 'b'], 'reordered by state order');
+
+  r = T.applyColumnState(cols(), [{ colId: 'b' }]);
+  assertEq(r.columns.map(function (c) { return c.colId; }), ['b', 'a', 'c'], 'unlisted columns appended in original order');
+
+  r = T.applyColumnState(cols(), [{ colId: 'ghost' }, { colId: 'b' }]);
+  assertEq(r.columns.map(function (c) { return c.colId; }), ['b', 'a', 'c'], 'unknown colId ignored');
+
+  r = T.applyColumnState(cols(), [{ colId: 'a', width: 250 }, { colId: 'b', width: 'x' }, { colId: 'c', width: -5 }]);
+  assertEq(r.widths, { a: 250 }, 'only positive numeric widths collected');
+
+  r = T.applyColumnState(cols(), [{ colId: 'a', hide: true }, { colId: 'b' }]);
+  assertEq(r.hidden, { a: true }, 'hidden map only for entries that specify hide');
+
+  var input = cols();
+  r = T.applyColumnState(input, [{ colId: 'c', hide: false }]);
+  assertEq(input.map(function (c) { return c.colId; }), ['a', 'b', 'c'], 'input array not mutated');
+  assertEq(input[2].hide, true, 'input column objects not mutated');
+
+  r = T.applyColumnState(cols(), []);
+  assertEq(r.columns.map(function (c) { return c.colId; }), ['a', 'b', 'c'], 'empty state keeps order');
+  assertEq(r.widths, {}, 'empty state → no widths');
+
+  r = T.applyColumnState(cols(), null);
+  assertEq(r.columns.length, 3, 'null state keeps all columns');
+
+  r = T.applyColumnState(cols(), [{ colId: 'a' }, { colId: 'a', width: 99 }]);
+  assertEq(r.columns.map(function (c) { return c.colId; }), ['a', 'b', 'c'], 'duplicate colId in state applied once');
+  assertEq(r.widths, {}, 'duplicate entry after first is ignored');
+
+  r = T.applyColumnState(cols(), [null, { noColId: true }, { colId: 'b' }]);
+  assertEq(r.columns[0].colId, 'b', 'malformed entries skipped');
+});
+
 /* ---------------- escapeHtml ---------------- */
 suite('escapeHtml', function () {
   assertEq(
