@@ -118,6 +118,11 @@ grid.on('sortChanged' | 'filterChanged' | 'paginationChanged' | 'rowClicked' |
 
 다크 모드는 루트에 `dg-theme-dark` 클래스를 추가하거나 `grid.setTheme('dark')`를 호출합니다.
 
+## 스펙 확장 로드맵
+
+향후 기능 확장은 [docs/spec-roadmap.md](docs/spec-roadmap.md)를 기준으로 진행합니다
+(ParamQuery Pro API 전수 비교 기반 — P1/P2/P3 우선순위와 제안 API 명세).
+
 ## 테스트
 
 ```bash
