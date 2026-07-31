@@ -846,6 +846,35 @@
   }
 
   /**
+   * 행 선택 상태로부터 트리 체크박스 표시 상태를 유도한다 (checkboxSelection 연동).
+   * 리프 = isSelected(row), 부모 = 자식 전부 true → true / 전부 false → false /
+   * 혼합 → 'indeterminate'. 선택이 어떤 경로(체크박스·행 클릭·API)로 바뀌어도
+   * 이 유도를 다시 돌리면 표시가 항상 일관된다.
+   */
+  function deriveTreeCheckStates(roots, getId, isSelected) {
+    var out = {};
+    var walk = function (node) {
+      if (node.children.length === 0) {
+        var st = !!isSelected(node.row);
+        out[getId(node.row)] = st;
+        return st;
+      }
+      var allTrue = true;
+      var allFalse = true;
+      node.children.forEach(function (c) {
+        var cst = walk(c);
+        if (cst !== true) allTrue = false;
+        if (cst !== false) allFalse = false;
+      });
+      var st2 = allTrue ? true : allFalse ? false : 'indeterminate';
+      out[getId(node.row)] = st2;
+      return st2;
+    };
+    roots.forEach(walk);
+    return out;
+  }
+
+  /**
    * 트리 부모 요약(treeData.summary): 부모 노드마다 자손 "리프"들의 집계를 계산.
    * aggColumns: [{ field, aggFunc }]. 반환: getId(부모 행) → { field: 집계값 }.
    * 한 번의 post-order 순회로 리프 목록을 전파한다.
@@ -1376,7 +1405,8 @@
     /* tree data — pagination/groupBy와 배타 (ParamQuery도 페이징 비호환 명시) */
     this._treeData = options.treeData || null;
     this._treeExpanded = {}; /* rowId -> bool */
-    this._treeChecked = {}; /* rowId -> true | false | 'indeterminate' (treeData.checkbox) */
+    /* checkboxSelection 컬럼 연동 트리 체크박스: 선택 상태에서 유도되는 표시 캐시 */
+    this._treeChecked = null; /* rowId -> true | false | 'indeterminate' */
     this._treeRoots = null; /* 필터 전 전체 트리 (체크 캐스케이드용) — 뷰 계산 시 갱신 */
     this._treeInfo = null; /* rowId -> { level, hasChildren, expanded } — 뷰 계산 시 갱신 */
     this._treeColId = null; /* 트리 UI(들여쓰기+토글)를 그릴 컬럼 */
@@ -1859,6 +1889,16 @@
     this._treeColId = treeFieldCol !== null ? treeFieldCol : firstDataCol;
 
     this._aggColumns = this._columns.filter(function (c) { return c.aggFunc && c.field; });
+
+    /* checkboxSelection 컬럼이 있으면 트리 체크박스 모드 — 선택에서 3상태 유도 */
+    this._treeChecked = null;
+    if (this._hasTreeCheckbox()) {
+      this._treeChecked = deriveTreeCheckStates(
+        this._treeRoots,
+        function (r) { return self._rowId(r); },
+        function (r) { return !!self._selection[self._rowId(r)]; }
+      );
+    }
 
     /* treeData.summary: 부모 행에 자손 리프 집계 표시 (필터 반영된 트리 기준) */
     this._treeSummary = null;
@@ -2576,12 +2616,25 @@
         cell.classList.add('dg-checkbox-cell');
         var cb = el('input', 'dg-checkbox', cell);
         cb.type = 'checkbox';
-        cb.checked = !!self._selection[id];
-        cb.setAttribute('aria-label', 'Select row');
-        cb.addEventListener('click', function (e) { e.stopPropagation(); });
-        cb.addEventListener('change', function () {
-          self._setRowSelected(row, cb.checked, true);
-        });
+        if (self._treeChecked) {
+          /* 트리 모드: 선택 연동 3상태 체크박스 — 캐스케이드는 _treeCheckToggle이 처리 */
+          var tState = self._treeChecked[id];
+          cb.checked = tState === true;
+          cb.indeterminate = tState === 'indeterminate';
+          cb.disabled = self._treeCheckOpts().isDisabled(row);
+          cb.setAttribute('aria-label', 'Select subtree');
+          cb.addEventListener('click', function (e) { e.stopPropagation(); });
+          cb.addEventListener('change', function () {
+            self._treeCheckToggle(row, cb.checked);
+          });
+        } else {
+          cb.checked = !!self._selection[id];
+          cb.setAttribute('aria-label', 'Select row');
+          cb.addEventListener('click', function (e) { e.stopPropagation(); });
+          cb.addEventListener('change', function () {
+            self._setRowSelected(row, cb.checked, true);
+          });
+        }
         if (col.field === undefined) return; /* checkbox-only column */
       }
 
@@ -2606,27 +2659,6 @@
             cell.setAttribute('aria-expanded', tInfo.expanded ? 'true' : 'false');
           } else {
             el('span', 'dg-tree-toggle-spacer', cell);
-          }
-
-          /* treeData.checkbox: 토글과 값 사이에 3상태 체크박스 */
-          if (self._treeData.checkbox) {
-            var tcb = el('input', 'dg-checkbox dg-tree-checkbox', cell);
-            tcb.type = 'checkbox';
-            var tState = self._treeChecked[id];
-            tcb.checked = tState === true;
-            tcb.indeterminate = tState === 'indeterminate';
-            tcb.setAttribute('aria-label', 'Check node');
-            if (self._treeData.checkboxDisabled) {
-              try {
-                tcb.disabled = !!self._treeData.checkboxDisabled(row);
-              } catch (err) {
-                console.error('[DataGrid] checkboxDisabled failed:', err);
-              }
-            }
-            tcb.addEventListener('click', function (e) { e.stopPropagation(); });
-            tcb.addEventListener('change', function () {
-              self.setNodeChecked(row, tcb.checked);
-            });
           }
         }
       }
@@ -3120,11 +3152,20 @@
     this.refresh();
   };
 
-  /* ---- tree checkbox (treeData.checkbox) ---- */
+  /* ---- tree checkbox (checkboxSelection 컬럼 연동) ----
+   * 별도 체크 상태를 두지 않는다: 행 선택(_selection)이 단일 진실이고,
+   * 체크박스 표시는 deriveTreeCheckStates로 선택에서 유도한다.
+   * 조회는 getSelectedRows(), 일괄 조작은 selectAll()/deselectAll(),
+   * 이벤트는 beforeSelectionChange(취소 가능)/selectionChanged를 그대로 쓴다. */
+
+  /** treeData + checkboxSelection 컬럼이 있으면 트리 체크박스 모드. */
+  DataGrid.prototype._hasTreeCheckbox = function () {
+    if (!this._treeData) return false;
+    return this._columns.some(function (c) { return c.checkboxSelection; });
+  };
 
   DataGrid.prototype._treeCheckOpts = function () {
     var td = this._treeData;
-    var self = this;
     return {
       cascade: td.cascade !== false, /* 기본 켜짐 */
       isDisabled: function (row) {
@@ -3140,82 +3181,30 @@
   };
 
   /**
-   * 노드 체크 설정. beforeNodeCheck(취소 가능) → 캐스케이드 반영 →
-   * nodeCheckChanged { data, checked, changedRows } 순. 상태가 바뀌면 true.
+   * 트리 모드 체크박스 토글: 캐스케이드 결과를 행 선택으로 커밋한다.
+   * 선택에 들어가는 행은 상태가 온전히 true인 행뿐(indeterminate 부모 제외).
    */
-  DataGrid.prototype.setNodeChecked = function (row, checked) {
-    if (!this._treeData || !this._treeData.checkbox || !row || !this._treeRoots) return false;
-    var self = this;
-    var ev = { data: row, checked: !!checked, cancel: false };
-    this._emitter.emit('beforeNodeCheck', ev);
-    if (ev.cancel) {
-      this.refreshRow(row); /* UI 체크박스를 원상 복구 */
-      return false;
-    }
-    var prev = this._treeChecked;
-    var next = applyTreeCheck(
-      this._treeRoots,
-      function (r) { return self._rowId(r); },
-      prev,
-      row,
-      !!checked,
-      this._treeCheckOpts()
-    );
-    var changed = [];
-    collectTreeNodes(this._treeRoots).forEach(function (n) {
-      var id = self._rowId(n.row);
-      if ((prev[id] || false) !== (next[id] || false)) changed.push(n.row);
-    });
-    if (changed.length === 0) return false;
-    this._treeChecked = next;
-    this.refresh();
-    this._emitter.emit('nodeCheckChanged', {
-      data: row,
-      checked: !!checked,
-      changedRows: changed,
-    });
-    return true;
-  };
-
-  /** true | false | 'indeterminate' (한 번도 체크되지 않았으면 false) */
-  DataGrid.prototype.isNodeChecked = function (row) {
-    if (!row) return false;
-    return this._treeChecked[this._rowId(row)] || false;
-  };
-
-  /** 체크 상태가 true인 행 전체(부모 포함)를 트리 표시 순서로 반환. */
-  DataGrid.prototype.getCheckedRows = function () {
-    if (!this._treeRoots) return [];
-    var self = this;
-    return collectTreeNodes(this._treeRoots)
-      .map(function (n) { return n.row; })
-      .filter(function (r) { return self._treeChecked[self._rowId(r)] === true; });
-  };
-
-  /** 전체 체크/해제 — 일괄 작업이므로 nodeCheckChanged는 1회(data: null)만 발생. */
-  DataGrid.prototype.checkAllNodes = function () { return this._checkAll(true); };
-  DataGrid.prototype.unCheckAllNodes = function () { return this._checkAll(false); };
-
-  DataGrid.prototype._checkAll = function (checked) {
-    if (!this._treeData || !this._treeData.checkbox || !this._treeRoots) return false;
+  DataGrid.prototype._treeCheckToggle = function (row, checked) {
     var self = this;
     var getId = function (r) { return self._rowId(r); };
     var opts = this._treeCheckOpts();
-    var prev = this._treeChecked;
-    var next = prev;
-    this._treeRoots.forEach(function (n) {
-      next = applyTreeCheck(self._treeRoots, getId, next, n.row, checked, opts);
-    });
-    var changed = [];
-    collectTreeNodes(this._treeRoots).forEach(function (n) {
-      var id = getId(n.row);
-      if ((prev[id] || false) !== (next[id] || false)) changed.push(n.row);
-    });
-    if (changed.length === 0) return false;
-    this._treeChecked = next;
-    this.refresh();
-    this._emitter.emit('nodeCheckChanged', { data: null, checked: checked, changedRows: changed });
-    return true;
+    if (opts.isDisabled(row)) return;
+    var next = {};
+    if (opts.cascade) {
+      var states = applyTreeCheck(
+        this._treeRoots, getId, this._treeChecked || {}, row, !!checked, opts
+      );
+      collectTreeNodes(this._treeRoots).forEach(function (n) {
+        if (states[getId(n.row)] === true) next[getId(n.row)] = n.row;
+      });
+    } else {
+      for (var k in this._selection) next[k] = this._selection[k];
+      if (checked) next[getId(row)] = row;
+      else delete next[getId(row)];
+    }
+    if (!this._commitSelection(next)) {
+      this.refreshRow(row); /* beforeSelectionChange 취소 → 체크박스 원복 */
+    }
   };
 
   /* ---- pinned top rows ---- */
@@ -3337,12 +3326,29 @@
   };
 
   DataGrid.prototype._syncSelectionDom = function () {
+    var self = this;
+    /* 트리 체크박스 모드: 선택이 어떤 경로로 바뀌었든 3상태를 다시 유도 */
+    if (this._treeChecked && this._treeRoots) {
+      this._treeChecked = deriveTreeCheckStates(
+        this._treeRoots,
+        function (r) { return self._rowId(r); },
+        function (r) { return !!self._selection[self._rowId(r)]; }
+      );
+    }
     for (var idx in this._renderedRows) {
       var rowEl = this._renderedRows[idx];
       var selected = !!this._selection[rowEl.dataset.rowId];
       rowEl.classList.toggle('dg-row-selected', selected);
       var cb = rowEl.querySelector('.dg-checkbox-cell .dg-checkbox');
-      if (cb) cb.checked = selected;
+      if (cb) {
+        if (this._treeChecked) {
+          var tState = this._treeChecked[rowEl.dataset.rowId];
+          cb.checked = tState === true;
+          cb.indeterminate = tState === 'indeterminate';
+        } else {
+          cb.checked = selected;
+        }
+      }
     }
     if (this._headerSelectAllEl) {
       var count = this.getSelectedRows().length;
@@ -4546,7 +4552,6 @@
     this._lastClickedViewIndex = -1;
     this._focusedCell = null;
     this._treeExpanded = {}; /* 새 데이터 = 펼침 상태 초기화 (defaultExpandLevel 재적용) */
-    this._treeChecked = {};
     this._treeLoading = {};
     this._treeLoaded = {};
     this._resetTracking(); /* 새 데이터 = 새 기준선 */
@@ -5062,6 +5067,7 @@
     sortTreeNodes: sortTreeNodes,
     flattenTreeNodes: flattenTreeNodes,
     applyTreeCheck: applyTreeCheck,
+    deriveTreeCheckStates: deriveTreeCheckStates,
     computeTreeSummary: computeTreeSummary,
     buildGroupHeaderRuns: buildGroupHeaderRuns,
     buildDataSourceRequest: buildDataSourceRequest,

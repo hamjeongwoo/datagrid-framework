@@ -1709,41 +1709,44 @@
   </div>
 
   <!-- ======================================================== 트리 체크박스 -->
-  <h2 class="section">Tree Checkbox — cascade (treeData.checkbox)</h2>
+  <h2 class="section">Tree Checkbox — cascade (checkboxSelection)</h2>
   <p class="section-desc">
-    <code class="inline">treeData.checkbox: true</code>는 트리 컬럼에 3상태 체크박스를 표시합니다 —
-    부모를 체크하면 자손 전체가, 자식 일부만 체크되면 부모가 <code class="inline">indeterminate</code>가 됩니다
-    (<code class="inline">cascade: false</code>로 끌 수 있음). <code class="inline">getCheckedRows()</code>·
-    <code class="inline">checkAllNodes()/unCheckAllNodes()</code>·<code class="inline">nodeCheckChanged</code> 이벤트,
-    <code class="inline">checkboxDisabled(row)</code> 콜백을 제공합니다. 이 카드는 flat(<code class="inline">parentId</code>) 형식 데이터를 사용합니다.
+    트리 모드에서는 기존 <code class="inline">checkboxSelection</code> 컬럼이 3상태 캐스케이드 체크박스가 됩니다 —
+    부모를 체크하면 자손 전체가 <strong>행 선택</strong>되고, 자식 일부만 선택되면 부모가
+    <code class="inline">indeterminate</code>로 표시됩니다 (<code class="inline">treeData.cascade: false</code>로 끌 수 있음).
+    별도 API 없이 선택 API를 그대로 씁니다: <code class="inline">getSelectedRows()</code>·
+    <code class="inline">selectAll()/deselectAll()</code>·<code class="inline">selectionChanged</code>/<code class="inline">beforeSelectionChange</code>.
+    <code class="inline">treeData.checkboxDisabled(row)</code>로 조건부 비활성을 걸 수 있고,
+    이 카드는 flat(<code class="inline">parentId</code>) 형식 데이터를 사용합니다.
   </p>
   <div class="example-card">
     <div class="example-html">
       <div class="toolbar">
-        <button id="tcbCheckAll" class="btn">전부 체크</button>
-        <button id="tcbUncheckAll" class="btn">전부 해제</button>
-        <button id="tcbGetChecked" class="btn">체크된 행 보기</button>
+        <button id="tcbSelectAll" class="btn">전부 선택 (selectAll)</button>
+        <button id="tcbDeselectAll" class="btn">전부 해제</button>
+        <button id="tcbGetChecked" class="btn">선택된 행 보기</button>
       </div>
       <div id="gridTreeCheck" class="grid-wrap-md"></div>
       <div class="status-line" id="tcbStatus">
-        폴더를 체크해 보세요 — 자손 전체가 함께 체크되고, license 파일은 비활성입니다.
+        폴더를 체크해 보세요 — 자손 전체가 행 선택되고, license 파일은 비활성입니다.
       </div>
     </div>
     <script type="text/x-example">
       var grid = new DataGrid(document.getElementById('gridTreeCheck'), {
         rowData: DemoData.makeFileTreeFlat(23),   // flat: 각 행이 id/parentId를 가짐
+        rowSelection: 'multiple',
         treeData: {
           parentIdField: 'parentId',
           idField: 'id',
           treeField: 'name',
           defaultExpandLevel: -1,                 // 전부 펼친 채 시작
-          checkbox: true,
-          cascade: true,
-          checkboxDisabled: function (row) {      // 조건부 비활성 체크박스
+          cascade: true,                          // 기본값 — 부모↔자손 선택 연동
+          checkboxDisabled: function (row) {      // 캐스케이드에서 제외 + UI 비활성
             return row.name.indexOf('license') === 0;
           },
         },
         columnDefs: [
+          { checkboxSelection: true, width: 44 }, // 기존 선택 체크박스 컬럼이 트리 체크박스가 된다
           { field: 'name', headerName: 'Name', flex: 2 },
           { field: 'type', headerName: 'Type', width: 100 },
           { field: 'size', headerName: 'Size (KB)', dataType: 'number', width: 110 },
@@ -1751,17 +1754,15 @@
       });
 
       var status = document.getElementById('tcbStatus');
-      grid.on('nodeCheckChanged', function (e) {
-        status.textContent = (e.data ? '"' + e.data.name + '" ' + (e.checked ? '체크' : '해제') : '일괄 변경')
-          + ' — 함께 바뀐 행 ' + e.changedRows.length + '개, 현재 체크 '
-          + grid.getCheckedRows().length + '개';
+      grid.on('selectionChanged', function (e) {
+        status.textContent = '선택 ' + e.selectedRows.length + '개 (indeterminate 부모는 선택에 포함되지 않음)';
       });
 
-      document.getElementById('tcbCheckAll').addEventListener('click', function () { grid.checkAllNodes(); });
-      document.getElementById('tcbUncheckAll').addEventListener('click', function () { grid.unCheckAllNodes(); });
+      document.getElementById('tcbSelectAll').addEventListener('click', function () { grid.selectAll(); });
+      document.getElementById('tcbDeselectAll').addEventListener('click', function () { grid.deselectAll(); });
       document.getElementById('tcbGetChecked').addEventListener('click', function () {
-        var names = grid.getCheckedRows().map(function (r) { return r.name; });
-        status.textContent = 'getCheckedRows(): ' + (names.length ? names.join(', ') : '(없음)');
+        var names = grid.getSelectedRows().map(function (r) { return r.name; });
+        status.textContent = 'getSelectedRows(): ' + (names.length ? names.join(', ') : '(없음)');
       });
     </script>
   </div>

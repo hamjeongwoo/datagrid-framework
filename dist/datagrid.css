@@ -594,7 +594,6 @@
   flex: none;
   width: calc(var(--dg-icon-size) + 6px);
 }
-.dg-tree-checkbox { flex: none; margin-right: 8px; }
 /* fetchChildren 지연 로딩 중: 토글이 스피너로 회전 (dg-spin은 로딩 오버레이와 공유) */
 .dg-tree-toggle.dg-tree-loading { animation: dg-spin 0.8s linear infinite; }
 .dg-group-count {

@@ -193,7 +193,7 @@
 | | ParamQuery | 제안 API | 우선순위 |
 |---|---|---|---|
 | [x] | **`treeModel` 코어**: nested(`children[]`)/flat(`parentId`) 데이터(행마다 고유 id 필수), `dataIndx`(트리 컬럼), `indent`, 노드 펼침/접힘, `beforeTreeExpand`/`treeExpand` 이벤트 | `treeData: { childrenField: 'children' \| parentIdField+idField(flat), treeField, indent, defaultExpandLevel }` + `expandNode()/collapseNode()/toggleNode()/expandAllNodes()/collapseAllNodes()/isNodeExpanded()` + `beforeNodeToggle`(취소 가능)/`nodeExpanded`/`nodeCollapsed`. 계층 정렬(형제끼리 재귀)·계층 필터(매치의 조상 유지 + `filterKeepChildren`) 통합 — v2.1.0 | **T1** |
-| [x] | **체크박스**: `treeModel.checkbox · cascade`, `Tree().getCheckedNodes() · checkNodes() · unCheckAll()`, `beforeCheck`/`check` 이벤트, `pq_tree_cb` 숨김 컬럼 트릭으로 비활성화 | `treeData.checkbox: true` + `treeData.cascade: true`(3상태 indeterminate 포함) + `treeData.checkboxDisabled(row)` 콜백 + `setNodeChecked()/isNodeChecked()/getCheckedRows()/checkAllNodes()/unCheckAllNodes()` + `beforeNodeCheck`(취소 가능)/`nodeCheckChanged` — v2.1.0 | **T2** |
+| [x] | **체크박스**: `treeModel.checkbox · cascade · select`, `Tree().getCheckedNodes() · checkNodes() · unCheckAll()`, `beforeCheck`/`check` 이벤트, `pq_tree_cb` 숨김 컬럼 트릭으로 비활성화 | 기존 **`checkboxSelection` 컬럼 재활용** — 트리 모드에서 3상태 캐스케이드 체크박스(부모↔자손 **행 선택** 연동, indeterminate 표시)로 동작. `treeData.cascade`(기본 true)·`treeData.checkboxDisabled(row)`만 추가하고 조회/조작/이벤트는 선택 API(`getSelectedRows`/`selectAll`/`deselectAll`/`beforeSelectionChange`/`selectionChanged`) 그대로. 별도 체크 API 없음(구현 중 API 단순화 — 초기의 `treeData.checkbox`+전용 API 설계를 폐기) — v2.1.0 | **T2** |
 | [x] | `treeModel.summaryInTitleRow` (부모 행 자체에 자식 집계 표시) | `treeData.summary: true` — `column.aggFunc` 재사용, 부모 노드 행에 자손 리프 집계를 표시(표시 전용, 데이터 불변, 필터 반영) — v2.1.0 | **T3** |
 | [x] | **Lazy loading** (원격 자식 로딩) | `treeData.fetchChildren(row) => Promise<rows>` + `treeData.hasChildren(row)` — 첫 펼침 때 로드 + 토글 스피너, 빈 배열 = 리프 확정, 실패 시 `dataLoadError` 후 접힌 채 재시도 가능. nested 형식 전용 — v2.1.0 | **T4** |
 
@@ -204,7 +204,7 @@
 | `Tree()` 별도 위젯 객체 | 인스턴스 메서드로 통합 (우리 관례 — §3의 위젯 제외와 동일) |
 | `treeModel.hideLines`(계층 연결선) | 들여쓰기 + 화살표로 계층 표현 충분. CSS 복잡도 대비 가치 낮음 |
 | `treeModel.icons` / `treeModel.render`(폴더/파일 아이콘) | `cellRenderer`로 앱에서 구현 가능 (treeField 컬럼도 cellRenderer 지원) |
-| `checkboxHead`(헤더 체크박스) | `checkAllNodes()/unCheckAllNodes()` API + 툴바 버튼으로 대체 |
-| 체크박스-행 선택 연동(`treeModel.select`) | `nodeCheckChanged` + `setSelectedRows()` 조합으로 앱에서 가능 |
+| `checkboxHead`(헤더 체크박스) | `selectAll()/deselectAll()` API + 툴바 버튼으로 대체 (단, `selectAll`은 `checkboxDisabled` 행도 선택함 — 캐스케이드 UI 경로만 비활성 존중) |
+| 체크박스-행 선택 분리(`treeModel.select` 없이 별도 체크 상태) | 도입하지 않음 — 체크 = 행 선택으로 통합(`checkboxSelection` 재활용)이 우리 설계. 선택과 무관한 체크가 필요하면 앱에서 별도 컬럼 + `cellRenderer`로 구현 |
 | `treeModel.summary`(부모별 별도 요약 행) | 부모 행 내 집계(T3)만 채택 — 트리에서 행 수 이중화 방지 |
 | 트리 DnD(노드 드래그 이동 · 트리 간 DnD) | 데이터 조작 API + 앱 구현 영역. 수요 확인 후 재검토 |

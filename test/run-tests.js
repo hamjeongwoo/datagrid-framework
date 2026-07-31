@@ -795,6 +795,33 @@ suite('applyTreeCheck', function () {
   assertEq(s8.p, 'indeterminate', 'parent reflects skipped child (mixed)');
 });
 
+/* ---------------- deriveTreeCheckStates ---------------- */
+suite('deriveTreeCheckStates', function () {
+  var data = [
+    { id: 'p', children: [{ id: 'a' }, { id: 'b' }] },
+    { id: 'q', children: [{ id: 'x' }, { id: 'y' }] },
+    { id: 'leafRoot' },
+  ];
+  var roots = T.buildTreeNodes(data, {});
+  var getId = function (r) { return r.id; };
+  var sel = function (ids) {
+    return function (r) { return ids.indexOf(r.id) !== -1; };
+  };
+
+  var s1 = T.deriveTreeCheckStates(roots, getId, sel(['a', 'b']));
+  assertEq(s1.p, true, 'all children selected → parent true');
+  var s2 = T.deriveTreeCheckStates(roots, getId, sel(['a']));
+  assertEq(s2.p, 'indeterminate', 'some children selected → parent indeterminate');
+  assertEq([s2.a, s2.b], [true, false], 'leaf states follow selection');
+  var s3 = T.deriveTreeCheckStates(roots, getId, sel([]));
+  assertEq([s3.p, s3.q, s3.leafRoot], [false, false, false], 'nothing selected → all false');
+  var s4 = T.deriveTreeCheckStates(roots, getId, sel(['leafRoot']));
+  assertEq(s4.leafRoot, true, 'leaf root reflects own selection');
+  // 부모 표시는 자식에서만 유도 — 부모 자신의 선택 여부와 무관
+  var s5 = T.deriveTreeCheckStates(roots, getId, sel(['p']));
+  assertEq(s5.p, false, 'parent display derived from children only');
+});
+
 /* ---------------- fillSeries ---------------- */
 suite('fillSeries', function () {
   assertEq(T.fillSeries([1, 3], 3), [5, 7, 9], 'arithmetic extrapolation');
