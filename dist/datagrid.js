@@ -385,6 +385,27 @@
     return null;
   }
 
+  /**
+   * checkbox 에디터/렌더러의 체크 여부 판정.
+   * opts = { checked, unchecked } 매핑이 있으면 checked 값과 일치 여부로 판정
+   * (엄격 일치 우선, 문자열화 일치 허용 — 숫자 1과 '1' 등).
+   * 매핑이 없으면 불리언 외 관용 표기를 지원한다:
+   * 'y'/'yes'/'true'/'1'(대소문자 무관) → 체크, 'n'/'no'/'false'/'0'/'' → 해제,
+   * 그 외에는 truthy 여부.
+   */
+  function isCheckedValue(value, opts) {
+    if (opts && typeof opts === 'object' && !Array.isArray(opts) && 'checked' in opts) {
+      return value === opts.checked ||
+        (value !== null && value !== undefined && String(value) === String(opts.checked));
+    }
+    if (typeof value === 'string') {
+      var s = value.toLowerCase();
+      if (s === 'y' || s === 'yes' || s === 'true' || s === '1') return true;
+      if (s === 'n' || s === 'no' || s === 'false' || s === '0' || s === '') return false;
+    }
+    return !!value;
+  }
+
   /** multiselect 값 정규화: 배열 그대로, null/undefined → [], 단일 값 → [값]. */
   function normalizeMultiValue(value) {
     if (Array.isArray(value)) return value;
@@ -4120,16 +4141,24 @@
       var focusable = cellEl.querySelector('input, select, textarea, [tabindex]');
       if (focusable) focusable.focus();
     } else if (editorType === 'checkbox') {
-      /* 불리언 인라인 체크박스 — 셀 자체가 편집 프레임(dg-cell-editing) */
+      /* 인라인 체크박스 — 셀 자체가 편집 프레임(dg-cell-editing).
+       * editorOptions: { checked, unchecked }로 'Y'/'N', 0/1 같은 표기 매핑 지원. */
+      var cbOpts = col.editorOptions && typeof col.editorOptions === 'object' &&
+        !Array.isArray(col.editorOptions) ? col.editorOptions : null;
       input = document.createElement('input');
       input.type = 'checkbox';
       input.className = 'dg-checkbox';
-      input.checked = !!value;
+      input.checked = isCheckedValue(value, cbOpts);
       cellEl.classList.add('dg-cell-editing');
       cleanup = function () { cellEl.classList.remove('dg-cell-editing'); };
       cellEl.appendChild(input);
       input.focus();
-      getValue = function () { return input.checked; };
+      getValue = function () {
+        if (cbOpts && 'checked' in cbOpts) {
+          return input.checked ? cbOpts.checked : cbOpts.unchecked;
+        }
+        return input.checked;
+      };
       invalidEl = cellEl;
     } else if (editorType === 'radio') {
       /* 인라인 라디오 그룹 — editorOptions에서 단일 선택 */
@@ -5336,11 +5365,22 @@
         }).join(' ');
       };
     },
-    /** checkbox 에디터 짝꿍 — 불리언을 실제 체크박스 모양으로 표시 (표시 전용). */
-    checkbox: function () {
+    /**
+     * checkbox 에디터 짝꿍 — 값을 실제 체크박스 모양으로 표시 (표시 전용).
+     * options = { checked, unchecked } 매핑 (생략 시 컬럼 editorOptions →
+     * 그것도 없으면 불리언/Y·N/0·1 관용 판정).
+     * disabled가 아니라 pointer-events: none — disabled 폼 요소는 마우스
+     * 이벤트를 삼켜서 셀 더블클릭 편집이 막힌다 (BUG-006).
+     */
+    checkbox: function (options) {
       return function (params) {
-        return '<input type="checkbox" class="dg-checkbox dg-checkbox-display" disabled' +
-          (params.value ? ' checked' : '') + '>';
+        var opts = options ||
+          (params.colDef && params.colDef.editorOptions &&
+            typeof params.colDef.editorOptions === 'object' &&
+            !Array.isArray(params.colDef.editorOptions)
+            ? params.colDef.editorOptions : null);
+        return '<input type="checkbox" class="dg-checkbox dg-checkbox-display" tabindex="-1"' +
+          (isCheckedValue(params.value, opts) ? ' checked' : '') + '>';
       };
     },
   };
@@ -5366,6 +5406,7 @@
     normalizeEditorOptions: normalizeEditorOptions,
     lookupOptionLabel: lookupOptionLabel,
     lookupOptionLabels: lookupOptionLabels,
+    isCheckedValue: isCheckedValue,
     normalizeMultiValue: normalizeMultiValue,
     shallowArrayEquals: shallowArrayEquals,
     buildTsv: buildTsv,

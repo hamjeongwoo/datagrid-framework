@@ -714,7 +714,10 @@ window.ApiDocs = {
             '(select는 드롭다운, radio는 셀 안 라디오 그룹). ' +
             '<code>\'multiselect\'</code>(v2.2.0)는 셀 아래에 체크리스트 패널을 펼치고 <strong>배열</strong>을 ' +
             '<code>editorOptions</code> 순서로 커밋합니다 — 내용이 같으면 커밋하지 않습니다. ' +
-            '<code>\'checkbox\'</code>(v2.2.0)는 불리언 체크박스입니다. ' +
+            '<code>\'checkbox\'</code>(v2.2.0)는 체크박스입니다 — 기본은 불리언 커밋이고, ' +
+            "<code>editorOptions: { checked: 'Y', unchecked: 'N' }</code> 매핑을 주면 " +
+            "그 값('Y'/'N', 1/0 등)으로 읽고 커밋합니다. 매핑 없이도 'y'/'yes'/'true'/'1' 계열 문자열은 " +
+            '체크로 인식합니다 (커밋은 불리언). ' +
             '모두 <kbd>Enter</kbd>/바깥 클릭으로 커밋, <kbd>Esc</kbd>로 취소하며, ' +
             'editor를 선언하면 <code>editable: true</code>는 생략할 수 있습니다 (v2.2.0).',
           example:
@@ -727,6 +730,8 @@ window.ApiDocs = {
           type: 'Array<string | { label, value }>',
           description:
             "<code>editor: 'select' | 'multiselect' | 'radio'</code>의 선택지 목록. " +
+            "<code>editor: 'checkbox'</code>에서는 배열 대신 <code>{ checked, unchecked }</code> " +
+            "매핑 객체를 받습니다 (예: <code>{ checked: 'Y', unchecked: 'N' }</code> — 읽기/커밋 모두 그 값 사용). " +
             '문자열 배열이면 표시와 저장에 같은 값을 쓰고, ' +
             '<code>{ label, value }</code> 객체 배열이면 편집 UI에는 <code>label</code>이 표시되고 ' +
             '선택 시 <code>value</code>가 데이터에 저장됩니다 (셀에는 저장된 value가 보입니다 — ' +
@@ -1799,12 +1804,18 @@ window.ApiDocs = {
         },
         {
           name: 'checkbox',
-          signature: 'DataGrid.renderers.checkbox()',
+          signature: 'DataGrid.renderers.checkbox(options?: { checked, unchecked })',
           since: '2.2.0',
           description:
-            'checkbox 에디터의 짝꿍 렌더러 — 불리언 값을 실제 체크박스 모양으로 표시합니다(표시 전용, 클릭 불가). ' +
+            'checkbox 에디터의 짝꿍 렌더러 — 값을 실제 체크박스 모양으로 표시합니다(표시 전용). ' +
+            '<code>options</code>(생략 시 컬럼의 <code>editorOptions</code> 매핑)가 있으면 ' +
+            "<code>checked</code> 값과의 일치로 판정하고, 없으면 불리언 외에 'Y'/'yes'/'true'/'1' 계열도 " +
+            '체크로 인식합니다. 마우스 이벤트는 셀로 통과시키므로(pointer-events) 더블클릭 편집을 막지 않습니다. ' +
             "✓/– 텍스트 표시를 원하면 <a href='#renderers-check'><code>check()</code></a>를 쓰세요.",
-          example: "{ field: 'remote', editor: 'checkbox', cellRenderer: DataGrid.renderers.checkbox() }",
+          example:
+            "{ field: 'approved', editor: 'checkbox',\n" +
+            "  editorOptions: { checked: 'Y', unchecked: 'N' },\n" +
+            '  cellRenderer: DataGrid.renderers.checkbox() }',
         },
       ],
     },

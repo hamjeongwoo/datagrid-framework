@@ -801,9 +801,10 @@
 /* 점 없는 일반 칩 — multiselect 렌더러 등 */
 .dg-tag-plain::before { display: none; }
 
-/* 표시 전용 체크박스 (renderers.checkbox) — disabled 흐림 없이 */
-.dg-checkbox.dg-checkbox-display:disabled {
-  opacity: 1;
+/* 표시 전용 체크박스 (renderers.checkbox) — disabled 대신 pointer-events로.
+ * disabled 폼 요소는 마우스 이벤트를 삼켜 셀 dblclick 편집을 막는다 (BUG-006). */
+.dg-checkbox.dg-checkbox-display {
+  pointer-events: none;
   cursor: default;
 }
 

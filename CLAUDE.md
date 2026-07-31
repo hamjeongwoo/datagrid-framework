@@ -147,6 +147,7 @@
 6. **가상화와 scrollWidth (BUG-003)**: 스크롤 컨테이너의 scrollWidth/scrollHeight를 가상화로 제거되는 콘텐츠(absolute 행/셀)에 의존시키지 말 것 — 전체 크기를 컨테이너 치수로 명시한다(세로 `_canvasEl.style.height`, 가로 `_canvasEl.style.minWidth = max(100%, 전체폭)`). 스크롤 중 DOM을 비웠다 재구성하는 사이 강제 레이아웃이 끼면 scrollWidth가 붕괴해 브라우저가 scrollLeft를 0으로 클램프한다(스크롤바 드래그가 제자리로 튕김). 또, 프리뷰 팬이 숨겨진 상태에선 scroll 이벤트가 발화하지 않으니 스크롤 핸들러 검증은 `dispatchEvent(new Event('scroll'))`로 수동 발화할 것. 같은 이유로 문서가 포커스를 안 가진 상태(`document.hasFocus() === false`)에선 `element.blur()`가 focusout을 발화하지 않는다 — blur 커밋 검증은 `dispatchEvent(new FocusEvent('focusout', { bubbles: true }))`로.
 7. **3상태 체크박스의 클릭 의도 (BUG-004)**: 브라우저는 indeterminate 체크박스 클릭에 항상 `checked=true`를 준다. "완전 체크가 불가능한 상태"(비활성 자손 등)가 존재하면 checked를 그대로 믿는 핸들러는 해제 경로를 잃고 indeterminate에 갇힌다 — 클릭 의도는 도메인 상태에서 도출할 것(체크할 것이 안 남았으면 해제로 해석). 유도(derived) 표시는 유도 규칙이 성립하는 모드에서만 쓰고, 아니면 원본 상태 표시로 폴백. 3상태 UI 검증은 체크→해제→재체크 왕복 + 비활성 포함 케이스를 반드시 돌릴 것.
 8. **에디터 내부 이벤트의 버블 (BUG-005)**: 에디터 안에서 발생해 캔버스로 버블되는 click/dblclick이 "편집을 (재)시작하는 핸들러"에 다시 잡히면 에디터 DOM이 재생성돼 네이티브 UI(select 드롭다운 등)가 열리자마자 닫힌다 — 편집 중 같은 셀 좌표면 조기 반환이 기본. 에디터 검증은 재생성이 티 나지 않는 text 말고 **select 드롭다운·range 드래그처럼 재생성이 드러나는 에디터로 클릭 상호작용까지** 확인할 것.
+9. **표시 전용 폼 요소에 disabled 금지 (BUG-006)**: disabled 폼 요소는 마우스 이벤트를 아예 발화하지 않아, 요소가 차지한 영역이 부모 셀의 클릭/더블클릭 상호작용(편집 진입 등)의 사각지대가 된다 — 표시 전용은 `pointer-events: none` + `tabindex="-1"` 조합이 기본. 또한 `dispatchEvent` 합성 이벤트는 disabled 요소에서도 강제 발화·버블되므로 이 계열 버그를 재현하지 못한다 — 클릭 경로 검증은 computed `pointer-events`/`document.elementFromPoint`를 함께 볼 것.
 
 ## 버전 정책
 

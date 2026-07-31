@@ -230,6 +230,37 @@ suite('lookupOptionLabel', function () {
     '문자영', 'strict match wins before loose stringified match');
 });
 
+suite('isCheckedValue', function () {
+  var c = T.isCheckedValue;
+  /* 매핑 없음 — 관용 표기 */
+  assertEq(c(true), true, 'true → checked');
+  assertEq(c(false), false, 'false → unchecked');
+  assertEq(c(1), true, '1 → checked');
+  assertEq(c(0), false, '0 → unchecked');
+  assertEq(c('Y'), true, "'Y' → checked");
+  assertEq(c('n'), false, "'n' → unchecked (case-insensitive)");
+  assertEq(c('yes'), true, "'yes' → checked");
+  assertEq(c('FALSE'), false, "'FALSE' → unchecked");
+  assertEq(c('0'), false, "'0' string → unchecked");
+  assertEq(c('1'), true, "'1' string → checked");
+  assertEq(c(''), false, 'empty string → unchecked');
+  assertEq(c(null), false, 'null → unchecked');
+  assertEq(c(undefined), false, 'undefined → unchecked');
+  assertEq(c('anything'), true, 'other truthy string → checked');
+  /* 매핑 있음 — checked 값과의 일치로만 판정 */
+  var yn = { checked: 'Y', unchecked: 'N' };
+  assertEq(c('Y', yn), true, "mapping: 'Y' matches checked");
+  assertEq(c('N', yn), false, "mapping: 'N' → unchecked");
+  assertEq(c('yes', yn), false, "mapping: 'yes' is not checked value");
+  assertEq(c(null, yn), false, 'mapping: null → unchecked');
+  var num = { checked: 1, unchecked: 0 };
+  assertEq(c(1, num), true, 'mapping: number 1 strict match');
+  assertEq(c('1', num), true, "mapping: '1' matches via stringified compare");
+  assertEq(c(0, num), false, 'mapping: 0 → unchecked');
+  /* 배열 editorOptions(select용)가 넘어와도 매핑으로 오인하지 않음 */
+  assertEq(c('Y', ['Y', 'N']), true, 'array opts ignored → lenient rules apply');
+});
+
 suite('normalizeMultiValue', function () {
   var n = T.normalizeMultiValue;
   assertEq(n(['a', 'b']), ['a', 'b'], 'array passes through');

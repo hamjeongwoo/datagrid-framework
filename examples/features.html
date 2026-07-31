@@ -1975,10 +1975,12 @@
   <h2 class="section">Multiselect · Radio · Checkbox Editors &amp; Renderers</h2>
   <p class="section-desc">
     <code class="inline">editor</code>에 <code class="inline">'multiselect'</code>(체크리스트 패널, 값은 배열)·
-    <code class="inline">'radio'</code>(인라인 라디오 그룹)·<code class="inline">'checkbox'</code>(불리언 체크박스)를
+    <code class="inline">'radio'</code>(인라인 라디오 그룹)·<code class="inline">'checkbox'</code>(체크박스)를
     지정할 수 있고, 각각 짝꿍 렌더러 <code class="inline">DataGrid.renderers.multiselect()</code>(label 칩 목록)·
     <code class="inline">renderers.radio()</code>(value → label)·<code class="inline">renderers.checkbox()</code>(표시 전용 체크박스)가
     있습니다. multiselect는 <code class="inline">editorOptions</code> 순서대로 배열을 커밋하며 내용이 같으면 커밋하지 않습니다.
+    checkbox는 불리언 외에 <code class="inline">editorOptions: { checked: 'Y', unchecked: 'N' }</code> 매핑으로
+    Y/N·0/1 같은 표기도 그대로 저장·표시합니다.
   </p>
   <div class="example-card">
     <div class="example-html">
@@ -2004,7 +2006,8 @@
       var rows = DemoData.makeEmployees(40, 67).map(function (r, i) {
         r.skills = pool.filter(function (_, k) { return (i + k) % 3 !== 0; });  // 시드 고정 조합
         r.level = (i % 3) + 1;
-        r.remote = i % 2 === 0;
+        r.remote = i % 2 === 0;                 // 불리언 표기
+        r.approved = i % 3 === 0 ? 'Y' : 'N';   // 'Y'/'N' 표기 — 매핑으로 그대로 저장
         return r;
       });
 
@@ -2018,9 +2021,13 @@
           { field: 'level', headerName: 'Level (radio)', width: 220,
             editor: 'radio', editorOptions: levelOptions,
             cellRenderer: DataGrid.renderers.radio() },
-          { field: 'remote', headerName: 'Remote (checkbox)', width: 130, align: 'center',
-            editor: 'checkbox',
+          { field: 'remote', headerName: 'Remote', width: 100, align: 'center',
+            editor: 'checkbox',                 // 불리언: true/false로 커밋
             cellRenderer: DataGrid.renderers.checkbox() },
+          { field: 'approved', headerName: 'Approved (Y/N)', width: 130, align: 'center',
+            editor: 'checkbox',
+            editorOptions: { checked: 'Y', unchecked: 'N' },  // 'Y'/'N'으로 커밋
+            cellRenderer: DataGrid.renderers.checkbox() },    // 매핑을 그대로 읽어 표시
         ],
       });
 
