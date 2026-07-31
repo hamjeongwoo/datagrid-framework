@@ -368,6 +368,24 @@
   }
 
   /**
+   * editorOptions에서 value에 해당하는 label을 찾는다 (없으면 null).
+   * 엄격 일치를 먼저 보고, select.value 경유로 문자열화된 값도 매칭한다
+   * (숫자 value 등 — 단 label을 못 찾는 경우에만 완화).
+   */
+  function lookupOptionLabel(options, value) {
+    var list = normalizeEditorOptions(options);
+    var i;
+    for (i = 0; i < list.length; i++) {
+      if (list[i].value === value) return list[i].label;
+    }
+    if (value === null || value === undefined) return null;
+    for (i = 0; i < list.length; i++) {
+      if (String(list[i].value) === String(value)) return list[i].label;
+    }
+    return null;
+  }
+
+  /**
    * 헤더 필터 행(floatingFilter)의 입력값 → 컬럼 필터 모델.
    * - raw가 null/undefined이거나 (set 제외) 공백뿐이면 null(필터 해제).
    * - 이미 적용된 모델의 연산자는 유지하되, 단일 입력으로 표현할 수 없는
@@ -5169,6 +5187,22 @@
         );
       };
     },
+    /**
+     * select 에디터 짝꿍 — 셀에 저장된 value를 editorOptions의 label로 표시.
+     * options를 생략하면 그 컬럼의 editorOptions를 그대로 사용한다.
+     * 목록에 없는 값은 기존 표시(formatted)로 폴백.
+     * Usage: { editor: 'select', editorOptions: [{ label: '한국', value: 'kr' }],
+     *          cellRenderer: DataGrid.renderers.select() }
+     */
+    select: function (options) {
+      return function (params) {
+        var label = lookupOptionLabel(
+          options || (params.colDef && params.colDef.editorOptions), params.value);
+        if (label !== null) return escapeHtml(label);
+        var v = params.formatted;
+        return v === null || v === undefined ? '' : escapeHtml(String(v));
+      };
+    },
   };
 
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
@@ -5190,6 +5224,7 @@
     buildFloatingFilterModel: buildFloatingFilterModel,
     validationMessage: validationMessage,
     normalizeEditorOptions: normalizeEditorOptions,
+    lookupOptionLabel: lookupOptionLabel,
     buildTsv: buildTsv,
     parseTsv: parseTsv,
     aggregateValues: aggregateValues,

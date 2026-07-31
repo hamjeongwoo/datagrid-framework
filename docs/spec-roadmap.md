@@ -177,6 +177,7 @@
 ### v2.2 — select 에디터 label/value (사용자 요청)
 - `editorOptions`가 문자열 배열 외에 `{ label, value }` 객체 배열 지원 — 드롭다운은 label 표시, 커밋은 value(원본 타입 보존). 셀에는 저장된 value가 표시된다.
 - `editor`를 선언한 컬럼은 `editable: true` 생략 가능 — editor 선언 자체가 편집 의도. 명시적 `editable: false`(컬럼 또는 defaultColDef)가 우선.
+- `DataGrid.renderers.select(options?)` — select 에디터 짝꿍 렌더러. 저장된 value를 editorOptions의 label로 표시 (options 생략 시 컬럼 editorOptions 사용, 목록 밖 값은 폴백).
 
 ---
 

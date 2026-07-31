@@ -1753,6 +1753,21 @@ window.ApiDocs = {
           description: '0–100 값을 진행 바와 퍼센트 라벨로 표시합니다(범위 밖 값은 잘림).',
           example: 'cellRenderer: DataGrid.renderers.progress()',
         },
+        {
+          name: 'select',
+          signature: 'DataGrid.renderers.select(options?: Array<string | { label, value }>)',
+          since: '2.2.0',
+          description:
+            'select 에디터의 짝꿍 렌더러 — 셀에 저장된 value를 <code>editorOptions</code>의 ' +
+            '<code>label</code>로 표시합니다. <code>options</code>를 생략하면 그 컬럼의 ' +
+            '<code>editorOptions</code>를 그대로 사용합니다. 표시만 바뀌고 데이터·정렬·필터·내보내기는 ' +
+            '저장된 value 기준입니다. 목록에 없는 값은 원래 표시(포맷 적용값)로 폴백하며, ' +
+            'label은 HTML 이스케이프됩니다.',
+          example:
+            "{ field: 'country', editor: 'select',\n" +
+            "  editorOptions: [{ label: '한국', value: 'kr' }, { label: '일본', value: 'jp' }],\n" +
+            '  cellRenderer: DataGrid.renderers.select() }',
+        },
       ],
     },
 

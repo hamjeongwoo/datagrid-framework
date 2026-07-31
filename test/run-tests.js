@@ -211,6 +211,25 @@ suite('normalizeEditorOptions', function () {
   ], 'falsy primitives (0, empty string) are kept');
 });
 
+suite('lookupOptionLabel', function () {
+  var l = T.lookupOptionLabel;
+  var opts = [{ label: '한국', value: 'kr' }, { label: '일본', value: 'jp' }];
+  assertEq(l(opts, 'kr'), '한국', 'value → label');
+  assertEq(l(opts, 'us'), null, 'unknown value → null');
+  assertEq(l(opts, null), null, 'null value → null');
+  assertEq(l(opts, undefined), null, 'undefined value → null');
+  assertEq(l(undefined, 'kr'), null, 'no options → null');
+  assertEq(l(['kr', 'jp'], 'kr'), 'kr', 'string options: label = value');
+  var nums = [{ label: 'Junior', value: 1 }, { label: 'Senior', value: 3 }];
+  assertEq(l(nums, 1), 'Junior', 'number value strict match');
+  assertEq(l(nums, '3'), 'Senior', 'stringified number matches loosely (via select.value)');
+  var zero = [{ label: '없음', value: 0 }, { label: '빈 값', value: '' }];
+  assertEq(l(zero, 0), '없음', 'falsy value 0 matches');
+  assertEq(l(zero, ''), '빈 값', 'falsy value empty-string matches');
+  assertEq(l([{ label: '영', value: 0 }, { label: '문자영', value: '0' }], '0'),
+    '문자영', 'strict match wins before loose stringified match');
+});
+
 /* ---------------- floating filter model ---------------- */
 suite('buildFloatingFilterModel', function () {
   var f = T.buildFloatingFilterModel;

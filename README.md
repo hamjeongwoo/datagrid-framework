@@ -125,6 +125,7 @@ python demo/server.py
 cellRenderer: DataGrid.renderers.tag({ Active: 'green', Overdue: 'red' })  // 상태 배지
 cellRenderer: DataGrid.renderers.check()      // 불리언 ✓ / –
 cellRenderer: DataGrid.renderers.progress()   // 0–100 진행 바
+cellRenderer: DataGrid.renderers.select()     // 저장된 value를 editorOptions의 label로 표시
 ```
 
 ## API
