@@ -20,7 +20,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '1.2.0',
+  version: '2.0.0',
   updated: '2026-07-31',
 
   sections: [
@@ -343,6 +343,14 @@ window.ApiDocs = {
             '<code>cellRangeChanged</code> 이벤트가 발생합니다.',
         },
         {
+          name: 'showHeader',
+          type: 'boolean',
+          default: 'true',
+          since: '2.0.0',
+          description:
+            '<code>false</code>면 헤더 영역 전체(컬럼 그룹·정렬·필터 UI 포함)를 숨깁니다.',
+        },
+        {
           name: 'pinnedTopRows',
           type: 'object[]',
           since: '2.0.0',
@@ -568,6 +576,14 @@ window.ApiDocs = {
             '  },\n' +
             '  getValue: function () { return Number(this._input.value); },\n' +
             '}',
+        },
+        {
+          name: 'headerAlign',
+          type: "'left' | 'center' | 'right'",
+          since: '2.0.0',
+          description:
+            '헤더 라벨만 셀과 다른 정렬을 지정합니다. 생략 시 <code>align</code>을 따릅니다.',
+          example: "{ field: 'salary', align: 'right', headerAlign: 'center' }",
         },
         {
           name: 'wrapText',
@@ -1356,6 +1372,25 @@ window.ApiDocs = {
             '이벤트 핸들러를 등록합니다. <code>off(eventName, handler)</code>로 해제합니다. ' +
             '이벤트 목록은 <a href="#events">Events</a> 섹션 참고.',
         },
+        {
+          name: 'once',
+          group: 'Events',
+          signature: 'once(eventName: string, handler: (e) => void): Function',
+          since: '2.0.0',
+          description:
+            '첫 발생 후 자동 해제되는 핸들러를 등록합니다. 반환값(wrapper)으로 ' +
+            '<code>off(eventName, wrapper)</code> 조기 해제가 가능합니다.',
+        },
+        {
+          name: 'setEnabled',
+          group: 'Display',
+          signature: 'setEnabled(enabled: boolean): void',
+          since: '2.0.0',
+          description:
+            '그리드 전체 인터랙션을 잠급니다 — 반투명 오버레이가 마우스를 가로막고 키보드 입력도 무시됩니다' +
+            '(저장 요청 중 등 일시적 비활성용). 진행 중 편집은 취소되며 <code>isEnabled()</code>로 상태 조회. ' +
+            '편집만 잠그려면 <code>setEditable(false)</code>를 쓰세요.',
+        },
       ],
     },
 
@@ -1383,6 +1418,14 @@ window.ApiDocs = {
           name: 'cellValueChanged',
           payload: '{ data, colDef, oldValue, newValue }',
           description: '인라인 편집이 커밋되어 값이 실제로 바뀌었을 때. 서버 저장 훅으로 사용하세요.',
+        },
+        {
+          name: 'rowValueChanged',
+          payload: '{ data, changes: { field: { oldValue, newValue } } }',
+          since: '2.0.0',
+          description:
+            '행 단위 변경 묶음 — 인라인 편집 커밋·붙여넣기·채우기 핸들에서 같은 행의 변경이 ' +
+            '하나의 이벤트로 묶입니다(셀별 <code>cellValueChanged</code>는 그대로 함께 발생).',
         },
         {
           name: 'editingStarted',

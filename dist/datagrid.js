@@ -1217,6 +1217,17 @@
   DataGrid.prototype.on = function (name, fn) { this._emitter.on(name, fn); return this; };
   DataGrid.prototype.off = function (name, fn) { this._emitter.off(name, fn); return this; };
 
+  /** 한 번만 실행되는 핸들러. 반환된 wrapper로 off(name, wrapper) 가능. */
+  DataGrid.prototype.once = function (name, fn) {
+    var self = this;
+    var wrapper = function (payload) {
+      self._emitter.off(name, wrapper);
+      fn(payload);
+    };
+    this._emitter.on(name, wrapper);
+    return wrapper;
+  };
+
   /* ---- DOM scaffolding ---- */
 
   DataGrid.prototype._buildDom = function () {
@@ -1226,6 +1237,7 @@
     if (this.options.theme === 'dark') root.classList.add('dg-theme-dark');
     if (this.options.zebra) root.classList.add('dg-zebra');
     if (this.options.domLayout === 'autoHeight') root.classList.add('dg-auto-height');
+    if (this.options.showHeader === false) root.classList.add('dg-no-header');
     root.style.setProperty('--dg-row-height', this._rowHeight + 'px');
     root.style.setProperty('--dg-header-height', this._headerHeight + 'px');
 
@@ -1703,8 +1715,9 @@
       var cell = el('div', 'dg-header-cell', self._headerRowEl);
       cell.setAttribute('role', 'columnheader');
       cell.dataset.colId = col.colId;
-      if (col.align === 'right') cell.classList.add('dg-align-right');
-      if (col.align === 'center') cell.classList.add('dg-align-center');
+      var headerAlign = col.headerAlign || col.align;
+      if (headerAlign === 'right') cell.classList.add('dg-align-right');
+      if (headerAlign === 'center') cell.classList.add('dg-align-center');
       if (col.pinned === 'left') cell.classList.add('dg-pinned-left');
       if (col.pinned === 'right') cell.classList.add('dg-pinned-right');
 
@@ -2837,6 +2850,7 @@
     var target = d.target;
     var cols = this._visibleColumns();
     var updated = 0;
+    var rowChangesMap = []; /* [{row, changes}] — 행 단위 rowValueChanged 묶음 */
 
     for (var c = range.c1; c <= range.c2; c++) {
       var col = cols[c];
@@ -2871,8 +2885,17 @@
         this._emitter.emit('cellValueChanged', {
           data: trow, colDef: col, oldValue: oldValue, newValue: evt.newValue,
         });
+        var entry = null;
+        for (var m = 0; m < rowChangesMap.length; m++) {
+          if (rowChangesMap[m].row === trow) { entry = rowChangesMap[m]; break; }
+        }
+        if (!entry) { entry = { row: trow, changes: {} }; rowChangesMap.push(entry); }
+        entry.changes[col.field] = { oldValue: oldValue, newValue: evt.newValue };
       }
     }
+    rowChangesMap.forEach(function (en) {
+      self._emitter.emit('rowValueChanged', { data: en.row, changes: en.changes });
+    });
 
     /* 범위를 채운 영역까지 확장하고 다시 그린다 */
     this._cellRange = {
@@ -3030,6 +3053,7 @@
   };
 
   DataGrid.prototype._onKeyDown = function (e) {
+    if (this._enabled === false) return; /* setEnabled(false) — 입력 잠금 */
     if (this._editing) return; /* editor handles its own keys */
 
     if (this._focusedCell) {
@@ -3346,6 +3370,9 @@
           self._emitter.emit('cellValueChanged', {
             data: row, colDef: col, oldValue: value, newValue: evt.newValue,
           });
+          var rowChanges = {};
+          rowChanges[col.field] = { oldValue: value, newValue: evt.newValue };
+          self._emitter.emit('rowValueChanged', { data: row, changes: rowChanges });
         }
       }
       finished = true;
@@ -3561,6 +3588,7 @@
     matrix.forEach(function (cells, i) {
       var row = self._pageRows[startR + i];
       if (!row || row.__group || row.__detail) return;
+      var rowChanges = null;
       cells.forEach(function (raw, j) {
         var col = cols[startC + j];
         if (!col || !col.editable || col.field === undefined) return;
@@ -3592,7 +3620,10 @@
         self._emitter.emit('cellValueChanged', {
           data: row, colDef: col, oldValue: oldValue, newValue: evt.newValue,
         });
+        if (!rowChanges) rowChanges = {};
+        rowChanges[col.field] = { oldValue: oldValue, newValue: evt.newValue };
       });
+      if (rowChanges) self._emitter.emit('rowValueChanged', { data: row, changes: rowChanges });
     });
 
     if (updated > 0) this.refresh();
@@ -3951,6 +3982,18 @@
   DataGrid.prototype.setTheme = function (theme) {
     this._rootEl.classList.toggle('dg-theme-dark', theme === 'dark');
   };
+
+  /**
+   * 그리드 전체 인터랙션을 잠근다/푼다. 잠그면 반투명 오버레이가 마우스를
+   * 가로막고 키보드 입력도 무시된다 (저장 중 등 일시적 비활성용).
+   */
+  DataGrid.prototype.setEnabled = function (enabled) {
+    this._enabled = enabled !== false;
+    if (!this._enabled) this._cancelEdit();
+    this._rootEl.classList.toggle('dg-disabled', !this._enabled);
+  };
+
+  DataGrid.prototype.isEnabled = function () { return this._enabled !== false; };
 
   /* ---- change tracking (trackChanges) + undo/redo ---- */
 
@@ -4352,7 +4395,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '1.2.0';
+  DataGrid.version = '2.0.0';
 
   /* Internals exposed for headless unit tests (not part of the public API). */
   DataGrid._test = {

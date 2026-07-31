@@ -335,6 +335,19 @@
   background: var(--dg-background-color);
 }
 
+/* setEnabled(false) — 전체 인터랙션 잠금 오버레이 */
+.dg-root.dg-disabled::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  background: color-mix(in srgb, var(--dg-background-color) 55%, transparent);
+  cursor: not-allowed;
+}
+
+/* showHeader: false — 헤더 영역 전체 숨김 */
+.dg-root.dg-no-header .dg-header { display: none; }
+
 /* domLayout: 'autoHeight' — 그리드가 내용 높이에 맞춰 늘어난다 (세로 가상화 없음) */
 .dg-root.dg-auto-height { height: auto; }
 .dg-root.dg-auto-height .dg-body {

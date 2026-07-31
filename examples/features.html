@@ -1572,6 +1572,86 @@
     </script>
   </div>
 
+  <!-- ======================================================== once · setEnabled · headerAlign · showHeader · rowValueChanged -->
+  <h2 class="section">Utility Options &amp; Events (v2.0)</h2>
+  <p class="section-desc">
+    <code class="inline">once(event, fn)</code>(1회 핸들러) ·
+    <code class="inline">setEnabled(bool)</code>(전체 인터랙션 잠금 오버레이) ·
+    <code class="inline">column.headerAlign</code>(헤더만 다른 정렬) ·
+    <code class="inline">showHeader: false</code>(헤더 숨김) ·
+    <code class="inline">rowValueChanged</code>(행 단위 변경 묶음 — 편집·붙여넣기·채우기 공통) 모음입니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn" id="enBtn" type="button">setEnabled 토글 (저장 중 흉내)</button>
+        <button class="tb-btn" id="onceBtn" type="button">once('sortChanged') 등록</button>
+      </div>
+      <div id="gridUtil" class="grid-wrap-sm"></div>
+      <div class="status-line" id="utilStatus">
+        Salary 헤더는 headerAlign: 'center' — 셀은 오른쪽 정렬이지만 헤더만 가운데입니다.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridUtil'), {
+        rowData: DemoData.makeEmployees(25, 97),
+        columnDefs: [
+          { field: 'name', headerName: 'Name', width: 160, editable: true },
+          { field: 'department', headerName: 'Department', width: 150, editable: true },
+          { field: 'salary', headerName: 'Salary (headerAlign)', dataType: 'number', format: '$#,##0',
+            width: 170, editable: true, headerAlign: 'center' },
+        ],
+      });
+
+      var status = document.getElementById('utilStatus');
+
+      grid.on('rowValueChanged', function (e) {
+        var fields = Object.keys(e.changes).join(', ');
+        status.textContent = 'rowValueChanged: ' + e.data.name + ' — 변경 필드 [' + fields + ']';
+      });
+
+      document.getElementById('enBtn').addEventListener('click', function () {
+        var next = !grid.isEnabled();
+        grid.setEnabled(next);
+        status.textContent = next
+          ? 'setEnabled(true) — 인터랙션이 다시 활성화되었습니다.'
+          : 'setEnabled(false) — 오버레이가 클릭·키보드를 모두 막습니다.';
+      });
+
+      document.getElementById('onceBtn').addEventListener('click', function () {
+        grid.once('sortChanged', function (e) {
+          status.textContent = 'once: 이 메시지는 첫 정렬에서만 나옵니다 — ' + JSON.stringify(e.sortModel);
+        });
+        status.textContent = 'once 핸들러 등록됨 — 헤더를 두 번 클릭해 보세요 (한 번만 반응).';
+      });
+    </script>
+  </div>
+
+  <!-- ======================================================== showHeader: false -->
+  <h2 class="section">Headerless Grid (showHeader)</h2>
+  <p class="section-desc">
+    <code class="inline">showHeader: false</code>는 헤더 영역 전체(정렬·필터 UI 포함)를 숨깁니다 —
+    읽기 전용 리스트나 커스텀 헤더를 직접 만들 때 사용합니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div id="gridNoHeader" class="grid-wrap-sm"></div>
+      <div class="status-line">헤더 없이 본문만 렌더링된 그리드입니다.</div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridNoHeader'), {
+        rowData: DemoData.makeEmployees(30, 101),
+        showHeader: false,
+        zebra: true,
+        columnDefs: [
+          { field: 'name', headerName: 'Name', flex: 1 },
+          { field: 'department', headerName: 'Department', flex: 1 },
+          { field: 'salary', headerName: 'Salary', dataType: 'number', format: '$#,##0', width: 130 },
+        ],
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

@@ -71,7 +71,7 @@
 | [x] | 커스텀 에디터 (`column > editor` 함수형: init/getData) | `editor: { init(cell, value, row, col), getValue(), destroy() }` 객체 지원 — validator·beforeCellSave 동일 적용 — v1.2.0 | **P2** |
 | [x] | **`trackModel` + `getChanges() · isDirty() · commit() · rollback()`** (변경 추적) | `trackChanges: true` 옵션 + `getChanges()` (added/updated/deleted) / `commitChanges()` / `rollbackChanges()` + dirty 셀·추가 행 표시 — v1.2.0 | **P2** |
 | [x] | `historyModel` + `history({method:'undo'\|'redo'})` | `undoRedo: true` 옵션 + `undo()` / `redo()` / `canUndo()/canRedo()` + Ctrl+Z/Y — v1.2.0 | **P2** (변경 추적 위에) |
-| [ ] | `change` 이벤트 (행 단위 변경 묶음) | `rowValueChanged` | P3 |
+| [x] | `change` 이벤트 (행 단위 변경 묶음) | `rowValueChanged` — 편집·붙여넣기·채우기 공통, payload `{ data, changes }` — v2.0.0 | P3 |
 
 ### 2.3 클립보드 · 내보내기 · 상태
 
@@ -95,7 +95,7 @@
 | [x] | `editable` (그리드 레벨 on/off) | `editable: false` 옵션 — 컬럼 설정 무시하고 잠금 + `setEditable(bool)` / `isEditable()` — v1.1.0 | **P1** (쉬움) |
 | [x] | `column > nodrag/nodrop` | `column.suppressMove` — 드래그 이동 제외 — v1.2.0 | **P2** |
 | [x] | `rowInit` (행별 클래스/속성) | `getRowClass(row, index) => string` 옵션 — v1.2.0 | **P2** |
-| [ ] | `column > halign` (헤더만 다른 정렬) | `headerAlign` | P3 |
+| [x] | `column > halign` (헤더만 다른 정렬) | `column.headerAlign: 'left'\|'center'\|'right'` — v2.0.0 | P3 |
 | [x] | `hwrap/wrap` (셀 줄바꿈 + 행 높이 자동) | `column.wrapText` + `autoRowHeight: true` — 텍스트 폭 측정 기반 가변 높이 가상화 — v2.0.0 | P3 |
 | [x] | `freezeRows` (상단 행 고정) | `pinnedTopRows: [rows]` + `setPinnedTopRows()` — 표시 전용 고정 행 — v2.0.0 | P3 |
 | [x] | `virtualX` (컬럼 가상화) | `virtualX: true` — 가시 컬럼 + 버퍼만 렌더, 창 밖은 스페이서 (computeColumnWindow) — v2.0.0 | P3 |
@@ -111,9 +111,9 @@
 | [x] | `cellRightClick / rowRightClick / headerCellClick` | `cellContextMenu` / `headerClicked` 이벤트 (컨텍스트 메뉴는 소비자 구현) — v1.2.0 | **P2** |
 | [x] | `cellKeyDown` | `cellKeyDown` 이벤트 (payload에 `originalEvent`) — v1.2.0 | **P2** |
 | [x] | `cellDblClick` | `cellDoubleClicked` 이벤트 (payload: data/colDef/value/rowIndex) — v1.1.0 | **P1** (쉬움) |
-| [ ] | `swipeModel` (모바일 킨네틱 스크롤) | 터치 스크롤은 네이티브로 충분 — 필요 시 재검토 | P3 |
+| [x] | `swipeModel` (모바일 킨네틱 스크롤) | 도입하지 않기로 확정 — 터치 스크롤은 네이티브로 충분 (v2.0.0 검토 종결) | P3 |
 | [x] | `autofill / fillHandle` (엑셀식 채우기 핸들, 패턴 인식) | `fillHandle: true` (cellSelection 필요) — 세로 드래그, 숫자 등차 외삽/패턴 반복, `fillApplied` — v2.0.0 | P3 |
-| [ ] | `hoverMode` (`cell` 호버) | 현재 row 호버로 충분 | P3 |
+| [x] | `hoverMode` (`cell` 호버) | 도입하지 않기로 확정 — row 호버로 충분 (v2.0.0 검토 종결) | P3 |
 
 ### 2.6 라이프사이클 · 렌더링 제어
 
@@ -123,8 +123,8 @@
 | [x] | **취소 가능한 before 이벤트 패턴** (`beforeSort · beforeTableView · beforeCheck …`) | `e.cancel = true` 규약 — `beforeSort` / `beforeSelectionChange` / `beforeCellSave` 도입(v1.1.0). `beforeExport`는 §2.3 P2에서 | **P1** |
 | [x] | `refreshCell() / refreshRow() / refreshColumn()` (부분 갱신) | 동일 이름 — 렌더된 DOM만 제자리 갱신, boolean 반환 — v1.2.0 | **P2** |
 | [x] | `option(name, value)` (런타임 옵션 변경) | `setOptions({ ... })` — 재생성 없이 주요 옵션 갱신 (pagination 패널 생성/제거 포함) — v1.2.0 | **P2** |
-| [ ] | `one(event, fn)` | `once(event, fn)` | P3 |
-| [ ] | `disable() / enable()` | `setEnabled(bool)` — 전체 인터랙션 잠금 오버레이 | P3 |
+| [x] | `one(event, fn)` | `once(event, fn)` — wrapper 반환으로 조기 해제 가능 — v2.0.0 | P3 |
+| [x] | `disable() / enable()` | `setEnabled(bool)` / `isEnabled()` — 오버레이 + 키보드 잠금 — v2.0.0 | P3 |
 | [x] | `reset({filter, group, sort})` | `resetState({ filter, sort, group, columns, page })` 통합 리셋 (인자 없으면 전체) — v1.1.0 | **P1** (쉬움) |
 
 ### 2.7 툴바 · 표시 요소
@@ -134,7 +134,7 @@
 | [x] | `title / showTitle` | `title: '직원 목록'` 옵션 — 그리드 상단 타이틀 바 (setOptions로 변경) — v1.2.0 | **P2** |
 | [x] | `toolbar / showToolbar / refreshToolbar` | `toolbar: HTMLElement \| (grid) => HTMLElement` 슬롯 — 소비자 DOM 주입 방식 — v1.2.0 | **P2** |
 | [x] | `filterModel`의 **헤더 필터 행** (`header: true`, 컬럼 아래 인라인 필터 입력) | `floatingFilter: true` — 헤더 아래 필터 행, 메뉴와 필터 모델 공유 (text/number 입력 + set 드롭다운) — v1.1.0 | **P1** |
-| [ ] | `showHeader / showTop / showBottom` | `showHeader: false` 정도만 | P3 |
+| [x] | `showHeader / showTop / showBottom` | `showHeader: false` — 헤더 영역 숨김 — v2.0.0 | P3 |
 
 ---
 

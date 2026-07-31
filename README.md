@@ -80,6 +80,7 @@ python demo/server.py
 | `pinnedTopRows` | array | 헤더 아래 고정 행 (표시 전용, `setPinnedTopRows`) |
 | `autoRowHeight` | boolean | `wrapText` 컬럼 기준 행 높이 자동 계산 |
 | `domLayout` | `'normal'` \| `'autoHeight'` | 내용 높이에 맞춘 그리드 (세로 가상화 없음) |
+| `showHeader` | boolean | `false`면 헤더 영역 숨김 |
 | `columnGroups` | array | 2단 컬럼 그룹 헤더 `[{ headerName, children }]` |
 | `dataSource` | object | 원격 데이터 `{ url, method, params, parse }` (`reloadData()`로 재요청) |
 | `rowDetail` | object | 마스터-디테일 `{ renderer(row), height }` (`expandRow`/`collapseRow`/`toggleRowDetail`) |
@@ -110,7 +111,7 @@ python demo/server.py
 | `valueFormatter(value, row)` | 표시 문자열 (기본 HTML 이스케이프) |
 | `cellRenderer(params)` | HTML/Node 반환 커스텀 렌더러 |
 | `cellClass` | string 또는 `fn(value, row)` |
-| `align` | `'left'` \| `'center'` \| `'right'` |
+| `align` / `headerAlign` | `'left'` \| `'center'` \| `'right'` (헤더만 다른 정렬 가능) |
 | `pinned` | `'left'` \| `'right'` 고정 컬럼 |
 | `checkboxSelection` / `headerCheckboxSelection` | 선택 체크박스 / 헤더 전체 선택 |
 | `resizable` (기본 true) | 드래그 크기 조절, 더블클릭 자동 맞춤 |
@@ -140,13 +141,15 @@ cellRenderer: DataGrid.renderers.progress()   // 0–100 진행 바
 `getCsv()` / `exportCsv(filename)` / `exportExcel(filename, sheetName)` / `getJson()` ·
 `showLoadingOverlay()` / `hideLoadingOverlay()` ·
 `setTheme('light'|'dark')` · `refresh()` · `refreshCell(row, field)` / `refreshRow(row)` / `refreshColumn(colId)` ·
-`setOptions(patch)` · `expandRow(row)` / `collapseRow(row)` / `toggleRowDetail(row)` · `reloadData()` · `destroy()`
+`setOptions(patch)` · `expandRow(row)` / `collapseRow(row)` / `toggleRowDetail(row)` · `reloadData()` ·
+`setPinnedTopRows(rows)` · `setEnabled(bool)` / `isEnabled()` · `once(event, fn)` · `destroy()`
 
 ## 이벤트
 
 ```js
 grid.on('selectionChanged', function (e) { e.selectedRows });
 grid.on('cellValueChanged', function (e) { e.data, e.colDef, e.oldValue, e.newValue });
+grid.on('rowValueChanged', function (e) { e.data, e.changes /* 행 단위 변경 묶음 */ });
 grid.on('sortChanged' | 'filterChanged' | 'paginationChanged' | 'groupChanged' |
         'groupToggled' | 'editingStarted' | 'editingStopped' | 'rowClicked' |
         'rowDoubleClicked' | 'cellClicked' | 'cellDoubleClicked' | 'columnResized' |
