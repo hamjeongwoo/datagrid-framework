@@ -497,7 +497,12 @@
     this._rootEl.addEventListener('keydown', function (e) { self._onKeyDown(e); });
 
     var closeMenus = function (e) {
-      if (self._menuEl && !self._menuEl.contains(e.target)) self._closeMenu();
+      if (!self._menuEl || self._menuEl.contains(e.target)) return;
+      /* 메뉴를 연 컬럼의 메뉴 버튼 위 mousedown은 여기서 닫지 않는다 —
+       * 닫아버리면 이어지는 click에서 다시 열려 토글이 불가능해진다. */
+      var btn = e.target.closest ? e.target.closest('.dg-header-menu-btn') : null;
+      if (btn && self._menuHeaderCell && self._menuHeaderCell.contains(btn)) return;
+      self._closeMenu();
     };
     document.addEventListener('mousedown', closeMenus);
     this._docListeners.push(['mousedown', closeMenus]);
@@ -641,6 +646,11 @@
         menuBtn.setAttribute('aria-label', col.headerName + ' filter menu');
         menuBtn.addEventListener('click', function (e) {
           e.stopPropagation();
+          /* 같은 컬럼 메뉴가 이미 열려 있으면 토글로 닫는다 */
+          if (self._menuHeaderCell === cell) {
+            self._closeMenu();
+            return;
+          }
           self._openFilterMenu(col, cell);
         });
       }

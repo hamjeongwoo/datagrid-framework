@@ -112,7 +112,8 @@
 1. **팝업/오버레이 토큰 상속 (BUG-001)**: `.dg-root` 밖에 렌더링될 수 있는 요소는 ① 루트 안에 append + ② CSS 토큰 블록 셀렉터에 추가 + ③ 다크 오버라이드에 후손 셀렉터 추가, 세 가지 세트로. 직접 선언된 토큰이 상속보다 우선하는 것에 특히 주의.
 2. **가상 행 레이아웃**: 스크롤 중 생성되는 행 셀은 `_buildRowEl` 안에서 `_applyCellLayout`을 거쳐야 폭이 적용된다.
 3. **데모 데이터 결정성**: `demo/data.js`는 시드 PRNG — 검증 스크립트가 특정 값에 의존해도 안전. `Math.random` 추가 금지.
-4. Windows 환경: PowerShell 5.1 (`&&` 없음), git 커밋 메시지는 here-string(`@'...'@`) 사용.
+4. Windows 환경: PowerShell 5.1 (`&&` 없음), git 커밋 메시지는 here-string(`@'...'@`) 사용. here-string 파싱이 깨지면 스크래치패드에 메시지 파일을 쓰고 `git commit -F <파일>`로 우회.
+5. **버튼으로 여는 팝업의 토글 (BUG-002)**: ① 같은 버튼 재클릭 = 닫기 분기, ② 바깥클릭(mousedown) 핸들러에서 그 버튼 제외 — 두 가지를 세트로. 빠지면 mousedown이 닫고 click이 재오픈해서 토글이 침묵 실패한다. 팝업 검증은 열기·재클릭 토글·다른 트리거 전환·바깥 클릭을 실제 이벤트 시퀀스(mousedown→mouseup→click)로 할 것 — `element.click()`만으론 mousedown 단계가 재현 안 됨.
 
 ## 버전 정책
 
