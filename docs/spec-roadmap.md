@@ -96,10 +96,10 @@
 | [x] | `column > nodrag/nodrop` | `column.suppressMove` — 드래그 이동 제외 — v1.2.0 | **P2** |
 | [x] | `rowInit` (행별 클래스/속성) | `getRowClass(row, index) => string` 옵션 — v1.2.0 | **P2** |
 | [ ] | `column > halign` (헤더만 다른 정렬) | `headerAlign` | P3 |
-| [ ] | `hwrap/wrap` (셀 줄바꿈 + 행 높이 자동) | `wrapText` + `autoRowHeight` | P3 |
-| [ ] | `freezeRows` (상단 행 고정) | `pinnedTopRows` | P3 |
+| [x] | `hwrap/wrap` (셀 줄바꿈 + 행 높이 자동) | `column.wrapText` + `autoRowHeight: true` — 텍스트 폭 측정 기반 가변 높이 가상화 — v2.0.0 | P3 |
+| [x] | `freezeRows` (상단 행 고정) | `pinnedTopRows: [rows]` + `setPinnedTopRows()` — 표시 전용 고정 행 — v2.0.0 | P3 |
 | [x] | `virtualX` (컬럼 가상화) | `virtualX: true` — 가시 컬럼 + 버퍼만 렌더, 창 밖은 스페이서 (computeColumnWindow) — v2.0.0 | P3 |
-| [ ] | `flexHeight/flexWidth` (콘텐츠 크기에 맞춘 그리드) | `domLayout: 'autoHeight'` | P3 |
+| [x] | `flexHeight/flexWidth` (콘텐츠 크기에 맞춘 그리드) | `domLayout: 'autoHeight'` — 내용 높이만큼 확장 (세로 가상화 비활성, 소량 데이터용) — v2.0.0 | P3 |
 
 ### 2.5 선택 · 탐색 · 상호작용
 

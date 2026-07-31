@@ -77,6 +77,9 @@ python demo/server.py
 | `fillHandle` | boolean | 엑셀식 채우기 핸들 (숫자 등차 외삽 / 패턴 반복) |
 | `mergeCells` | array | 연속 동일 값 세로 병합 표시 `['field'...]` |
 | `virtualX` | boolean | 컬럼 가상화 — 보이는 컬럼만 렌더링 (수백 컬럼용) |
+| `pinnedTopRows` | array | 헤더 아래 고정 행 (표시 전용, `setPinnedTopRows`) |
+| `autoRowHeight` | boolean | `wrapText` 컬럼 기준 행 높이 자동 계산 |
+| `domLayout` | `'normal'` \| `'autoHeight'` | 내용 높이에 맞춘 그리드 (세로 가상화 없음) |
 | `columnGroups` | array | 2단 컬럼 그룹 헤더 `[{ headerName, children }]` |
 | `dataSource` | object | 원격 데이터 `{ url, method, params, parse }` (`reloadData()`로 재요청) |
 | `rowDetail` | object | 마스터-디테일 `{ renderer(row), height }` (`expandRow`/`collapseRow`/`toggleRowDetail`) |
@@ -101,6 +104,7 @@ python demo/server.py
 | `validator(value, row)` | `true` 또는 오류 메시지 반환 — 거부 시 커밋 차단 + 빨간 표시 |
 | `suppressCopy` | 클립보드 복사에서 제외 (CSV에는 영향 없음) |
 | `exportFormatter(value, row)` | CSV/Excel 내보내기 전용 포맷 (화면과 분리) |
+| `wrapText` | 셀 줄바꿈 (`autoRowHeight`와 함께 행 높이 자동) |
 | `valueGetter(row)` | 파생 값 계산 — 정렬·필터·내보내기에도 반영 |
 | `suppressMove` | 드래그 순서 변경에서 제외 |
 | `valueFormatter(value, row)` | 표시 문자열 (기본 HTML 이스케이프) |

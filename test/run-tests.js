@@ -546,6 +546,36 @@ suite('buildGroupHeaderRuns', function () {
   assertEq(T.buildGroupHeaderRuns([], groups), [], 'no columns → empty');
 });
 
+/* ---------------- computeAutoHeights / computeTopsFromHeights ---------------- */
+suite('computeAutoHeights', function () {
+  var measure = function (text) { return text.length * 10; }; /* 글자당 10px 가짜 측정기 */
+  var wrapCols = [{ field: 'memo', width: 132 }]; /* 가용폭 100px → 10글자/줄 */
+
+  var h = T.computeAutoHeights(
+    [{ memo: 'short' }, { memo: 'this is a much longer memo text' }, { memo: null }],
+    wrapCols, measure, 40, 20
+  );
+  assertEq(h[0], 40, 'single line keeps base height');
+  /* 31글자 → 310px / 100px = 4줄 → 4*20+12 = 92 */
+  assertEq(h[1], 92, 'long text grows row height');
+  assertEq(h[2], 40, 'null value → base height');
+
+  var h2 = T.computeAutoHeights([{ memo: 'ab\ncd' }], wrapCols, measure, 40, 20);
+  assertEq(h2[0], 52, 'explicit newlines counted (2 lines → 2*20+12)');
+
+  var h3 = T.computeAutoHeights([{ __group: true }, { __detail: true }], wrapCols, measure, 40, 20);
+  assertEq(h3, [40, 40], 'group/detail items keep base height');
+
+  var fmt = [{ field: 'v', width: 132, valueFormatter: function (v) { return v + '!!!!!!!!!!!!!!!'; } }];
+  var h4 = T.computeAutoHeights([{ v: 'x' }], fmt, measure, 40, 20);
+  assertEq(h4[0], 52, 'formatter output measured (16 chars → 2 lines)');
+
+  var layout = T.computeTopsFromHeights([40, 92, 40]);
+  assertEq(layout.tops, [0, 40, 132], 'tops from heights');
+  assertEq(layout.total, 172, 'total from heights');
+  assertEq(T.computeTopsFromHeights([]), { tops: [], total: 0 }, 'empty heights');
+});
+
 /* ---------------- computeColumnWindow ---------------- */
 suite('computeColumnWindow', function () {
   var W = T.computeColumnWindow;

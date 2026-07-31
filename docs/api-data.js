@@ -343,6 +343,36 @@ window.ApiDocs = {
             '<code>cellRangeChanged</code> 이벤트가 발생합니다.',
         },
         {
+          name: 'pinnedTopRows',
+          type: 'object[]',
+          since: '2.0.0',
+          description:
+            '헤더 아래에 스크롤과 무관하게 고정되는 행(요약·평균 등 표시 전용 — 정렬·필터·선택·편집 대상 아님). ' +
+            '<code>valueFormatter</code>/<code>cellRenderer</code>는 동일하게 적용되고 가로 스크롤·컬럼 폭과 ' +
+            '동기화됩니다. 런타임에는 <code>setPinnedTopRows(rows)</code> / <code>getPinnedTopRows()</code>.',
+          example: "pinnedTopRows: [{ name: '― 평균', salary: 61200 }]",
+        },
+        {
+          name: 'autoRowHeight',
+          type: 'boolean',
+          default: 'false',
+          since: '2.0.0',
+          description:
+            '<code>wrapText</code> 컬럼의 텍스트 폭을 측정해 행 높이를 내용에 맞춰 계산합니다' +
+            '(명시적 <code>\\n</code> 포함, 가변 높이 가상 스크롤에 정확히 반영). ' +
+            '컬럼 리사이즈 직후에는 다음 <code>refresh()</code>에서 높이가 재계산됩니다.',
+        },
+        {
+          name: 'domLayout',
+          type: "'normal' | 'autoHeight'",
+          default: "'normal'",
+          since: '2.0.0',
+          description:
+            '<code>\'autoHeight\'</code>면 컨테이너 높이 대신 내용 높이만큼 그리드가 늘어납니다 — ' +
+            '컨테이너에 높이를 지정할 필요가 없어지는 대신 <strong>세로 가상화가 비활성</strong>화되므로 ' +
+            '소량 데이터(수십~수백 행) 전용입니다.',
+        },
+        {
           name: 'virtualX',
           type: 'boolean',
           default: 'false',
@@ -538,6 +568,16 @@ window.ApiDocs = {
             '  },\n' +
             '  getValue: function () { return Number(this._input.value); },\n' +
             '}',
+        },
+        {
+          name: 'wrapText',
+          type: 'boolean',
+          default: 'false',
+          since: '2.0.0',
+          description:
+            '셀 텍스트를 줄바꿈해 표시합니다. 행 높이가 내용에 맞게 늘어나려면 그리드 옵션 ' +
+            '<a href="#grid-options-autoRowHeight"><code>autoRowHeight: true</code></a>를 함께 켜세요' +
+            '(없으면 고정 행 높이 안에서 줄바꿈되어 잘립니다).',
         },
         {
           name: 'exportFormatter',

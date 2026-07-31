@@ -463,6 +463,44 @@
     return { tops: tops, total: top, ordinals: ordinals };
   }
 
+  /**
+   * autoRowHeight: 줄바꿈(wrapText) 컬럼의 텍스트 폭을 재서 행별 높이를 추정한다.
+   * measure(text)는 픽셀 폭을 반환하는 주입 함수(브라우저에선 canvas measureText).
+   * 명시적 개행(\n)도 줄 수에 반영하며, 결과는 baseHeight 이상이다.
+   */
+  function computeAutoHeights(rows, wrapCols, measure, baseHeight, lineHeight) {
+    return rows.map(function (row) {
+      if (!row || row.__group || row.__detail) return baseHeight;
+      var maxLines = 1;
+      for (var i = 0; i < wrapCols.length; i++) {
+        var c = wrapCols[i];
+        var v = row[c.field];
+        if (c.valueFormatter) {
+          try { v = c.valueFormatter(v, row); } catch (e) { /* 원시 값으로 폴백 */ }
+        }
+        if (v === null || v === undefined || v === '') continue;
+        var avail = Math.max(20, c.width - 32); /* 좌우 패딩 제외 */
+        var lines = 0;
+        String(v).split('\n').forEach(function (part) {
+          lines += Math.max(1, Math.ceil(measure(part) / avail));
+        });
+        if (lines > maxLines) maxLines = lines;
+      }
+      return Math.max(baseHeight, maxLines * lineHeight + 12);
+    });
+  }
+
+  /** 행별 높이 배열 → { tops, total } (가변 높이 가상화용). */
+  function computeTopsFromHeights(heights) {
+    var tops = [];
+    var top = 0;
+    for (var i = 0; i < heights.length; i++) {
+      tops.push(top);
+      top += heights[i];
+    }
+    return { tops: tops, total: top };
+  }
+
   /** tops(오름차순)에서 y 오프셋이 속한 행 인덱스(top <= y인 마지막 인덱스). */
   function findRowAtOffset(tops, y) {
     if (tops.length === 0) return 0;
@@ -1095,6 +1133,8 @@
     this._groupDefaultExpanded = options.groupDefaultExpanded !== false;
     this._groupToggled = {}; /* path -> expanded override */
 
+    this._pinnedTopRows = (options.pinnedTopRows || []).slice();
+
     /* interaction state */
     this._sortModel = options.sortModel ? options.sortModel.slice() : [];
     this._filterModel = {};
@@ -1185,6 +1225,7 @@
     root.setAttribute('role', 'grid');
     if (this.options.theme === 'dark') root.classList.add('dg-theme-dark');
     if (this.options.zebra) root.classList.add('dg-zebra');
+    if (this.options.domLayout === 'autoHeight') root.classList.add('dg-auto-height');
     root.style.setProperty('--dg-row-height', this._rowHeight + 'px');
     root.style.setProperty('--dg-header-height', this._headerHeight + 'px');
 
@@ -1199,6 +1240,9 @@
 
     this._headerEl = el('div', 'dg-header', root);
     this._headerRowEl = el('div', 'dg-header-row', this._headerEl);
+
+    this._pinnedTopEl = el('div', 'dg-pinned-top', root);
+    this._pinnedTopEl.hidden = true;
 
     this._bodyEl = el('div', 'dg-body', root);
     this._canvasEl = el('div', 'dg-canvas', this._bodyEl);
@@ -1235,6 +1279,7 @@
     this._bodyEl.addEventListener('scroll', function () {
       self._headerEl.scrollLeft = self._bodyEl.scrollLeft;
       self._footerEl.scrollLeft = self._bodyEl.scrollLeft;
+      self._pinnedTopEl.scrollLeft = self._bodyEl.scrollLeft;
       if (self.options.virtualX && self._updateColWindow()) {
         self._renderBody(); /* 컬럼 창이 바뀌면 행 셀을 새 창으로 재구성 */
       } else {
@@ -1410,11 +1455,12 @@
       this._pageRows = display;
     }
 
-    /* 마스터-디테일: 펼쳐진 행 뒤에 디테일 항목을 끼우고 세로 레이아웃을 계산 */
+    /* 가변 세로 레이아웃: 마스터-디테일 삽입 + (autoRowHeight) 행별 높이 추정 */
     this._rowTops = null;
     this._pageOrdinals = null;
+    this._rowHeights = null;
+    var self2 = this;
     if (this.options.rowDetail) {
-      var self2 = this;
       var withDetails = [];
       this._pageRows.forEach(function (row) {
         withDetails.push(row);
@@ -1423,13 +1469,60 @@
         }
       });
       this._pageRows = withDetails;
-      var layout = computeRowTops(withDetails, this._rowHeight, this._detailHeight());
+    }
+    var wrapCols = [];
+    if (this.options.autoRowHeight) {
+      this._visibleColumns().forEach(function (c) {
+        if (c.wrapText && c.field !== undefined) {
+          wrapCols.push({
+            field: c.field,
+            valueFormatter: c.valueFormatter,
+            width: (self2._computedWidths && self2._computedWidths[c.colId]) || c.width,
+          });
+        }
+      });
+    }
+    if (this.options.rowDetail || wrapCols.length > 0) {
+      var detailH = this._detailHeight();
+      var heights;
+      if (wrapCols.length > 0) {
+        heights = computeAutoHeights(
+          this._pageRows, wrapCols, this._textMeasurer(), this._rowHeight, this._lineHeight()
+        );
+        for (var hi = 0; hi < heights.length; hi++) {
+          if (this._pageRows[hi] && this._pageRows[hi].__detail) heights[hi] = detailH;
+        }
+      } else {
+        heights = this._pageRows.map(function (it) {
+          return it && it.__detail ? detailH : self2._rowHeight;
+        });
+      }
+      this._rowHeights = heights;
+      var layout = computeTopsFromHeights(heights);
       this._rowTops = layout.tops;
-      this._pageOrdinals = layout.ordinals;
       this._totalRowsHeight = layout.total;
+      var ordinal = 0;
+      this._pageOrdinals = this._pageRows.map(function (it) {
+        var o = ordinal;
+        if (!it || !it.__detail) ordinal++;
+        return o;
+      });
     }
 
     this._computeMergeMap();
+  };
+
+  /** 루트 폰트 기준 텍스트 폭 측정 함수 (autoRowHeight용). */
+  DataGrid.prototype._textMeasurer = function () {
+    var canvas = this._measureCanvas || (this._measureCanvas = document.createElement('canvas'));
+    var ctx = canvas.getContext('2d');
+    var style = getComputedStyle(this._rootEl);
+    ctx.font = style.fontSize + ' ' + style.fontFamily;
+    return function (text) { return ctx.measureText(text).width; };
+  };
+
+  DataGrid.prototype._lineHeight = function () {
+    return Math.round((parseFloat(getComputedStyle(this._rootEl).fontSize) || 14) * 1.45);
   };
 
   DataGrid.prototype._computeMergeMap = function () {
@@ -1460,6 +1553,7 @@
     this._renderHeader();
     this._layoutColumns();
     this._renderBody();
+    this._renderPinnedTop();
     this._renderGrandTotal();
     this._renderPaging();
     this._updateOverlay();
@@ -1882,6 +1976,15 @@
     for (var fColId in this._footerCells) {
       this._applyCellLayout(this._footerCells[fColId], fColId);
     }
+    /* apply to pinned top rows */
+    if (this._pinnedTopEl && !this._pinnedTopEl.hidden) {
+      for (var pt = 0; pt < this._pinnedTopEl.children.length; pt++) {
+        var ptRow = this._pinnedTopEl.children[pt];
+        for (var pc = 0; pc < ptRow.children.length; pc++) {
+          this._applyCellLayout(ptRow.children[pc], ptRow.children[pc].dataset.colId);
+        }
+      }
+    }
     /* apply to rendered rows */
     for (var idx in this._renderedRows) {
       var rowEl = this._renderedRows[idx];
@@ -1982,6 +2085,7 @@
     var rowEl = el('div', 'dg-row');
     rowEl.setAttribute('role', 'row');
     rowEl.style.top = this._rowTop(pageIndex) + 'px';
+    if (this._rowHeights) rowEl.style.height = this._rowHeights[pageIndex] + 'px';
     rowEl.dataset.rowIndex = pageIndex;
     rowEl.dataset.rowId = id;
     var ordinal = this._pageOrdinals ? this._pageOrdinals[pageIndex] : pageIndex;
@@ -2032,6 +2136,7 @@
       if (col.align === 'center') cell.classList.add('dg-align-center');
       if (col.pinned === 'left') cell.classList.add('dg-pinned-left');
       if (col.pinned === 'right') cell.classList.add('dg-pinned-right');
+      if (col.wrapText) cell.classList.add('dg-cell-wrap');
       if (col.editable && self._editable) cell.classList.add('dg-cell-editable');
       if (dirtyFields && col.field !== undefined && (col.field in dirtyFields)) {
         cell.classList.add('dg-cell-dirty');
@@ -2477,6 +2582,45 @@
   DataGrid.prototype.isRowExpanded = function (row) {
     return !!(row && this._detailExpanded[this._rowId(row)]);
   };
+
+  /* ---- pinned top rows ---- */
+
+  /** 헤더 아래 고정 행(표시 전용 — 정렬·필터·선택·편집 대상 아님)을 렌더링한다. */
+  DataGrid.prototype._renderPinnedTop = function () {
+    var container = this._pinnedTopEl;
+    if (!container) return;
+    container.innerHTML = '';
+    var rows = this._pinnedTopRows;
+    container.hidden = !rows || rows.length === 0;
+    if (container.hidden) return;
+    var self = this;
+    rows.forEach(function (row) {
+      var rowEl = el('div', 'dg-row dg-pinned-top-row', container);
+      rowEl.setAttribute('role', 'row');
+      self._visibleColumns().forEach(function (col) {
+        var cell = el('div', 'dg-cell', rowEl);
+        cell.setAttribute('role', 'gridcell');
+        cell.dataset.colId = col.colId;
+        if (col.align === 'right') cell.classList.add('dg-align-right');
+        if (col.align === 'center') cell.classList.add('dg-align-center');
+        if (col.pinned === 'left') cell.classList.add('dg-pinned-left');
+        if (col.pinned === 'right') cell.classList.add('dg-pinned-right');
+        self._applyCellLayout(cell, col.colId);
+        if (col.field !== undefined && !col.__rowNumber && !col.__detailToggle && !col.checkboxSelection) {
+          self._renderCellValue(cell, col, row);
+        }
+      });
+    });
+    container.scrollLeft = this._bodyEl.scrollLeft;
+  };
+
+  /** 상단 고정 행을 교체한다 (빈 배열이면 숨김). */
+  DataGrid.prototype.setPinnedTopRows = function (rows) {
+    this._pinnedTopRows = (rows || []).slice();
+    this._renderPinnedTop();
+  };
+
+  DataGrid.prototype.getPinnedTopRows = function () { return this._pinnedTopRows.slice(); };
 
   /* ---- grand total footer ---- */
 
@@ -3007,7 +3151,10 @@
   DataGrid.prototype._scrollRowIntoView = function (r) {
     var top = this._rowTop(r);
     var item = this._pageRows[r];
-    var bottom = top + (item && item.__detail ? this._detailHeight() : this._rowHeight);
+    var h = this._rowHeights
+      ? this._rowHeights[r]
+      : item && item.__detail ? this._detailHeight() : this._rowHeight;
+    var bottom = top + h;
     if (top < this._bodyEl.scrollTop) this._bodyEl.scrollTop = top;
     else if (bottom > this._bodyEl.scrollTop + this._bodyEl.clientHeight) {
       this._bodyEl.scrollTop = bottom - this._bodyEl.clientHeight;
@@ -4238,6 +4385,8 @@
     buildDataSourceRequest: buildDataSourceRequest,
     parseDataSourceResponse: parseDataSourceResponse,
     computeRowTops: computeRowTops,
+    computeAutoHeights: computeAutoHeights,
+    computeTopsFromHeights: computeTopsFromHeights,
     findRowAtOffset: findRowAtOffset,
     crc32: crc32,
     makeZip: makeZip,

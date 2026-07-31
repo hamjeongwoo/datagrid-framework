@@ -335,6 +335,38 @@
   background: var(--dg-background-color);
 }
 
+/* domLayout: 'autoHeight' — 그리드가 내용 높이에 맞춰 늘어난다 (세로 가상화 없음) */
+.dg-root.dg-auto-height { height: auto; }
+.dg-root.dg-auto-height .dg-body {
+  flex: none;
+  height: auto;
+  overflow-y: hidden;
+}
+
+/* 상단 고정 행 (pinnedTopRows) */
+.dg-pinned-top {
+  flex: none;
+  overflow: hidden;
+  border-bottom: 2px solid var(--dg-border-color);
+  background: var(--dg-background-color);
+}
+.dg-pinned-top .dg-row {
+  position: static;
+  font-weight: 600;
+}
+
+/* 셀 줄바꿈 (wrapText — autoRowHeight와 함께 사용) */
+.dg-cell.dg-cell-wrap {
+  white-space: normal;
+  align-items: flex-start;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.dg-cell.dg-cell-wrap > .dg-cell-value {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .dg-canvas {
   position: relative;
   width: max-content;

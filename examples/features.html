@@ -1494,6 +1494,84 @@
     </script>
   </div>
 
+  <!-- ======================================================== 고정 행 · 줄바꿈 · autoHeight -->
+  <h2 class="section">Pinned Top Rows · Wrap Text · Auto Height</h2>
+  <p class="section-desc">
+    <code class="inline">pinnedTopRows</code>는 헤더 아래에 스크롤과 무관한 고정 행(표시 전용)을 두고
+    <code class="inline">setPinnedTopRows(rows)</code>로 갱신합니다.
+    <code class="inline">column.wrapText</code> + <code class="inline">autoRowHeight: true</code>는
+    긴 텍스트를 줄바꿈하고 행 높이를 내용에 맞춰 계산하며(가변 높이 가상화),
+    <code class="inline">domLayout: 'autoHeight'</code>는 그리드가 내용 높이만큼 늘어나게 합니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn" id="ptUpdateBtn" type="button">setPinnedTopRows — 평균 행 갱신</button>
+      </div>
+      <div id="gridWrap" class="grid-wrap-md"></div>
+      <div class="status-line" id="wrapStatus">
+        Note 컬럼은 wrapText — 행 높이가 내용에 따라 다릅니다. 맨 위 굵은 행이 pinnedTopRows입니다.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var NOTES = [
+        '짧은 메모',
+        '긴 메모 예시 — 셀 폭을 넘어가는 텍스트는 자동으로 줄바꿈되고 행 높이가 내용에 맞춰 늘어납니다. autoRowHeight가 텍스트 폭을 측정해 계산합니다.',
+        '중간 길이의 메모입니다. 두 줄 정도로 표시됩니다.',
+        '첫 줄\n둘째 줄 (명시적 개행도 반영)',
+      ];
+      var rows = DemoData.makeEmployees(30, 87).map(function (r, i) {
+        r.note = NOTES[i % NOTES.length];
+        return r;
+      });
+
+      var avgRow = function () {
+        var sum = rows.reduce(function (a, r) { return a + r.salary; }, 0);
+        return { name: '― 평균 (pinned)', salary: Math.round(sum / rows.length), note: '표시 전용 고정 행' };
+      };
+
+      var grid = new DataGrid(document.getElementById('gridWrap'), {
+        rowData: rows,
+        autoRowHeight: true,
+        pinnedTopRows: [avgRow()],
+        columnDefs: [
+          { field: 'name', headerName: 'Name', width: 160 },
+          { field: 'salary', headerName: 'Salary', dataType: 'number', format: '$#,##0', width: 120, editable: true },
+          { field: 'note', headerName: 'Note (wrapText)', width: 280, wrapText: true },
+        ],
+      });
+
+      document.getElementById('ptUpdateBtn').addEventListener('click', function () {
+        grid.setPinnedTopRows([avgRow()]);
+        document.getElementById('wrapStatus').textContent = '고정 행을 최신 평균으로 갱신했습니다.';
+      });
+    </script>
+  </div>
+
+  <!-- ======================================================== domLayout autoHeight -->
+  <h2 class="section">Auto-Height Grid (domLayout)</h2>
+  <p class="section-desc">
+    <code class="inline">domLayout: 'autoHeight'</code>는 컨테이너 높이 대신 <strong>내용 높이</strong>만큼
+    그리드가 늘어납니다 — 세로 스크롤/가상화가 없어지므로 소량 데이터 전용입니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div id="gridAutoH"></div>  <!-- 높이 지정 없음 -->
+      <div class="status-line" id="autoHStatus">이 그리드는 8행 높이만큼만 차지합니다 (컨테이너 높이 불필요).</div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridAutoH'), {
+        rowData: DemoData.makeEmployees(8, 89),
+        domLayout: 'autoHeight',
+        columnDefs: [
+          { field: 'name', headerName: 'Name', flex: 1 },
+          { field: 'department', headerName: 'Department', flex: 1 },
+          { field: 'salary', headerName: 'Salary', dataType: 'number', format: '$#,##0', width: 130 },
+        ],
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>
