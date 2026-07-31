@@ -68,5 +68,65 @@
     return rows;
   }
 
-  global.DemoData = { makeEmployees: makeEmployees, makeOrders: makeOrders };
+  /**
+   * 파일 시스템 형태의 트리 데이터 (treeData 데모용).
+   * nested 형식: 폴더 행은 children 배열을 가진다. size는 파일에만 있고 KB 단위.
+   */
+  var FOLDERS = ['src', 'docs', 'assets', 'test', 'config', 'scripts', 'vendor', 'build'];
+  var FILES = ['readme.md', 'index.js', 'main.css', 'app.js', 'notes.txt', 'logo.svg',
+    'data.json', 'utils.js', 'spec.md', 'setup.cfg', 'icon.png', 'license.txt'];
+
+  function makeFileTree(seed) {
+    var rnd = mulberry32(seed || 11);
+    var fileNo = 0;
+    function makeDate() {
+      var y = 2022 + Math.floor(rnd() * 4);
+      var m = 1 + Math.floor(rnd() * 12);
+      var d = 1 + Math.floor(rnd() * 28);
+      return y + '-' + (m < 10 ? '0' : '') + m + '-' + (d < 10 ? '0' : '') + d;
+    }
+    function makeFile() {
+      fileNo++;
+      var base = FILES[Math.floor(rnd() * FILES.length)];
+      return {
+        name: base.replace('.', '-' + fileNo + '.'),
+        type: 'file',
+        size: 1 + Math.floor(rnd() * 900),
+        modified: makeDate(),
+      };
+    }
+    function makeFolder(name, depth) {
+      var children = [];
+      var folders = depth < 2 ? 1 + Math.floor(rnd() * 2) : 0;
+      for (var f = 0; f < folders; f++) {
+        children.push(makeFolder(FOLDERS[Math.floor(rnd() * FOLDERS.length)] + '-' + depth, depth + 1));
+      }
+      var files = 2 + Math.floor(rnd() * 3);
+      for (var i = 0; i < files; i++) children.push(makeFile());
+      return { name: name, type: 'folder', modified: makeDate(), children: children };
+    }
+    return [makeFolder('project', 0), makeFolder('backup', 0), makeFile()];
+  }
+
+  /** makeFileTree와 같은 계층을 flat(parentId) 형식으로. */
+  function makeFileTreeFlat(seed) {
+    var out = [];
+    var nextId = 1;
+    (function walk(rows, parentId) {
+      rows.forEach(function (r) {
+        var id = nextId++;
+        var flat = { id: id, parentId: parentId, name: r.name, type: r.type, size: r.size, modified: r.modified };
+        out.push(flat);
+        if (r.children) walk(r.children, id);
+      });
+    })(makeFileTree(seed), null);
+    return out;
+  }
+
+  global.DemoData = {
+    makeEmployees: makeEmployees,
+    makeOrders: makeOrders,
+    makeFileTree: makeFileTree,
+    makeFileTreeFlat: makeFileTreeFlat,
+  };
 })(window);

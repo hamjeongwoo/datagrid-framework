@@ -1653,6 +1653,61 @@
     </script>
   </div>
 
+  <!-- ======================================================== 트리 그리드 -->
+  <h2 class="section">Tree Grid (treeData)</h2>
+  <p class="section-desc">
+    <code class="inline">treeData</code>는 계층 데이터를 트리로 표시합니다 — nested(<code class="inline">children</code> 배열)와
+    flat(<code class="inline">parentId</code>) 형식을 모두 지원하고, 정렬은 형제끼리, 필터는 매치된 노드의 조상을 유지한 채 동작합니다.
+    <code class="inline">expandAllNodes()/collapseAllNodes()/toggleNode()</code>로 프로그램 제어,
+    <code class="inline">beforeNodeToggle</code>(취소 가능)/<code class="inline">nodeExpanded</code>/<code class="inline">nodeCollapsed</code> 이벤트를 제공합니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button id="treeExpandAll" class="btn">전부 펼치기</button>
+        <button id="treeCollapseAll" class="btn">전부 접기</button>
+        <input id="treeQuick" class="tb-input" type="text" placeholder="필터 (예: js)" />
+      </div>
+      <div id="gridTree" class="grid-wrap-md"></div>
+      <div class="status-line" id="treeStatus">폴더 행의 화살표를 클릭해 펼치고 접어 보세요.</div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridTree'), {
+        rowData: DemoData.makeFileTree(11),   // nested: 폴더 행이 children 배열을 가짐
+        treeData: {
+          treeField: 'name',        // 트리 UI(들여쓰기+토글)를 그릴 컬럼
+          indent: 20,
+          defaultExpandLevel: 1,    // 루트만 펼친 채 시작 (-1 = 전부)
+        },
+        columnDefs: [
+          { field: 'name', headerName: 'Name', flex: 2 },
+          { field: 'type', headerName: 'Type', width: 100 },
+          { field: 'size', headerName: 'Size (KB)', dataType: 'number', width: 110 },
+          { field: 'modified', headerName: 'Modified', dataType: 'date', width: 130 },
+        ],
+      });
+
+      var status = document.getElementById('treeStatus');
+      grid.on('nodeExpanded', function (e) { status.textContent = '펼침: ' + e.data.name; });
+      grid.on('nodeCollapsed', function (e) { status.textContent = '접힘: ' + e.data.name; });
+
+      document.getElementById('treeExpandAll').addEventListener('click', function () {
+        grid.expandAllNodes();
+        status.textContent = 'expandAllNodes() — 전부 펼쳤습니다.';
+      });
+      document.getElementById('treeCollapseAll').addEventListener('click', function () {
+        grid.collapseAllNodes();
+        status.textContent = 'collapseAllNodes() — 전부 접었습니다.';
+      });
+      document.getElementById('treeQuick').addEventListener('input', function (e) {
+        grid.setQuickFilter(e.target.value);
+        status.textContent = e.target.value
+          ? '필터 "' + e.target.value + '" — 매치된 노드의 조상은 유지됩니다.'
+          : '필터 해제';
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

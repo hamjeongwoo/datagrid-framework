@@ -84,6 +84,7 @@ python demo/server.py
 | `columnGroups` | array | 2단 컬럼 그룹 헤더 `[{ headerName, children }]` |
 | `dataSource` | object | 원격 데이터 `{ url, method, params, parse }` (`reloadData()`로 재요청) |
 | `rowDetail` | object | 마스터-디테일 `{ renderer(row), height }` (`expandRow`/`collapseRow`/`toggleRowDetail`) |
+| `treeData` | object | 계층 데이터 트리 표시 `{ treeField, indent, defaultExpandLevel, childrenField \| parentIdField+idField }` — `pagination`/`groupBy`와 배타 |
 | `title` / `toolbar` | string / element | 그리드 타이틀 바 / 소비자 DOM 툴바 슬롯 |
 | `sortMode` / `filterMode` / `pageMode` | `'client'` \| `'server'` | 각 축의 처리 주체 — server면 상태를 요청 파라미터로 전달 |
 
@@ -142,6 +143,7 @@ cellRenderer: DataGrid.renderers.progress()   // 0–100 진행 바
 `showLoadingOverlay()` / `hideLoadingOverlay()` ·
 `setTheme('light'|'dark')` · `refresh()` · `refreshCell(row, field)` / `refreshRow(row)` / `refreshColumn(colId)` ·
 `setOptions(patch)` · `expandRow(row)` / `collapseRow(row)` / `toggleRowDetail(row)` · `reloadData()` ·
+`toggleNode(row, expanded?)` / `expandNode(row)` / `collapseNode(row)` / `isNodeExpanded(row)` / `expandAllNodes(level?)` / `collapseAllNodes()` ·
 `setPinnedTopRows(rows)` · `setEnabled(bool)` / `isEnabled()` · `once(event, fn)` · `destroy()`
 
 ## 이벤트
@@ -154,10 +156,12 @@ grid.on('sortChanged' | 'filterChanged' | 'paginationChanged' | 'groupChanged' |
         'groupToggled' | 'editingStarted' | 'editingStopped' | 'rowClicked' |
         'rowDoubleClicked' | 'cellClicked' | 'cellDoubleClicked' | 'columnResized' |
         'columnMoved' | 'stateChanged' | 'gridReady' | 'dataChanged' | 'viewRendered' |
-        'cellRangeChanged' | 'cellContextMenu' | 'headerClicked' | 'cellKeyDown', fn);
+        'cellRangeChanged' | 'cellContextMenu' | 'headerClicked' | 'cellKeyDown' |
+        'nodeExpanded' | 'nodeCollapsed', fn);
 
 // 취소 가능 이벤트: e.cancel = true로 동작 거부
 grid.on('beforeCellSave', function (e) { if (e.newValue < 0) e.cancel = true; });
+grid.on('beforeNodeToggle', function (e) { if (e.data.locked) e.cancel = true; });
 grid.on('beforeSort', function (e) { if (locked) e.cancel = true; });
 grid.on('beforeSelectionChange', function (e) { if (frozen) e.cancel = true; });
 grid.on('beforeExport', function (e) { e.filename = 'report-' + Date.now() + '.' + e.format; });

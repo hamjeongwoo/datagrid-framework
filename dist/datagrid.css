@@ -584,6 +584,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* 트리 그리드 (treeData): 트리 컬럼의 들여쓰기 + 펼침 토글.
+   토글은 그룹 셰브론 스타일을 재사용하고, 리프에는 같은 폭의 스페이서를 넣어
+   부모/자식 라벨의 시작 위치를 맞춘다. */
+.dg-tree-indent { flex: none; }
+.dg-tree-toggle { cursor: pointer; margin-right: 6px; }
+.dg-tree-toggle-spacer {
+  flex: none;
+  width: calc(var(--dg-icon-size) + 6px);
+}
 .dg-group-count {
   color: var(--dg-secondary-foreground-color);
   font-weight: 500;

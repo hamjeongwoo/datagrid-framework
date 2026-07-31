@@ -647,6 +647,84 @@ suite('computeMergeSpans', function () {
   );
 });
 
+/* ---------------- tree (buildTreeNodes 등) ---------------- */
+suite('buildTreeNodes', function () {
+  // nested 형식
+  var nested = [
+    { name: 'a', children: [{ name: 'a1' }, { name: 'a2', children: [{ name: 'a2x' }] }] },
+    { name: 'b' },
+  ];
+  var roots = T.buildTreeNodes(nested, {});
+  assertEq(roots.length, 2, 'nested: two roots');
+  assertEq(roots[0].children.length, 2, 'nested: children parsed');
+  assertEq(roots[0].children[1].children[0].row.name, 'a2x', 'nested: deep child');
+  assertEq(roots[0].children[1].children[0].level, 2, 'nested: level assigned');
+
+  // flat(parentId) 형식
+  var flat = [
+    { id: 1, name: 'root' },
+    { id: 2, name: 'child', parentId: 1 },
+    { id: 3, name: 'grandchild', parentId: 2 },
+    { id: 4, name: 'orphan', parentId: 99 },
+  ];
+  var froots = T.buildTreeNodes(flat, { parentIdField: 'parentId', idField: 'id' });
+  assertEq(froots.length, 2, 'flat: missing parent → root');
+  assertEq(froots[0].children[0].children[0].row.name, 'grandchild', 'flat: chain built');
+  assertEq(froots[1].row.name, 'orphan', 'flat: orphan kept as root');
+
+  // 순환 참조: 어느 루트에서도 도달 불가한 행도 유실되지 않는다
+  var cyc = [
+    { id: 1, parentId: 2, name: 'x' },
+    { id: 2, parentId: 1, name: 'y' },
+  ];
+  var croots = T.buildTreeNodes(cyc, { parentIdField: 'parentId', idField: 'id' });
+  assertEq(T.collectTreeNodes(croots).length, 2, 'flat: cycle broken, no row lost');
+
+  assertEq(T.buildTreeNodes([], {}), [], 'empty input');
+});
+
+suite('filterTreeNodes / sortTreeNodes / flattenTreeNodes', function () {
+  var data = [
+    { name: 'docs', children: [{ name: 'readme' }, { name: 'license' }] },
+    { name: 'src', children: [{ name: 'app', children: [{ name: 'main' }] }] },
+  ];
+  var roots = T.buildTreeNodes(data, {});
+
+  // filter: 매치 + 조상 유지
+  var f1 = T.filterTreeNodes(roots, function (r) { return r.name === 'main'; }, false);
+  assertEq(f1.length, 1, 'filter: only matching branch kept');
+  assertEq(f1[0].row.name, 'src', 'filter: ancestor kept');
+  assertEq(f1[0].children[0].children[0].row.name, 'main', 'filter: match kept');
+
+  // filter: keepChildren이면 매치된 부모의 자손 유지
+  var f2 = T.filterTreeNodes(roots, function (r) { return r.name === 'docs'; }, true);
+  assertEq(f2[0].children.length, 2, 'filter: children of match kept (keepChildren)');
+  var f3 = T.filterTreeNodes(roots, function (r) { return r.name === 'docs'; }, false);
+  assertEq(f3[0].children.length, 0, 'filter: children dropped without keepChildren');
+
+  // sort: 형제끼리만 정렬 (계층 유지)
+  var sorted = T.sortTreeNodes(roots, function (rows) {
+    return rows.slice().sort(function (a, b) { return a.name < b.name ? -1 : 1; });
+  });
+  assertEq(sorted[0].row.name, 'docs', 'sort: roots sorted');
+  assertEq(sorted[0].children[0].row.name, 'license', 'sort: siblings sorted');
+  assertEq(sorted[1].children[0].row.name, 'app', 'sort: hierarchy preserved');
+
+  // flatten: 조상이 모두 펼쳐진 노드만
+  var all = T.flattenTreeNodes(roots, function () { return true; });
+  assertEq(all.length, 6, 'flatten: all visible when expanded');
+  assertEq(all.map(function (n) { return n.level; }), [0, 1, 1, 0, 1, 2], 'flatten: levels');
+  var collapsed = T.flattenTreeNodes(roots, function (r) { return r.name === 'src'; });
+  assertEq(collapsed.length, 3, 'flatten: collapsed subtree hidden');
+  assertEq(
+    collapsed.map(function (n) { return n.row.name; }),
+    ['docs', 'src', 'app'],
+    'flatten: only expanded ancestors shown (app collapsed → main hidden)'
+  );
+  assertEq(collapsed[1].expanded, true, 'flatten: expanded flag set');
+  assertEq(collapsed[0].hasChildren, true, 'flatten: hasChildren flag set');
+});
+
 /* ---------------- fillSeries ---------------- */
 suite('fillSeries', function () {
   assertEq(T.fillSeries([1, 3], 3), [5, 7, 9], 'arithmetic extrapolation');

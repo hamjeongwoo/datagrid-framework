@@ -404,6 +404,20 @@ window.ApiDocs = {
           example: "mergeCells: ['product', 'status'],\nsortModel: [{ field: 'product', dir: 'asc' }]",
         },
         {
+          name: 'treeData',
+          type: 'object',
+          since: '2.1.0',
+          description:
+            '계층 데이터를 트리로 표시합니다. nested 형식(각 행의 <code>childrenField</code> 배열이 자식, 기본 ' +
+            '<code>children</code>)과 flat 형식(<code>parentIdField</code> + <code>idField</code>로 계층 구성)을 ' +
+            '모두 지원합니다. <code>treeField</code> 컬럼(생략 시 첫 데이터 컬럼)에 들여쓰기(<code>indent</code>px, 기본 20)와 ' +
+            '펼침 토글이 그려지고, <code>defaultExpandLevel</code>(기본 0, <code>-1</code> = 전부) 깊이까지 펼친 채 시작합니다. ' +
+            '정렬은 형제끼리, 필터는 매치된 노드의 조상을 유지하며 동작합니다(<code>filterKeepChildren: false</code>로 ' +
+            '매치된 부모의 자손 표시를 끌 수 있음). <code>pagination</code>/<code>groupBy</code>와는 함께 쓸 수 없습니다.',
+          example:
+            "treeData: {\n  treeField: 'name',\n  indent: 20,\n  defaultExpandLevel: 1,\n  // flat 형식이면: parentIdField: 'parentId', idField: 'id'\n},",
+        },
+        {
           name: 'fillHandle',
           type: 'boolean',
           default: 'false',
@@ -1077,6 +1091,32 @@ window.ApiDocs = {
             '<code>rowDetail</code> 옵션이 없거나 이미 해당 상태면 <code>false</code>를 반환합니다.',
         },
 
+        /* ---- 트리 그리드 ---- */
+        {
+          name: 'toggleNode',
+          group: 'Tree',
+          signature: 'toggleNode(row: object, expanded?: boolean): boolean',
+          since: '2.1.0',
+          description:
+            '트리 노드를 펼치거나 접습니다(<code>expanded</code> 생략 시 토글). ' +
+            '<code>beforeNodeToggle</code>(취소 가능) → 갱신 → <code>nodeExpanded</code>/' +
+            '<code>nodeCollapsed</code> 순으로 이벤트가 발생하고, 상태가 바뀌면 <code>true</code>를 반환합니다. ' +
+            '<code>expandNode(row)</code> / <code>collapseNode(row)</code>는 방향 고정 단축형, ' +
+            '<code>isNodeExpanded(row)</code>는 상태 조회입니다.',
+          example:
+            "grid.on('cellClicked', function (e) {\n  if (e.data.type === 'folder') grid.toggleNode(e.data);\n});",
+        },
+        {
+          name: 'expandAllNodes',
+          group: 'Tree',
+          signature: 'expandAllNodes(level?: number): void',
+          since: '2.1.0',
+          description:
+            '트리 전체를 펼칩니다. <code>level</code>을 주면 그 깊이 미만 레벨의 노드만 펼칩니다 ' +
+            '(예: <code>expandAllNodes(1)</code> = 루트만). <code>collapseAllNodes()</code>는 전부 접습니다. ' +
+            '일괄 작업이므로 노드별 이벤트는 발생하지 않습니다.',
+        },
+
         /* ---- 셀 선택 · 검색 ---- */
         {
           name: 'getCellRange',
@@ -1579,6 +1619,17 @@ window.ApiDocs = {
           description:
             '디테일 패널이 펼쳐질 때(셰브론 클릭·<code>expandRow()</code>). ' +
             '접힐 때는 <code>rowCollapsed</code>가 발생합니다.',
+        },
+        {
+          name: 'beforeNodeToggle',
+          payload: '{ data, expanded, cancel }',
+          since: '2.1.0',
+          description:
+            '트리 노드가 펼쳐지거나 접히기 직전(<code>treeData</code> 필요). <code>expanded</code>는 ' +
+            '전환될 목표 상태이며 <code>e.cancel = true</code>로 전환을 막을 수 있습니다. ' +
+            '전환 후에는 <code>nodeExpanded</code> 또는 <code>nodeCollapsed</code>(payload <code>{ data }</code>)가 발생합니다.',
+          example:
+            "grid.on('beforeNodeToggle', function (e) {\n  if (e.data.locked) e.cancel = true;\n});",
         },
         {
           name: 'dataLoadError',

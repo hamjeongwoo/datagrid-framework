@@ -171,6 +171,9 @@
 ### v2.0+ — 백로그 (P3)
 - fillHandle/autofill, mergeCells, virtualX, pinnedTopRows, wrapText/autoRowHeight, autoHeight 레이아웃, once, setEnabled, headerAlign
 
+### v2.1 — "TreeGrid" (§6 T1~T4)
+- treeData 코어(계층 표시·펼침/접힘·계층 정렬/필터), 체크박스 캐스케이드, 부모 요약, 지연 로딩
+
 ---
 
 ## 5. 진행 관리 방법
@@ -178,3 +181,30 @@
 1. 스펙 하나를 시작할 때: 이 문서의 체크박스에 작업 중 표시 → 구현 → 테스트(`test/run-tests.js`에 데이터 로직 추가) → `docs/api-data.js`에 `since: '1.x.0'`으로 문서화 → Features 페이지에 Example/View Source 카드 추가 → 체크.
 2. API 이름은 "제안 API" 컬럼을 기본으로 하되, 구현 중 바뀌면 이 문서를 갱신한다.
 3. 새로운 비교 대상(AG Grid Enterprise, Kendo 등)을 추가 분석할 때는 §2 표에 컬럼을 추가하지 말고 별도 섹션으로 append한다.
+
+---
+
+## 6. TreeGrid (ParamQuery Pro `demos/treegrid` 비교) — 2026-08-01 추가
+
+계층 데이터(트리) 표시 스펙. ParamQuery는 treegrid를 grid 위에 얹은 별도 위젯(`treeModel` 옵션 + `Tree()` API 객체)으로 제공한다.
+우리는 별도 위젯 없이 **`treeData` 옵션 하나**로 기존 뷰 파이프라인(필터 → 정렬 → 가상화)에 통합한다.
+트리 모드에서는 `pagination`·`groupBy`와 배타적이다 (ParamQuery도 페이징 비호환을 명시).
+
+| | ParamQuery | 제안 API | 우선순위 |
+|---|---|---|---|
+| [x] | **`treeModel` 코어**: nested(`children[]`)/flat(`parentId`) 데이터(행마다 고유 id 필수), `dataIndx`(트리 컬럼), `indent`, 노드 펼침/접힘, `beforeTreeExpand`/`treeExpand` 이벤트 | `treeData: { childrenField: 'children' \| parentIdField+idField(flat), treeField, indent, defaultExpandLevel }` + `expandNode()/collapseNode()/toggleNode()/expandAllNodes()/collapseAllNodes()/isNodeExpanded()` + `beforeNodeToggle`(취소 가능)/`nodeExpanded`/`nodeCollapsed`. 계층 정렬(형제끼리 재귀)·계층 필터(매치의 조상 유지 + `filterKeepChildren`) 통합 — v2.1.0 | **T1** |
+| [ ] | **체크박스**: `treeModel.checkbox · cascade`, `Tree().getCheckedNodes() · checkNodes() · unCheckAll()`, `beforeCheck`/`check` 이벤트, `pq_tree_cb` 숨김 컬럼 트릭으로 비활성화 | `treeData.checkbox: true` + `treeData.cascade: true`(3상태 indeterminate 포함) + `treeData.checkboxDisabled(row)` 콜백 + `setNodeChecked()/isNodeChecked()/getCheckedRows()/checkAllNodes()/unCheckAllNodes()` + `beforeNodeCheck`(취소 가능)/`nodeCheckChanged` | **T2** |
+| [ ] | `treeModel.summaryInTitleRow` (부모 행 자체에 자식 집계 표시) | `treeData.summary: true` — `column.aggFunc` 재사용, 부모 노드 행에 자손 리프 집계를 표시(표시 전용, 데이터 불변) | **T3** |
+| [ ] | **Lazy loading** (원격 자식 로딩) | `treeData.fetchChildren(row) => Promise<rows>` + `treeData.hasChildren(row)` — 첫 펼침 때 로드 + 로딩 표시, 실패 시 `dataLoadError` 재사용. nested 형식 전제 | **T4** |
+
+### 도입하지 않는 것 (TreeGrid)
+
+| ParamQuery 스펙 | 사유 |
+|---|---|
+| `Tree()` 별도 위젯 객체 | 인스턴스 메서드로 통합 (우리 관례 — §3의 위젯 제외와 동일) |
+| `treeModel.hideLines`(계층 연결선) | 들여쓰기 + 화살표로 계층 표현 충분. CSS 복잡도 대비 가치 낮음 |
+| `treeModel.icons` / `treeModel.render`(폴더/파일 아이콘) | `cellRenderer`로 앱에서 구현 가능 (treeField 컬럼도 cellRenderer 지원) |
+| `checkboxHead`(헤더 체크박스) | `checkAllNodes()/unCheckAllNodes()` API + 툴바 버튼으로 대체 |
+| 체크박스-행 선택 연동(`treeModel.select`) | `nodeCheckChanged` + `setSelectedRows()` 조합으로 앱에서 가능 |
+| `treeModel.summary`(부모별 별도 요약 행) | 부모 행 내 집계(T3)만 채택 — 트리에서 행 수 이중화 방지 |
+| 트리 DnD(노드 드래그 이동 · 트리 간 DnD) | 데이터 조작 API + 앱 구현 영역. 수요 확인 후 재검토 |

@@ -688,6 +688,129 @@
     return spans;
   }
 
+  /* ======================== 트리 데이터 (treeData) ======================== */
+
+  /**
+   * treeData: 행 배열을 트리 노드로 정규화. 노드: { row, level, children: [노드] }
+   * - nested(기본): 각 행의 childrenField 배열이 자식
+   * - flat: parentIdField 지정 시 idField/parentIdField로 계층 구성.
+   *   부모 id가 없거나(=루트) 자기 자신을 가리키면 루트. 순환 참조로 어떤 루트에서도
+   *   도달할 수 없는 행은 순환을 끊고 루트로 승격한다 (행 유실 방지).
+   */
+  function buildTreeNodes(rows, opts) {
+    opts = opts || {};
+    if (!rows || rows.length === 0) return [];
+    if (opts.parentIdField) {
+      var idField = opts.idField || 'id';
+      var parentIdField = opts.parentIdField;
+      var byId = {};
+      rows.forEach(function (r) { byId[r[idField]] = true; });
+      var byParent = {};
+      var roots = [];
+      rows.forEach(function (r) {
+        var p = r[parentIdField];
+        if (p === null || p === undefined || !byId[p] || p === r[idField]) roots.push(r);
+        else (byParent[p] = byParent[p] || []).push(r);
+      });
+      var visited = {};
+      var buildFlat = function (row, level) {
+        visited[row[idField]] = true;
+        var kids = byParent[row[idField]] || [];
+        return {
+          row: row,
+          level: level,
+          children: kids
+            .filter(function (c) { return !visited[c[idField]]; })
+            .map(function (c) { return buildFlat(c, level + 1); }),
+        };
+      };
+      var out = roots.map(function (r) { return buildFlat(r, 0); });
+      rows.forEach(function (r) {
+        if (!visited[r[idField]]) out.push(buildFlat(r, 0));
+      });
+      return out;
+    }
+    var childrenField = opts.childrenField || 'children';
+    var buildNested = function (row, level) {
+      var kids = Array.isArray(row[childrenField]) ? row[childrenField] : [];
+      return {
+        row: row,
+        level: level,
+        children: kids.map(function (c) { return buildNested(c, level + 1); }),
+      };
+    };
+    return rows.map(function (r) { return buildNested(r, 0); });
+  }
+
+  /** 트리 전체 노드를 표시 순서(DFS)로 평탄화 — 펼침 상태와 무관. */
+  function collectTreeNodes(nodes) {
+    var out = [];
+    (function walk(list) {
+      list.forEach(function (n) {
+        out.push(n);
+        walk(n.children);
+      });
+    })(nodes);
+    return out;
+  }
+
+  /**
+   * 계층 필터: predicate 매치 노드와 그 조상을 유지한다.
+   * keepChildren이면 매치된 노드의 자손도 통째로 유지 (ParamQuery filterShowChildren).
+   * 매치되지 않은 노드는 유지되는 자손이 있을 때만 남는다.
+   */
+  function filterTreeNodes(nodes, predicate, keepChildren) {
+    var out = [];
+    nodes.forEach(function (n) {
+      var matched = false;
+      try {
+        matched = !!predicate(n.row);
+      } catch (e) {
+        console.error('[DataGrid] tree filter predicate failed:', e);
+      }
+      if (matched && keepChildren) {
+        out.push(n);
+        return;
+      }
+      var kids = filterTreeNodes(n.children, predicate, keepChildren);
+      if (matched || kids.length > 0) {
+        out.push({ row: n.row, level: n.level, children: kids });
+      }
+    });
+    return out;
+  }
+
+  /**
+   * 계층 정렬: 형제끼리 재귀 정렬. rowSorter는 행 배열을 받아 정렬된 새 배열을
+   * 반환하는 함수 (sortRows를 그대로 재사용하기 위한 시그니처).
+   */
+  function sortTreeNodes(nodes, rowSorter) {
+    if (nodes.length === 0) return nodes;
+    var byRow = new Map();
+    nodes.forEach(function (n) { byRow.set(n.row, n); });
+    return rowSorter(nodes.map(function (n) { return n.row; })).map(function (r) {
+      var n = byRow.get(r);
+      return { row: n.row, level: n.level, children: sortTreeNodes(n.children, rowSorter) };
+    });
+  }
+
+  /**
+   * 펼침 평탄화: 조상이 모두 펼쳐진 노드만 표시 순서로 반환.
+   * 항목: { row, level, hasChildren, expanded }
+   */
+  function flattenTreeNodes(nodes, isExpanded) {
+    var out = [];
+    (function walk(list) {
+      list.forEach(function (n) {
+        var has = n.children.length > 0;
+        var exp = has && !!isExpanded(n.row);
+        out.push({ row: n.row, level: n.level, hasChildren: has, expanded: exp });
+        if (exp) walk(n.children);
+      });
+    })(nodes);
+    return out;
+  }
+
   /**
    * 채우기 핸들의 연속 값 생성 (엑셀 방식).
    * - 원본이 모두 숫자이고 2개 이상이면 등차 수열로 외삽
@@ -1175,6 +1298,22 @@
     this._pageSizeOptions = options.paginationPageSizeOptions || [10, 20, 50, 100];
     this._currentPage = 0;
 
+    /* tree data — pagination/groupBy와 배타 (ParamQuery도 페이징 비호환 명시) */
+    this._treeData = options.treeData || null;
+    this._treeExpanded = {}; /* rowId -> bool */
+    this._treeInfo = null; /* rowId -> { level, hasChildren, expanded } — 뷰 계산 시 갱신 */
+    this._treeColId = null; /* 트리 UI(들여쓰기+토글)를 그릴 컬럼 */
+    if (this._treeData) {
+      if (this._pagination) {
+        console.error('[DataGrid] treeData는 pagination과 함께 쓸 수 없습니다 — pagination을 끕니다.');
+        this._pagination = false;
+      }
+      if (this._groupBy.length > 0) {
+        console.error('[DataGrid] treeData는 groupBy와 함께 쓸 수 없습니다 — groupBy를 무시합니다.');
+        this._groupBy = [];
+      }
+    }
+
     this._rowHeight = options.rowHeight || 42;
     this._headerHeight = options.headerHeight || 48;
 
@@ -1429,6 +1568,13 @@
       .map(function (c) { return c.field; })
       .filter(Boolean);
 
+    if (this._treeData) {
+      /* 트리 파이프라인이 _viewRows/_displayRows/_pageRows를 모두 채운다 */
+      this._recomputeTreeView(comparators, fields);
+      this._afterViewComputed();
+      return;
+    }
+
     applyValueGetters(this._rows, this._columns);
     /* server 모드인 축은 서버가 이미 처리했으므로 클라이언트 단계를 건너뛴다 */
     var rows = this._rows.slice();
@@ -1483,7 +1629,12 @@
       this._pageRows = display;
     }
 
-    /* 가변 세로 레이아웃: 마스터-디테일 삽입 + (autoRowHeight) 행별 높이 추정 */
+    this._afterViewComputed();
+  };
+
+  /* 뷰 파이프라인 공통 꼬리: 가변 세로 레이아웃(마스터-디테일 삽입 +
+   * autoRowHeight 행별 높이 추정) + 병합 맵. 일반/트리 파이프라인이 공유한다. */
+  DataGrid.prototype._afterViewComputed = function () {
     this._rowTops = null;
     this._pageOrdinals = null;
     this._rowHeights = null;
@@ -1538,6 +1689,77 @@
     }
 
     this._computeMergeMap();
+  };
+
+  /* 트리 뷰 파이프라인: 노드 구축 → 계층 필터(매치+조상 유지) → 계층 정렬(형제끼리)
+   * → 펼침 평탄화. 페이징/그룹핑은 트리와 배타 (생성자에서 차단). */
+  DataGrid.prototype._recomputeTreeView = function (comparators, fields) {
+    var self = this;
+    var td = this._treeData;
+    var roots = buildTreeNodes(this._rows, td);
+    applyValueGetters(
+      collectTreeNodes(roots).map(function (n) { return n.row; }),
+      this._columns
+    );
+
+    var hasFilter =
+      this._filterMode !== 'server' &&
+      (Object.keys(this._filterModel).length > 0 || this._quickFilter);
+    if (hasFilter) {
+      var model = this._filterModel;
+      var quick = this._quickFilter;
+      var pred = function (row) {
+        return (
+          filterRows([row], model).length > 0 &&
+          quickFilterRows([row], quick, fields).length > 0
+        );
+      };
+      roots = filterTreeNodes(roots, pred, td.filterKeepChildren !== false);
+    }
+
+    if (this._sortModel.length > 0 && this._sortMode !== 'server') {
+      var sortModel = this._sortModel;
+      roots = sortTreeNodes(roots, function (rows) {
+        return sortRows(rows, sortModel, comparators);
+      });
+    }
+
+    /* 펼침 상태: 처음 보는 노드는 defaultExpandLevel로 초기화 (-1 = 전부 펼침) */
+    var defLevel = td.defaultExpandLevel === undefined ? 0 : td.defaultExpandLevel;
+    var nodes = collectTreeNodes(roots);
+    var info = {};
+    nodes.forEach(function (n) {
+      var id = self._rowId(n.row);
+      if (n.children.length > 0 && self._treeExpanded[id] === undefined) {
+        self._treeExpanded[id] = defLevel === -1 || n.level < defLevel;
+      }
+      info[id] = { level: n.level, hasChildren: n.children.length > 0, expanded: false };
+    });
+    var flat = flattenTreeNodes(roots, function (row) {
+      return !!self._treeExpanded[self._rowId(row)];
+    });
+    flat.forEach(function (it) {
+      info[self._rowId(it.row)].expanded = it.expanded;
+    });
+    this._treeInfo = info;
+
+    /* 트리 UI를 그릴 컬럼: treeField 지정 컬럼 우선, 없으면 첫 데이터 컬럼 */
+    var firstDataCol = null;
+    var treeFieldCol = null;
+    this._visibleColumns().forEach(function (c) {
+      if (c.field === undefined || c.__rowNumber || c.__detailToggle) return;
+      if (firstDataCol === null) firstDataCol = c.colId;
+      if (td.treeField && c.field === td.treeField && treeFieldCol === null) {
+        treeFieldCol = c.colId;
+      }
+    });
+    this._treeColId = treeFieldCol !== null ? treeFieldCol : firstDataCol;
+
+    this._aggColumns = this._columns.filter(function (c) { return c.aggFunc && c.field; });
+    this._viewRows = nodes.map(function (n) { return n.row; });
+    this._displayRows = flat.map(function (it) { return it.row; });
+    this._pageInfo = null;
+    this._pageRows = this._displayRows;
   };
 
   /** 루트 폰트 기준 텍스트 폭 측정 함수 (autoRowHeight용). */
@@ -2249,6 +2471,29 @@
         if (col.field === undefined) return; /* checkbox-only column */
       }
 
+      /* treeData: 트리 컬럼에 들여쓰기 + 펼침 토글(자식 있을 때) */
+      if (self._treeData && col.colId === self._treeColId && self._treeInfo) {
+        var tInfo = self._treeInfo[id];
+        if (tInfo) {
+          cell.classList.add('dg-tree-cell');
+          if (tInfo.level > 0) {
+            var tIndent = el('span', 'dg-tree-indent', cell);
+            tIndent.style.width = tInfo.level * (self._treeData.indent || 20) + 'px';
+          }
+          if (tInfo.hasChildren) {
+            var tChev = el(
+              'span',
+              'dg-group-chevron dg-tree-toggle' + (tInfo.expanded ? ' dg-expanded' : ''),
+              cell
+            );
+            tChev.innerHTML = CHEVRON_SVG;
+            cell.setAttribute('aria-expanded', tInfo.expanded ? 'true' : 'false');
+          } else {
+            el('span', 'dg-tree-toggle-spacer', cell);
+          }
+        }
+      }
+
       self._renderCellValue(cell, col, row);
     });
 
@@ -2634,6 +2879,55 @@
 
   DataGrid.prototype.isRowExpanded = function (row) {
     return !!(row && this._detailExpanded[this._rowId(row)]);
+  };
+
+  /* ---- tree API (treeData) ---- */
+
+  /**
+   * 노드 펼침/접힘. expanded 생략 시 토글. 상태가 바뀌면 true.
+   * beforeNodeToggle(취소 가능) → 갱신 → nodeExpanded/nodeCollapsed 순으로 발생.
+   */
+  DataGrid.prototype.toggleNode = function (row, expanded) {
+    if (!this._treeData || !row || !this._treeInfo) return false;
+    var id = this._rowId(row);
+    var info = this._treeInfo[id];
+    if (!info || !info.hasChildren) return false;
+    var target = expanded === undefined ? !this._treeExpanded[id] : !!expanded;
+    if (target === !!this._treeExpanded[id]) return false;
+    var ev = { data: row, expanded: target, cancel: false };
+    this._emitter.emit('beforeNodeToggle', ev);
+    if (ev.cancel) return false;
+    this._treeExpanded[id] = target;
+    this.refresh();
+    this._emitter.emit(target ? 'nodeExpanded' : 'nodeCollapsed', { data: row });
+    return true;
+  };
+
+  DataGrid.prototype.expandNode = function (row) { return this.toggleNode(row, true); };
+  DataGrid.prototype.collapseNode = function (row) { return this.toggleNode(row, false); };
+
+  DataGrid.prototype.isNodeExpanded = function (row) {
+    return !!(row && this._treeExpanded[this._rowId(row)]);
+  };
+
+  /** level 미지정 = 전부 펼침. 지정 시 그 깊이 미만 레벨의 노드만 펼침 (예: 1 = 루트만). */
+  DataGrid.prototype.expandAllNodes = function (level) {
+    if (!this._treeData || !this._treeInfo) return;
+    for (var id in this._treeInfo) {
+      var info = this._treeInfo[id];
+      if (info.hasChildren) {
+        this._treeExpanded[id] = level === undefined || info.level < level;
+      }
+    }
+    this.refresh();
+  };
+
+  DataGrid.prototype.collapseAllNodes = function () {
+    if (!this._treeData || !this._treeInfo) return;
+    for (var id in this._treeInfo) {
+      if (this._treeInfo[id].hasChildren) this._treeExpanded[id] = false;
+    }
+    this.refresh();
   };
 
   /* ---- pinned top rows ---- */
@@ -3022,6 +3316,11 @@
 
     if (hit.col && hit.col.__detailToggle) {
       this.toggleRowDetail(hit.row);
+      return;
+    }
+
+    if (this._treeData && e.target.closest && e.target.closest('.dg-tree-toggle')) {
+      this.toggleNode(hit.row);
       return;
     }
 
@@ -3958,6 +4257,7 @@
     this._currentPage = 0;
     this._lastClickedViewIndex = -1;
     this._focusedCell = null;
+    this._treeExpanded = {}; /* 새 데이터 = 펼침 상태 초기화 (defaultExpandLevel 재적용) */
     this._resetTracking(); /* 새 데이터 = 새 기준선 */
     this._undoStack = [];
     this._redoStack = [];
@@ -4465,6 +4765,11 @@
     fillSeries: fillSeries,
     computeMergeContinuation: computeMergeContinuation,
     computeMergeSpans: computeMergeSpans,
+    buildTreeNodes: buildTreeNodes,
+    collectTreeNodes: collectTreeNodes,
+    filterTreeNodes: filterTreeNodes,
+    sortTreeNodes: sortTreeNodes,
+    flattenTreeNodes: flattenTreeNodes,
     buildGroupHeaderRuns: buildGroupHeaderRuns,
     buildDataSourceRequest: buildDataSourceRequest,
     parseDataSourceResponse: parseDataSourceResponse,
