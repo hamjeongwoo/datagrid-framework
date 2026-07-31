@@ -415,7 +415,9 @@ window.ApiDocs = {
             '정렬은 형제끼리, 필터는 매치된 노드의 조상을 유지하며 동작합니다(<code>filterKeepChildren: false</code>로 ' +
             '매치된 부모의 자손 표시를 끌 수 있음). <code>pagination</code>/<code>groupBy</code>와는 함께 쓸 수 없습니다. ' +
             '<code>checkbox: true</code>는 트리 컬럼에 3상태 체크박스를 표시하고 <code>cascade</code>(기본 true)로 ' +
-            '부모↔자손 연동, <code>checkboxDisabled(row)</code>로 조건부 비활성을 제어합니다.',
+            '부모↔자손 연동, <code>checkboxDisabled(row)</code>로 조건부 비활성을 제어합니다. ' +
+            '<code>summary: true</code>는 <code>column.aggFunc</code> 컬럼에서 부모 행에 자손 리프 집계를 ' +
+            '표시합니다(표시 전용, 필터 반영).',
           example:
             "treeData: {\n  treeField: 'name',\n  indent: 20,\n  defaultExpandLevel: 1,\n  checkbox: true,        // 3상태 체크박스 + cascade\n  // flat 형식이면: parentIdField: 'parentId', idField: 'id'\n},",
         },

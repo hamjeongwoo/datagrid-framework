@@ -1766,6 +1766,46 @@
     </script>
   </div>
 
+  <!-- ======================================================== 트리 부모 요약 -->
+  <h2 class="section">Tree Summary (treeData.summary)</h2>
+  <p class="section-desc">
+    <code class="inline">treeData.summary: true</code>는 <code class="inline">column.aggFunc</code>가 지정된 컬럼에서
+    부모 노드 행에 자손 리프들의 집계값을 표시합니다 (표시 전용 — 데이터는 그대로).
+    필터를 걸면 남은 리프 기준으로 집계가 다시 계산됩니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <input id="tsumQuick" class="tb-input" type="text" placeholder="필터 후 집계 재계산 확인 (예: js)" />
+      </div>
+      <div id="gridTreeSum" class="grid-wrap-md"></div>
+      <div class="status-line" id="tsumStatus">폴더 행의 Size 컬럼에 자손 파일 크기 합계가 표시됩니다.</div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridTreeSum'), {
+        rowData: DemoData.makeFileTree(31),
+        treeData: {
+          treeField: 'name',
+          defaultExpandLevel: -1,
+          summary: true,              // 부모 행에 자손 리프 집계 표시
+        },
+        columnDefs: [
+          { field: 'name', headerName: 'Name', flex: 2 },
+          { field: 'type', headerName: 'Type', width: 100 },
+          { field: 'size', headerName: 'Size (KB)', dataType: 'number', aggFunc: 'sum', width: 120 },
+          { field: 'modified', headerName: 'Modified', dataType: 'date', width: 130 },
+        ],
+      });
+
+      document.getElementById('tsumQuick').addEventListener('input', function (e) {
+        grid.setQuickFilter(e.target.value);
+        document.getElementById('tsumStatus').textContent = e.target.value
+          ? '필터 적용 — 남은 리프 기준으로 폴더 합계가 재계산되었습니다.'
+          : '폴더 행의 Size 컬럼에 자손 파일 크기 합계가 표시됩니다.';
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

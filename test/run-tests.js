@@ -725,6 +725,31 @@ suite('filterTreeNodes / sortTreeNodes / flattenTreeNodes', function () {
   assertEq(collapsed[0].hasChildren, true, 'flatten: hasChildren flag set');
 });
 
+/* ---------------- computeTreeSummary ---------------- */
+suite('computeTreeSummary', function () {
+  var data = [
+    {
+      id: 'root',
+      children: [
+        { id: 'sub', children: [{ id: 'f1', size: 10 }, { id: 'f2', size: 30 }] },
+        { id: 'f3', size: 5 },
+      ],
+    },
+    { id: 'single', size: 99 }, // 리프 루트 — 요약 없음
+  ];
+  var roots = T.buildTreeNodes(data, {});
+  var getId = function (r) { return r.id; };
+  var s = T.computeTreeSummary(roots, getId, [{ field: 'size', aggFunc: 'sum' }]);
+  assertEq(s.root.size, 45, 'parent sums all descendant leaves (not folders)');
+  assertEq(s.sub.size, 40, 'nested parent sums its own leaves');
+  assertEq(s.single, undefined, 'leaf root has no summary');
+  var avg = T.computeTreeSummary(roots, getId, [{ field: 'size', aggFunc: 'avg' }]);
+  assertEq(avg.sub.size, 20, 'avg aggregation');
+  var cnt = T.computeTreeSummary(roots, getId, [{ field: 'size', aggFunc: 'count' }]);
+  assertEq(cnt.root.size, 3, 'count counts leaves');
+  assertEq(T.computeTreeSummary([], getId, [{ field: 'size', aggFunc: 'sum' }]), {}, 'empty tree');
+});
+
 /* ---------------- applyTreeCheck ---------------- */
 suite('applyTreeCheck', function () {
   var data = [

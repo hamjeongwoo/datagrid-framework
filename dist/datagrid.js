@@ -846,6 +846,30 @@
   }
 
   /**
+   * 트리 부모 요약(treeData.summary): 부모 노드마다 자손 "리프"들의 집계를 계산.
+   * aggColumns: [{ field, aggFunc }]. 반환: getId(부모 행) → { field: 집계값 }.
+   * 한 번의 post-order 순회로 리프 목록을 전파한다.
+   */
+  function computeTreeSummary(roots, getId, aggColumns) {
+    var out = {};
+    var walk = function (node) {
+      if (node.children.length === 0) return [node.row];
+      var leaves = [];
+      node.children.forEach(function (c) {
+        leaves.push.apply(leaves, walk(c));
+      });
+      var agg = {};
+      aggColumns.forEach(function (c) {
+        agg[c.field] = aggregateValues(leaves, c.field, c.aggFunc);
+      });
+      out[getId(node.row)] = agg;
+      return leaves;
+    };
+    roots.forEach(walk);
+    return out;
+  }
+
+  /**
    * 펼침 평탄화: 조상이 모두 펼쳐진 노드만 표시 순서로 반환.
    * 항목: { row, level, hasChildren, expanded }
    */
@@ -1356,6 +1380,7 @@
     this._treeRoots = null; /* 필터 전 전체 트리 (체크 캐스케이드용) — 뷰 계산 시 갱신 */
     this._treeInfo = null; /* rowId -> { level, hasChildren, expanded } — 뷰 계산 시 갱신 */
     this._treeColId = null; /* 트리 UI(들여쓰기+토글)를 그릴 컬럼 */
+    this._treeSummary = null; /* rowId -> { field: 집계값 } (treeData.summary) */
     if (this._treeData) {
       if (this._pagination) {
         console.error('[DataGrid] treeData는 pagination과 함께 쓸 수 없습니다 — pagination을 끕니다.');
@@ -1810,6 +1835,17 @@
     this._treeColId = treeFieldCol !== null ? treeFieldCol : firstDataCol;
 
     this._aggColumns = this._columns.filter(function (c) { return c.aggFunc && c.field; });
+
+    /* treeData.summary: 부모 행에 자손 리프 집계 표시 (필터 반영된 트리 기준) */
+    this._treeSummary = null;
+    if (td.summary && this._aggColumns.length > 0) {
+      this._treeSummary = computeTreeSummary(
+        roots,
+        function (r) { return self._rowId(r); },
+        this._aggColumns
+      );
+    }
+
     this._viewRows = nodes.map(function (n) { return n.row; });
     this._displayRows = flat.map(function (it) { return it.row; });
     this._pageInfo = null;
@@ -2566,6 +2602,19 @@
               self.setNodeChecked(row, tcb.checked);
             });
           }
+        }
+      }
+
+      /* treeData.summary: 부모 행의 aggFunc 컬럼에 자손 리프 집계 (표시 전용) */
+      if (self._treeSummary && col.aggFunc && col.field) {
+        var tNode = self._treeInfo && self._treeInfo[id];
+        var tAgg = self._treeSummary[id];
+        if (tNode && tNode.hasChildren && tAgg &&
+            tAgg[col.field] !== null && tAgg[col.field] !== undefined) {
+          cell.classList.add('dg-cell-agg');
+          var tHolder = el('span', 'dg-cell-value', cell);
+          tHolder.textContent = self._formatAggValue(col, tAgg[col.field]);
+          return;
         }
       }
 
@@ -4945,6 +4994,7 @@
     sortTreeNodes: sortTreeNodes,
     flattenTreeNodes: flattenTreeNodes,
     applyTreeCheck: applyTreeCheck,
+    computeTreeSummary: computeTreeSummary,
     buildGroupHeaderRuns: buildGroupHeaderRuns,
     buildDataSourceRequest: buildDataSourceRequest,
     parseDataSourceResponse: parseDataSourceResponse,
