@@ -57,7 +57,7 @@
 | [x] | `group` / `beforeGroupExpand` / `toggle` 이벤트 | `groupChanged` / `groupToggled` — v1.1.0 | **P1** (그룹핑과 함께) |
 | [ ] | **`dataModel`** (원격 데이터: `url · method · postData · getData · location:'remote'`, remote 정렬/필터/페이징) | `dataSource: { url, method, params, parse }` + `sortMode/filterMode/pageMode: 'client'\|'server'` | **P2** |
 | [ ] | `detailModel` + `rowExpand/rowCollapse` (마스터-디테일 행) | `rowDetail: { renderer }` + `expandRow()/collapseRow()` + `rowExpanded` 이벤트 | **P2** |
-| [ ] | `column > formula` (계산 컬럼) | `valueGetter(row)` — 파생 값 계산(정렬·필터에도 사용) | **P2** |
+| [x] | `column > formula` (계산 컬럼) | `valueGetter(row)` — 파생 값을 row[field]에 기록(정렬·필터·내보내기 공유) — v1.2.0 | **P2** |
 | [ ] | `mergeCells` | 셀 병합 | P3 |
 
 ### 2.2 편집 · 검증 · 변경 추적
@@ -93,8 +93,8 @@
 | [x] | `numberCell` (행 번호 컬럼) | `rowNumbers: true` 옵션 (좌측 고정, 표시 순서 기준) — v1.1.0 | **P1** (쉬움) |
 | [x] | `column > maxWidth` | `maxWidth` — 리사이즈·flex·autoSize 상한 — v1.1.0 | **P1** (쉬움) |
 | [x] | `editable` (그리드 레벨 on/off) | `editable: false` 옵션 — 컬럼 설정 무시하고 잠금 + `setEditable(bool)` / `isEditable()` — v1.1.0 | **P1** (쉬움) |
-| [ ] | `column > nodrag/nodrop` | `column.suppressMove` | **P2** |
-| [ ] | `rowInit` (행별 클래스/속성) | `getRowClass(row, index) => string` 옵션 | **P2** |
+| [x] | `column > nodrag/nodrop` | `column.suppressMove` — 드래그 이동 제외 — v1.2.0 | **P2** |
+| [x] | `rowInit` (행별 클래스/속성) | `getRowClass(row, index) => string` 옵션 — v1.2.0 | **P2** |
 | [ ] | `column > halign` (헤더만 다른 정렬) | `headerAlign` | P3 |
 | [ ] | `hwrap/wrap` (셀 줄바꿈 + 행 높이 자동) | `wrapText` + `autoRowHeight` | P3 |
 | [ ] | `freezeRows` (상단 행 고정) | `pinnedTopRows` | P3 |

@@ -220,6 +220,16 @@ window.ApiDocs = {
             '그룹핑 없이도 사용할 수 있습니다.',
         },
         {
+          name: 'getRowClass',
+          type: '(row, index) => string',
+          since: '1.2.0',
+          description:
+            '행별 CSS 클래스. 표시 순서 기준 <code>index</code>와 행 객체를 받아 클래스 문자열' +
+            '(공백 구분 복수 허용)을 반환합니다. falsy 반환 시 클래스 없음. 예외는 콘솔 기록 후 무시됩니다.',
+          example:
+            "getRowClass: function (row) { return row.total >= 2000 ? 'row-hot' : ''; }",
+        },
+        {
           name: 'rowNumbers',
           type: 'boolean',
           default: 'false',
@@ -326,6 +336,28 @@ window.ApiDocs = {
             '헤더 메뉴에서 열 수 있는 컬럼 필터 종류. <code>true</code>는 <code>dataType</code>에 맞는 종류' +
             '(number → <code>\'number\'</code>, bool → <code>\'set\'</code>, 그 외 <code>\'text\'</code>)로 해석됩니다. ' +
             '필터 모델 구조는 <a href="#filter-model">Filter Model</a> 섹션 참고.',
+        },
+        {
+          name: 'valueGetter',
+          type: '(row) => any',
+          since: '1.2.0',
+          description:
+            '파생 값 계산 컬럼. 뷰가 재계산될 때마다 결과가 <code>row[field]</code>에 <strong>기록</strong>되므로 ' +
+            '정렬·필터·퀵 필터·CSV/JSON 내보내기·클립보드가 모두 같은 파생 값을 봅니다. ' +
+            '전용 <code>field</code> 이름을 주세요(기존 필드를 덮어쓸 수도 있음). ' +
+            'getter 예외는 콘솔에 기록되고 해당 셀만 건너뜁니다.',
+          example:
+            "{ field: 'total', headerName: 'Total', dataType: 'number',\n" +
+            '  valueGetter: function (row) { return row.quantity * row.unitPrice; } }',
+        },
+        {
+          name: 'suppressMove',
+          type: 'boolean',
+          default: 'false',
+          since: '1.2.0',
+          description:
+            '이 컬럼을 헤더 드래그 순서 변경에서 제외합니다(다른 컬럼은 계속 이동 가능). ' +
+            '고정(pinned) 컬럼은 원래 드래그 대상이 아닙니다.',
         },
         {
           name: 'dataType',

@@ -854,6 +854,50 @@
     </script>
   </div>
 
+  <!-- ======================================================== valueGetter · getRowClass · suppressMove -->
+  <h2 class="section">Computed Columns &amp; Row Styling</h2>
+  <p class="section-desc">
+    <code class="inline">column.valueGetter(row)</code>는 파생 값을 계산해 행에 기록합니다 —
+    정렬·필터·CSV/JSON 내보내기 모두 같은 값을 봅니다.
+    <code class="inline">getRowClass(row, index)</code>는 행별 CSS 클래스를,
+    <code class="inline">column.suppressMove</code>는 특정 컬럼의 드래그 이동을 막습니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <style>
+        #gridComputed .row-hot .dg-cell { background: rgba(255, 170, 0, 0.12); }
+      </style>
+      <div id="gridComputed" class="grid-wrap-sm"></div>
+      <div class="status-line" id="computedStatus">
+        Total은 Qty × Unit Price로 계산된 컬럼입니다 — Qty를 더블클릭해 수정하면 Total·정렬이 함께 갱신됩니다.
+        합계 $2,000 이상 행은 강조 표시됩니다. Order ID는 suppressMove라 드래그로 옮길 수 없습니다.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridComputed'), {
+        rowData: DemoData.makeOrders(40, 43),
+        getRowClass: function (row) {
+          return row.total >= 2000 ? 'row-hot' : '';
+        },
+        columnDefs: [
+          { field: 'orderId', headerName: 'Order ID (고정 위치)', width: 150, suppressMove: true },
+          { field: 'product', headerName: 'Product', width: 170 },
+          { field: 'quantity', headerName: 'Qty', dataType: 'number', width: 90, editable: true },
+          { field: 'unitPrice', headerName: 'Unit Price', dataType: 'number', format: '$#,##0', width: 120 },
+          { field: 'total', headerName: 'Total (computed)', dataType: 'number', format: '$#,##0', width: 150,
+            valueGetter: function (row) { return row.quantity * row.unitPrice; } },
+        ],
+      });
+
+      grid.on('cellValueChanged', function (e) {
+        grid.refresh();   // Qty 수정 → valueGetter 재계산 반영
+        document.getElementById('computedStatus').textContent =
+          e.data.orderId + '의 Qty가 ' + e.newValue + '로 변경 → Total ' +
+          DataGrid.format(e.data.quantity * e.data.unitPrice, '$#,##0');
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

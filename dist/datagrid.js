@@ -474,6 +474,23 @@
     return out;
   }
 
+  /**
+   * valueGetter가 있는 컬럼의 파생 값을 행 객체의 field에 기록한다(ParamQuery
+   * formula 방식). 뷰 재계산 시마다 호출되어 정렬·필터·내보내기 모두가
+   * 같은 파생 값을 보게 된다. getter 예외는 기록하고 해당 셀만 건너뛴다.
+   */
+  function applyValueGetters(rows, columns) {
+    var getters = columns.filter(function (c) { return c.valueGetter && c.field; });
+    if (getters.length === 0) return rows;
+    rows.forEach(function (row) {
+      getters.forEach(function (c) {
+        try { row[c.field] = c.valueGetter(row); }
+        catch (e) { console.error('[DataGrid] valueGetter failed for "' + c.field + '":', e); }
+      });
+    });
+    return rows;
+  }
+
   /** 뷰 행 배열 → field가 있는 컬럼만 담은 평범한 객체 배열 (getJson()용). */
   function buildJsonRows(rows, columns) {
     return rows.map(function (row) {
@@ -832,6 +849,7 @@
       .map(function (c) { return c.field; })
       .filter(Boolean);
 
+    applyValueGetters(this._rows, this._columns);
     var rows = filterRows(this._rows, this._filterModel);
     rows = quickFilterRows(rows, this._quickFilter, fields);
     rows = sortRows(rows, this._sortModel, comparators);
@@ -953,7 +971,7 @@
         self._bindResizer(resizer, col);
       }
 
-      if (self.options.columnReorder !== false && !col.pinned && !col.checkboxSelection) {
+      if (self.options.columnReorder !== false && !col.pinned && !col.checkboxSelection && !col.suppressMove) {
         self._bindReorder(cell, col);
       }
 
@@ -1188,6 +1206,14 @@
     var globalIndex = (this._pageInfo ? this._pageInfo.start : 0) + pageIndex;
     if (globalIndex % 2 === 1) rowEl.classList.add('dg-row-odd');
     if (this._selection[id]) rowEl.classList.add('dg-row-selected');
+    if (this.options.getRowClass) {
+      try {
+        var rowCls = this.options.getRowClass(row, globalIndex);
+        if (rowCls) rowEl.classList.add.apply(rowEl.classList, String(rowCls).split(/\s+/));
+      } catch (e) {
+        console.error('[DataGrid] getRowClass failed:', e);
+      }
+    }
 
     this._visibleColumns().forEach(function (col, cIdx) {
       var cell = el('div', 'dg-cell', rowEl);
@@ -2633,6 +2659,7 @@
     csvEscape: csvEscape,
     buildCsv: buildCsv,
     buildJsonRows: buildJsonRows,
+    applyValueGetters: applyValueGetters,
     normalizeColumns: normalizeColumns,
     applyColumnState: applyColumnState,
     computeColumnWidths: computeColumnWidths,

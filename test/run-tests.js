@@ -326,6 +326,43 @@ suite('csv', function () {
   assertEq(csv, 'Name,Amount\r\n"Kim, Minsoo",$1200', 'header + formatted + escaped row');
 });
 
+/* ---------------- applyValueGetters ---------------- */
+suite('applyValueGetters', function () {
+  var rows = [
+    { qty: 2, price: 100 },
+    { qty: 3, price: 50 },
+  ];
+  var cols = [
+    { field: 'qty' },
+    { field: 'total', valueGetter: function (r) { return r.qty * r.price; } },
+  ];
+  var out = T.applyValueGetters(rows, cols);
+  assert(out === rows, 'returns same array');
+  assertEq(rows[0].total, 200, 'derived value written to row');
+  assertEq(rows[1].total, 150, 'second row derived');
+
+  /* getter가 기존 필드를 덮어쓸 수도 있다 */
+  T.applyValueGetters(rows, [{ field: 'qty', valueGetter: function (r) { return r.qty + 10; } }]);
+  assertEq(rows[0].qty, 12, 'getter can overwrite existing field');
+
+  /* 예외는 해당 셀만 건너뛴다 */
+  var errRows = [{ a: 1 }, { a: 2 }];
+  var origError = console.error;
+  console.error = function () {};
+  T.applyValueGetters(errRows, [{
+    field: 'b',
+    valueGetter: function (r) { if (r.a === 1) throw new Error('boom'); return r.a * 2; },
+  }]);
+  console.error = origError;
+  assertEq(errRows[0].b, undefined, 'failing getter leaves value unset');
+  assertEq(errRows[1].b, 4, 'other rows still computed');
+
+  /* field 없는 getter·getter 없는 컬럼은 무시 */
+  var same = [{ x: 1 }];
+  T.applyValueGetters(same, [{ valueGetter: function () { return 9; } }, { field: 'x' }]);
+  assertEq(same, [{ x: 1 }], 'no field or no getter → untouched');
+});
+
 /* ---------------- buildJsonRows ---------------- */
 suite('buildJsonRows', function () {
   var rows = [
