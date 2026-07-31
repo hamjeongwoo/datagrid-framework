@@ -247,6 +247,24 @@ window.ApiDocs = {
             '행 끝에서는 다음/이전 행으로 감쌉니다.',
         },
         {
+          name: 'rowDetail',
+          type: '{ renderer: (row) => string | Node, height?: number }',
+          since: '1.2.0',
+          description:
+            '마스터-디테일 행. 첫 컬럼에 셰브론 토글 컬럼이 자동 추가되고, 펼치면 행 아래에 ' +
+            '<code>renderer</code>가 그린 디테일 패널이 나타납니다(기본 높이 200px, ' +
+            '<code>height</code>로 조절 — 가상 스크롤 레이아웃에 정확히 반영). ' +
+            '<code>expandRow()</code> / <code>collapseRow()</code> / <code>toggleRowDetail()</code> / ' +
+            '<code>isRowExpanded()</code>로 제어합니다. ' +
+            '<strong>renderer가 반환한 HTML은 이스케이프되지 않습니다</strong> — ' +
+            '<code>cellRenderer</code>와 같은 주의가 필요합니다.',
+          example:
+            'rowDetail: {\n' +
+            '  height: 150,\n' +
+            "  renderer: function (row) { return '<h4>' + row.name + '</h4>…'; },\n" +
+            '}',
+        },
+        {
           name: 'dataSource',
           type: '{ url, method?, params?, parse? }',
           since: '1.2.0',
@@ -924,6 +942,19 @@ window.ApiDocs = {
           description: '페이지 크기를 변경합니다. 현재 보고 있던 첫 행이 포함된 페이지로 이동합니다.',
         },
 
+        /* ---- 마스터-디테일 ---- */
+        {
+          name: 'expandRow',
+          group: 'Master-Detail',
+          signature: 'expandRow(row: object): boolean',
+          since: '1.2.0',
+          description:
+            '행의 디테일 패널을 펼치고 <code>rowExpanded</code>를 발생시킵니다. ' +
+            '<code>collapseRow(row)</code>는 접고 <code>rowCollapsed</code>를 발생, ' +
+            '<code>toggleRowDetail(row)</code>는 토글, <code>isRowExpanded(row)</code>는 상태 조회. ' +
+            '<code>rowDetail</code> 옵션이 없거나 이미 해당 상태면 <code>false</code>를 반환합니다.',
+        },
+
         /* ---- 셀 선택 · 검색 ---- */
         {
           name: 'getCellRange',
@@ -1331,6 +1362,14 @@ window.ApiDocs = {
           since: '1.2.0',
           description:
             '셀에 포커스가 있는 상태의 키 입력(편집 중 제외). 그리드 자체 키 처리(화살표·Enter 등)보다 먼저 발생합니다.',
+        },
+        {
+          name: 'rowExpanded',
+          payload: '{ data }',
+          since: '1.2.0',
+          description:
+            '디테일 패널이 펼쳐질 때(셰브론 클릭·<code>expandRow()</code>). ' +
+            '접힐 때는 <code>rowCollapsed</code>가 발생합니다.',
         },
         {
           name: 'dataLoadError',

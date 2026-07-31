@@ -439,6 +439,43 @@
     return items;
   }
 
+  /**
+   * 마스터-디테일이 섞인 표시 리스트의 세로 레이아웃.
+   * __detail 항목은 detailHeight, 나머지는 rowHeight를 차지한다.
+   * { tops: [항목별 top(px)], total: 전체 높이, ordinals: [디테일 제외 순번] }
+   * ordinals는 행 번호·얼룩말 배경이 디테일 행을 건너뛰고 이어지게 한다.
+   */
+  function computeRowTops(items, rowHeight, detailHeight) {
+    var tops = [];
+    var ordinals = [];
+    var top = 0;
+    var ordinal = 0;
+    for (var i = 0; i < items.length; i++) {
+      tops.push(top);
+      ordinals.push(ordinal);
+      if (items[i] && items[i].__detail) {
+        top += detailHeight;
+      } else {
+        top += rowHeight;
+        ordinal++;
+      }
+    }
+    return { tops: tops, total: top, ordinals: ordinals };
+  }
+
+  /** tops(오름차순)에서 y 오프셋이 속한 행 인덱스(top <= y인 마지막 인덱스). */
+  function findRowAtOffset(tops, y) {
+    if (tops.length === 0) return 0;
+    var lo = 0;
+    var hi = tops.length - 1;
+    while (lo < hi) {
+      var mid = (lo + hi + 1) >> 1;
+      if (tops[mid] <= y) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo;
+  }
+
   function paginate(totalRows, pageSize, currentPage) {
     var pageCount = Math.max(1, Math.ceil(totalRows / pageSize));
     var page = clamp(currentPage, 0, pageCount - 1);
@@ -824,6 +861,11 @@
     this._rangeDragging = false;
     this._findCursor = null;
 
+    /* master-detail rows */
+    this._detailExpanded = {}; /* rowId -> true */
+    this._rowTops = null; /* rowDetail 사용 시 항목별 top 오프셋 */
+    this._pageOrdinals = null;
+
     /* pagination */
     this._pagination = !!options.pagination;
     this._pageSize = options.paginationPageSize || 20;
@@ -867,6 +909,13 @@
 
   DataGrid.prototype._buildColumns = function () {
     var cols = normalizeColumns(this.options.columnDefs, this.options.defaultColDef);
+    if (this.options.rowDetail) {
+      cols.unshift({
+        colId: '__detailToggle', headerName: '', width: 44, minWidth: 36, maxWidth: 60,
+        sortable: false, resizable: false, editable: false, filter: false,
+        hide: false, pinned: 'left', align: 'center', __detailToggle: true,
+      });
+    }
     if (this.options.rowNumbers) {
       cols.unshift({
         colId: '__rowNum', headerName: '', width: 52, minWidth: 40, maxWidth: 90,
@@ -1082,6 +1131,34 @@
       this._pageInfo = null;
       this._pageRows = display;
     }
+
+    /* 마스터-디테일: 펼쳐진 행 뒤에 디테일 항목을 끼우고 세로 레이아웃을 계산 */
+    this._rowTops = null;
+    this._pageOrdinals = null;
+    if (this.options.rowDetail) {
+      var self2 = this;
+      var withDetails = [];
+      this._pageRows.forEach(function (row) {
+        withDetails.push(row);
+        if (!row.__group && self2._detailExpanded[self2._rowId(row)]) {
+          withDetails.push({ __detail: true, row: row });
+        }
+      });
+      this._pageRows = withDetails;
+      var layout = computeRowTops(withDetails, this._rowHeight, this._detailHeight());
+      this._rowTops = layout.tops;
+      this._pageOrdinals = layout.ordinals;
+      this._totalRowsHeight = layout.total;
+    }
+  };
+
+  DataGrid.prototype._detailHeight = function () {
+    return (this.options.rowDetail && this.options.rowDetail.height) || 200;
+  };
+
+  /** 페이지 인덱스의 top 오프셋(px). 디테일 행이 없으면 등간격. */
+  DataGrid.prototype._rowTop = function (pageIndex) {
+    return this._rowTops ? this._rowTops[pageIndex] : pageIndex * this._rowHeight;
   };
 
   /* ---- full refresh ---- */
@@ -1393,6 +1470,11 @@
     /* apply to rendered rows */
     for (var idx in this._renderedRows) {
       var rowEl = this._renderedRows[idx];
+      if (rowEl.classList.contains('dg-detail-row')) {
+        var detailBody = rowEl.firstChild;
+        if (detailBody) detailBody.style.width = (this._bodyEl.clientWidth || 400) + 'px';
+        continue;
+      }
       for (var j = 0; j < rowEl.children.length; j++) {
         this._applyCellLayout(rowEl.children[j], rowEl.children[j].dataset.colId);
       }
@@ -1419,15 +1501,22 @@
     this._canvasEl.innerHTML = '';
     this._renderedRows = {};
     this._lastRange = null;
-    this._canvasEl.style.height = this._pageRows.length * this._rowHeight + 'px';
+    this._canvasEl.style.height =
+      (this._rowTops ? this._totalRowsHeight : this._pageRows.length * this._rowHeight) + 'px';
     this._renderVisibleRows(true);
   };
 
   DataGrid.prototype._renderVisibleRows = function (force) {
     var total = this._pageRows.length;
     var viewportH = this._bodyEl.clientHeight || 400;
-    var first = Math.floor(this._bodyEl.scrollTop / this._rowHeight) - ROW_BUFFER;
-    var last = Math.ceil((this._bodyEl.scrollTop + viewportH) / this._rowHeight) + ROW_BUFFER;
+    var first, last;
+    if (this._rowTops) {
+      first = findRowAtOffset(this._rowTops, this._bodyEl.scrollTop) - ROW_BUFFER;
+      last = findRowAtOffset(this._rowTops, this._bodyEl.scrollTop + viewportH) + 1 + ROW_BUFFER;
+    } else {
+      first = Math.floor(this._bodyEl.scrollTop / this._rowHeight) - ROW_BUFFER;
+      last = Math.ceil((this._bodyEl.scrollTop + viewportH) / this._rowHeight) + ROW_BUFFER;
+    }
     first = clamp(first, 0, Math.max(0, total - 1));
     last = clamp(last, 0, total);
 
@@ -1453,14 +1542,16 @@
   DataGrid.prototype._buildRowEl = function (pageIndex) {
     var self = this;
     var row = this._pageRows[pageIndex];
+    if (row && row.__detail) return this._buildDetailRowEl(pageIndex, row);
     if (row && row.__group) return this._buildGroupRowEl(pageIndex, row);
     var id = this._rowId(row);
     var rowEl = el('div', 'dg-row');
     rowEl.setAttribute('role', 'row');
-    rowEl.style.top = pageIndex * this._rowHeight + 'px';
+    rowEl.style.top = this._rowTop(pageIndex) + 'px';
     rowEl.dataset.rowIndex = pageIndex;
     rowEl.dataset.rowId = id;
-    var globalIndex = (this._pageInfo ? this._pageInfo.start : 0) + pageIndex;
+    var ordinal = this._pageOrdinals ? this._pageOrdinals[pageIndex] : pageIndex;
+    var globalIndex = (this._pageInfo ? this._pageInfo.start : 0) + ordinal;
     if (globalIndex % 2 === 1) rowEl.classList.add('dg-row-odd');
     if (this._selection[id]) rowEl.classList.add('dg-row-selected');
     if (this.options.getRowClass) {
@@ -1517,6 +1608,15 @@
         return;
       }
 
+      if (col.__detailToggle) {
+        cell.classList.add('dg-detail-toggle-cell');
+        var expanded = !!self._detailExpanded[id];
+        var chev = el('span', 'dg-group-chevron' + (expanded ? ' dg-expanded' : ''), cell);
+        chev.innerHTML = CHEVRON_SVG;
+        cell.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        return;
+      }
+
       if (col.checkboxSelection) {
         cell.classList.add('dg-checkbox-cell');
         var cb = el('input', 'dg-checkbox', cell);
@@ -1543,7 +1643,7 @@
     var rowEl = el('div', 'dg-row dg-group-row');
     rowEl.setAttribute('role', 'row');
     rowEl.setAttribute('aria-expanded', item.expanded ? 'true' : 'false');
-    rowEl.style.top = pageIndex * this._rowHeight + 'px';
+    rowEl.style.top = this._rowTop(pageIndex) + 'px';
     rowEl.dataset.rowIndex = pageIndex;
 
     var cols = this._visibleColumns();
@@ -1588,6 +1688,28 @@
       }
     });
 
+    return rowEl;
+  };
+
+  /* 디테일 행: 전체 폭을 차지하는 컨테이너 하나. 내용은 rowDetail.renderer가 채운다. */
+  DataGrid.prototype._buildDetailRowEl = function (pageIndex, item) {
+    var rowEl = el('div', 'dg-row dg-detail-row');
+    rowEl.setAttribute('role', 'row');
+    rowEl.style.top = this._rowTop(pageIndex) + 'px';
+    rowEl.style.height = this._detailHeight() + 'px';
+    rowEl.dataset.rowIndex = pageIndex;
+    var body = el('div', 'dg-detail-body', rowEl);
+    body.style.width = (this._bodyEl.clientWidth || 400) + 'px';
+    var renderer = this.options.rowDetail && this.options.rowDetail.renderer;
+    if (renderer) {
+      try {
+        var out = renderer(item.row);
+        if (out instanceof (global.Node || Object)) body.appendChild(out);
+        else if (out !== undefined && out !== null) body.innerHTML = out;
+      } catch (e) {
+        console.error('[DataGrid] rowDetail.renderer failed:', e);
+      }
+    }
     return rowEl;
   };
 
@@ -1860,6 +1982,38 @@
     });
   };
 
+  /* ---- master-detail rows (rowDetail) ---- */
+
+  /** 행의 디테일 패널을 펼친다. rowDetail 미설정·이미 펼침이면 false. */
+  DataGrid.prototype.expandRow = function (row) {
+    if (!this.options.rowDetail || !row) return false;
+    var id = this._rowId(row);
+    if (this._detailExpanded[id]) return false;
+    this._detailExpanded[id] = true;
+    this.refresh();
+    this._emitter.emit('rowExpanded', { data: row });
+    return true;
+  };
+
+  /** 행의 디테일 패널을 접는다. 펼쳐져 있지 않으면 false. */
+  DataGrid.prototype.collapseRow = function (row) {
+    if (!this.options.rowDetail || !row) return false;
+    var id = this._rowId(row);
+    if (!this._detailExpanded[id]) return false;
+    delete this._detailExpanded[id];
+    this.refresh();
+    this._emitter.emit('rowCollapsed', { data: row });
+    return true;
+  };
+
+  DataGrid.prototype.toggleRowDetail = function (row) {
+    if (!this.expandRow(row)) this.collapseRow(row);
+  };
+
+  DataGrid.prototype.isRowExpanded = function (row) {
+    return !!(row && this._detailExpanded[this._rowId(row)]);
+  };
+
   /* ---- grand total footer ---- */
 
   DataGrid.prototype._renderGrandTotal = function () {
@@ -2024,7 +2178,7 @@
     var rows = [];
     for (var r = range.r1; r <= range.r2; r++) {
       var row = this._pageRows[r];
-      if (row && !row.__group) rows.push(row);
+      if (row && !row.__group && !row.__detail) rows.push(row);
     }
     return {
       startRow: range.r1, endRow: range.r2,
@@ -2082,10 +2236,15 @@
 
   DataGrid.prototype._onCellClick = function (e) {
     var hit = this._cellFromEvent(e);
-    if (!hit || !hit.row) return;
+    if (!hit || !hit.row || hit.row.__detail) return;
 
     if (hit.row.__group) {
       this._toggleGroup(hit.row);
+      return;
+    }
+
+    if (hit.col && hit.col.__detailToggle) {
+      this.toggleRowDetail(hit.row);
       return;
     }
 
@@ -2233,8 +2392,14 @@
     var handled = true;
 
     switch (e.key) {
-      case 'ArrowUp': r = Math.max(0, r - 1); break;
-      case 'ArrowDown': r = Math.min(maxR, r + 1); break;
+      case 'ArrowUp':
+        r = Math.max(0, r - 1);
+        while (r > 0 && this._pageRows[r] && this._pageRows[r].__detail) r--;
+        break;
+      case 'ArrowDown':
+        r = Math.min(maxR, r + 1);
+        while (r < maxR && this._pageRows[r] && this._pageRows[r].__detail) r++;
+        break;
       case 'ArrowLeft': c = Math.max(0, c - 1); break;
       case 'ArrowRight': c = Math.min(maxC, c + 1); break;
       case 'Enter': {
@@ -2270,8 +2435,9 @@
   };
 
   DataGrid.prototype._scrollRowIntoView = function (r) {
-    var top = r * this._rowHeight;
-    var bottom = top + this._rowHeight;
+    var top = this._rowTop(r);
+    var item = this._pageRows[r];
+    var bottom = top + (item && item.__detail ? this._detailHeight() : this._rowHeight);
     if (top < this._bodyEl.scrollTop) this._bodyEl.scrollTop = top;
     else if (bottom > this._bodyEl.scrollTop + this._bodyEl.clientHeight) {
       this._bodyEl.scrollTop = bottom - this._bodyEl.clientHeight;
@@ -2539,7 +2705,7 @@
       }
       if (nr < 0 || nr >= this._pageRows.length) return false;
       var row = this._pageRows[nr];
-      if (!row || row.__group) continue;
+      if (!row || row.__group || row.__detail) continue;
       var col = cols[nc];
       if (!col || !col.editable || !this._editable || col.field === undefined) {
         if (dc !== 0) continue;
@@ -2677,7 +2843,7 @@
 
     matrix.forEach(function (cells, i) {
       var row = self._pageRows[startR + i];
-      if (!row || row.__group) return;
+      if (!row || row.__group || row.__detail) return;
       cells.forEach(function (raw, j) {
         var col = cols[startC + j];
         if (!col || !col.editable || col.field === undefined) return;
@@ -3452,6 +3618,8 @@
     buildGroupHeaderRuns: buildGroupHeaderRuns,
     buildDataSourceRequest: buildDataSourceRequest,
     parseDataSourceResponse: parseDataSourceResponse,
+    computeRowTops: computeRowTops,
+    findRowAtOffset: findRowAtOffset,
     normalizeColumns: normalizeColumns,
     applyColumnState: applyColumnState,
     computeColumnWidths: computeColumnWidths,

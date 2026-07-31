@@ -383,6 +383,21 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--dg-invalid-color) 18%, transparent);
 }
 
+/* 마스터-디테일 행 (rowDetail) */
+.dg-detail-toggle-cell { cursor: pointer; }
+.dg-row.dg-detail-row {
+  background: var(--dg-group-row-background-color);
+  border-bottom: 1px solid var(--dg-row-border-color);
+}
+.dg-detail-body {
+  position: sticky;
+  left: 0;
+  height: 100%;
+  padding: 12px 16px;
+  overflow: auto;
+  box-sizing: border-box;
+}
+
 /* 셀/블록 선택 (cellSelection) — background-image로 겹쳐 고정 컬럼 배경 보존 */
 .dg-cell.dg-cell-range {
   background-image: linear-gradient(

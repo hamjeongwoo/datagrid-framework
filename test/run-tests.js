@@ -363,6 +363,34 @@ suite('applyValueGetters', function () {
   assertEq(same, [{ x: 1 }], 'no field or no getter → untouched');
 });
 
+/* ---------------- computeRowTops / findRowAtOffset ---------------- */
+suite('computeRowTops / findRowAtOffset', function () {
+  var items = [
+    { id: 1 },
+    { __detail: true, row: { id: 1 } },
+    { id: 2 },
+    { id: 3 },
+    { __detail: true, row: { id: 3 } },
+  ];
+  var layout = T.computeRowTops(items, 40, 200);
+  assertEq(layout.tops, [0, 40, 240, 280, 320], 'tops accumulate mixed heights');
+  assertEq(layout.total, 520, 'total height');
+  assertEq(layout.ordinals, [0, 1, 1, 2, 3], 'ordinals skip detail rows');
+
+  var empty = T.computeRowTops([], 40, 200);
+  assertEq(empty.tops, [], 'empty items');
+  assertEq(empty.total, 0, 'empty total');
+
+  var tops = layout.tops;
+  assertEq(T.findRowAtOffset(tops, 0), 0, 'offset 0 → first row');
+  assertEq(T.findRowAtOffset(tops, 39), 0, 'inside first row');
+  assertEq(T.findRowAtOffset(tops, 40), 1, 'boundary → detail row');
+  assertEq(T.findRowAtOffset(tops, 239), 1, 'inside tall detail row');
+  assertEq(T.findRowAtOffset(tops, 240), 2, 'after detail');
+  assertEq(T.findRowAtOffset(tops, 9999), 4, 'beyond end → last row');
+  assertEq(T.findRowAtOffset([], 100), 0, 'empty tops → 0');
+});
+
 /* ---------------- buildDataSourceRequest / parseDataSourceResponse ---------------- */
 suite('dataSource request/response', function () {
   var state = {

@@ -1194,6 +1194,61 @@
     </script>
   </div>
 
+  <!-- ======================================================== 마스터-디테일 -->
+  <h2 class="section">Master-Detail Rows</h2>
+  <p class="section-desc">
+    <code class="inline">rowDetail: { renderer(row), height }</code>는 행 아래에 커스텀 디테일 패널을 펼칩니다.
+    첫 컬럼의 셰브론(자동 추가)이나 <code class="inline">expandRow(row)</code> /
+    <code class="inline">collapseRow(row)</code> / <code class="inline">toggleRowDetail(row)</code>로 제어하고
+    <code class="inline">rowExpanded</code> / <code class="inline">rowCollapsed</code> 이벤트가 발생합니다.
+    디테일 높이는 가상 스크롤 레이아웃에 정확히 반영됩니다.
+    (renderer 반환 HTML은 이스케이프되지 않으므로 신뢰할 수 있는 마크업만 사용하세요.)
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn" id="detailExpandBtn" type="button">expandRow(첫 행)</button>
+        <button class="tb-btn" id="detailCollapseBtn" type="button">collapseRow(첫 행)</button>
+      </div>
+      <div id="gridDetail" class="grid-wrap-md"></div>
+      <div class="status-line" id="detailStatus">행 앞의 ▸ 를 클릭해 디테일 패널을 펼쳐 보세요.</div>
+    </div>
+    <script type="text/x-example">
+      var rows = DemoData.makeEmployees(100, 67);
+      var grid = new DataGrid(document.getElementById('gridDetail'), {
+        rowData: rows,
+        rowDetail: {
+          height: 150,
+          renderer: function (row) {
+            return '<div style="display:flex;gap:32px">' +
+              '<dl style="margin:0"><dt style="font-weight:600">Email</dt><dd style="margin:0 0 8px">' + row.email + '</dd>' +
+              '<dt style="font-weight:600">Hire Date</dt><dd style="margin:0">' + row.hireDate + '</dd></dl>' +
+              '<dl style="margin:0"><dt style="font-weight:600">Status</dt><dd style="margin:0 0 8px">' + row.status + '</dd>' +
+              '<dt style="font-weight:600">Progress</dt><dd style="margin:0">' + row.progress + '%</dd></dl>' +
+              '</div>';
+          },
+        },
+        columnDefs: [
+          { field: 'name', headerName: 'Name', width: 170 },
+          { field: 'department', headerName: 'Department', width: 150 },
+          { field: 'city', headerName: 'City', width: 130 },
+          { field: 'salary', headerName: 'Salary', dataType: 'number', format: '$#,##0', width: 130 },
+        ],
+      });
+
+      var status = document.getElementById('detailStatus');
+      grid.on('rowExpanded', function (e) { status.textContent = 'rowExpanded: ' + e.data.name; });
+      grid.on('rowCollapsed', function (e) { status.textContent = 'rowCollapsed: ' + e.data.name; });
+
+      document.getElementById('detailExpandBtn').addEventListener('click', function () {
+        grid.expandRow(rows[0]);
+      });
+      document.getElementById('detailCollapseBtn').addEventListener('click', function () {
+        grid.collapseRow(rows[0]);
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>
