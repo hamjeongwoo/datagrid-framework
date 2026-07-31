@@ -142,6 +142,18 @@ suite('quickFilterRows', function () {
   assertEq(T.quickFilterRows(rows, '  ', fields).length, 3, 'blank text returns all');
 });
 
+/* ---------------- validation message ---------------- */
+suite('validationMessage', function () {
+  var v = T.validationMessage;
+  assertEq(v(true), null, 'true is valid');
+  assertEq(v(undefined), null, 'undefined is valid (validator with no return)');
+  assertEq(v(null), null, 'null is valid');
+  assertEq(v('급여는 0 이상이어야 합니다'), '급여는 0 이상이어야 합니다', 'string is the error message');
+  assertEq(v(false), 'Invalid value', 'false rejects with default message');
+  assertEq(v(''), 'Invalid value', 'empty string rejects with default message');
+  assertEq(v(0), 'Invalid value', 'other falsy values reject with default message');
+});
+
 /* ---------------- floating filter model ---------------- */
 suite('buildFloatingFilterModel', function () {
   var f = T.buildFloatingFilterModel;

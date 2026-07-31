@@ -64,9 +64,9 @@
 
 | | ParamQuery | 제안 API | 우선순위 |
 |---|---|---|---|
-| [ ] | **`column > validations`**, `validation`, `isValid()` (편집 검증: minLen/maxLen/format/regexp/nonEmpty/gte/lte) | `column.validator(value, row) => true \| '오류 메시지'` + 실패 시 커밋 거부·`--dg-invalid-color` 표시 | **P1** |
-| [ ] | **편집 프로그래매틱 제어**: `editCell() · quitEditMode() · saveEditCell() · getEditCell() · isEditableCell()` | `startEdit(row, field)` / `stopEdit(commit)` / `isEditing()` | **P1** |
-| [ ] | 편집 라이프사이클 이벤트: `editorBegin · editorEnd · cellBeforeSave(취소 가능) · cellSave` | `editingStarted` / `editingStopped` / `beforeCellSave`(=`e.cancel = true` 지원) | **P1** |
+| [x] | **`column > validations`**, `validation`, `isValid()` (편집 검증: minLen/maxLen/format/regexp/nonEmpty/gte/lte) | `column.validator(value, row) => true \| '오류 메시지'` — 실패 시 커밋 거부 + 편집기 유지(`--dg-invalid-color` 표시, title 툴팁) — v1.1.0 | **P1** |
+| [x] | **편집 프로그래매틱 제어**: `editCell() · quitEditMode() · saveEditCell() · getEditCell() · isEditableCell()` | `startEdit(row, field)`(페이지 이동·스크롤 포함, 성공 여부 반환) / `stopEdit(commit)` / `isEditing()` — v1.1.0 | **P1** |
+| [x] | 편집 라이프사이클 이벤트: `editorBegin · editorEnd · cellBeforeSave(취소 가능) · cellSave` | `editingStarted` / `editingStopped`(payload에 `committed`) / `beforeCellSave`(`e.cancel = true` 거부, `e.newValue` 수정 가능) — v1.1.0 | **P1** |
 | [ ] | `editModel` (Enter/Tab/화살표로 다음 셀 이동하며 연속 편집, 클릭 한 번 편집) | `editOnSingleClick`, `enterMovesDown`, `tabMovesRight` 옵션 | **P2** |
 | [ ] | 커스텀 에디터 (`column > editor` 함수형: init/getData) | `editor: { init(cell, value), getValue(), destroy() }` 객체 지원 | **P2** |
 | [ ] | **`trackModel` + `getChanges() · isDirty() · commit() · rollback()`** (변경 추적) | `trackChanges: true` 옵션 + `getChanges()` (added/updated/deleted) / `commitChanges()` / `rollbackChanges()` + dirty 셀 표시 | **P2** |
@@ -120,7 +120,7 @@
 | | ParamQuery | 제안 API | 우선순위 |
 |---|---|---|---|
 | [ ] | `create · load · dataReady · render · refresh · complete` 이벤트 | `gridReady` / `dataChanged` / `viewRendered` 3개로 정리 | **P1** (쉬움) |
-| [ ] | **취소 가능한 before 이벤트 패턴** (`beforeSort · beforeTableView · beforeCheck …`) | 이벤트 payload에 `e.cancel = true` 규약 도입 — 우선 `beforeSort` / `beforeCellSave` / `beforeExport` / `beforeSelectionChange` | **P1** |
+| [ ] | **취소 가능한 before 이벤트 패턴** (`beforeSort · beforeTableView · beforeCheck …`) | 이벤트 payload에 `e.cancel = true` 규약 도입 — 우선 `beforeSort` / `beforeCellSave`(✔ v1.1.0에서 규약 도입) / `beforeExport` / `beforeSelectionChange` | **P1** |
 | [ ] | `refreshCell() / refreshRow() / refreshColumn()` (부분 갱신) | 동일 이름 — 대량 데이터에서 전체 refresh 회피 | **P2** |
 | [ ] | `option(name, value)` (런타임 옵션 변경) | `setOptions({ ... })` — 재생성 없이 주요 옵션 갱신 | **P2** |
 | [ ] | `one(event, fn)` | `once(event, fn)` | P3 |

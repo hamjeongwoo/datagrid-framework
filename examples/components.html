@@ -233,13 +233,13 @@
 
   <!-- Inline editor -->
   <h2 class="section">Inline Cell Editor</h2>
-  <p class="section-desc">편집 중인 셀 — 액센트 보더의 인라인 인풋.</p>
+  <p class="section-desc">편집 중인 셀 — 액센트 보더의 인라인 인풋. validator가 거부하면 <code class="inline">dg-invalid</code> 상태(빨간 보더, 메시지는 title 툴팁).</p>
   <div class="dg-root specimen">
     <div class="dg-canvas" style="height:auto">
       <div class="dg-row">
         <div class="dg-cell" style="width:200px">Read-only cell</div>
         <div class="dg-cell" style="width:220px;padding:0 6px"><input class="dg-cell-editor" value="편집 중…"></div>
-        <div class="dg-cell" style="width:160px">Cell</div>
+        <div class="dg-cell" style="width:240px;padding:0 6px"><input class="dg-cell-editor dg-invalid" value="-500" title="급여는 0 이상이어야 합니다"></div>
       </div>
     </div>
   </div>

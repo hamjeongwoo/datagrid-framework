@@ -337,6 +337,19 @@ window.ApiDocs = {
           description: "<code>editor: 'select'</code>일 때의 선택지 목록.",
         },
         {
+          name: 'validator',
+          type: "(value, row) => true | string",
+          since: '1.1.0',
+          description:
+            '편집 커밋 직전에 호출되는 검증 함수. <code>true</code>(또는 반환 없음)면 저장하고, ' +
+            '문자열을 반환하면 그 메시지로 커밋을 거부합니다 — 편집기가 빨간 테두리(<code>--dg-invalid-color</code>)로 ' +
+            '유지되고 메시지는 title 툴팁으로 표시되며, 값을 고치거나 <kbd>Esc</kbd>로 취소할 때까지 닫히지 않습니다. ' +
+            '검증 통과 후에는 <a href="#events-beforeCellSave"><code>beforeCellSave</code></a> 이벤트로 한 번 더 거부할 수 있습니다.',
+          example:
+            "{ field: 'salary', editable: true, editor: 'number',\n" +
+            "  validator: function (v) { return v >= 0 || '급여는 0 이상이어야 합니다'; } }",
+        },
+        {
           name: 'valueFormatter',
           type: '(value, row) => string',
           description:
@@ -530,6 +543,35 @@ window.ApiDocs = {
             '<code>deselectAll()</code>은 모든 선택을 해제합니다.',
         },
 
+        /* ---- 편집 ---- */
+        {
+          name: 'startEdit',
+          group: 'Editing',
+          signature: 'startEdit(row: object, field: string): boolean',
+          since: '1.1.0',
+          description:
+            '지정한 행/필드의 인라인 편집을 코드로 시작합니다. 다른 페이지에 있으면 해당 페이지로 이동하고 ' +
+            '행을 스크롤해 보이게 만든 뒤 시작합니다. 편집 불가 컬럼이거나 행이 현재 뷰에 없으면 ' +
+            '<code>false</code>를 반환합니다.',
+          example: "grid.startEdit(grid.getSelectedRows()[0], 'salary');",
+        },
+        {
+          name: 'stopEdit',
+          group: 'Editing',
+          signature: 'stopEdit(commit?: boolean): void',
+          since: '1.1.0',
+          description:
+            '진행 중인 편집을 종료합니다. 기본은 커밋(검증·<code>beforeCellSave</code> 통과 시 저장), ' +
+            '<code>stopEdit(false)</code>는 취소합니다. 편집 중이 아니면 무시됩니다.',
+        },
+        {
+          name: 'isEditing',
+          group: 'Editing',
+          signature: 'isEditing(): boolean',
+          since: '1.1.0',
+          description: '인라인 편집이 진행 중인지 반환합니다.',
+        },
+
         /* ---- 필터/정렬 ---- */
         {
           name: 'setQuickFilter',
@@ -714,6 +756,33 @@ window.ApiDocs = {
           name: 'cellValueChanged',
           payload: '{ data, colDef, oldValue, newValue }',
           description: '인라인 편집이 커밋되어 값이 실제로 바뀌었을 때. 서버 저장 훅으로 사용하세요.',
+        },
+        {
+          name: 'editingStarted',
+          payload: '{ data, colDef, value }',
+          since: '1.1.0',
+          description: '인라인 편집이 시작될 때 (더블클릭·<kbd>Enter</kbd>·<code>startEdit()</code> 모두).',
+        },
+        {
+          name: 'editingStopped',
+          payload: '{ data, colDef, oldValue, newValue, committed }',
+          since: '1.1.0',
+          description:
+            '편집기가 닫힐 때. <code>committed</code>가 <code>true</code>면 값이 저장된 것이고, ' +
+            '<code>false</code>면 취소되었거나 값이 바뀌지 않은 것입니다(<code>newValue</code>는 이때 이전 값).',
+        },
+        {
+          name: 'beforeCellSave',
+          payload: '{ data, colDef, oldValue, newValue, cancel }',
+          since: '1.1.0',
+          description:
+            '<strong>취소 가능 이벤트</strong> — 검증 통과 후, 값이 저장되기 직전에 발생합니다. ' +
+            '핸들러에서 <code>e.cancel = true</code>를 설정하면 저장이 거부되고 편집기가 유지됩니다. ' +
+            '<code>e.newValue</code>를 수정하면 그 값으로 저장됩니다(정규화 훅).',
+          example:
+            "grid.on('beforeCellSave', function (e) {\n" +
+            "  if (e.colDef.field === 'salary' && e.newValue > 900000) e.cancel = true;\n" +
+            '});',
         },
         {
           name: 'sortChanged',

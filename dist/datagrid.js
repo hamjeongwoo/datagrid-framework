@@ -174,6 +174,16 @@
   }
 
   /**
+   * column.validator 반환값 해석: 유효하면 null, 아니면 표시할 오류 메시지.
+   * true/undefined/null = 유효, 문자열 = 해당 메시지로 거부,
+   * 그 외 falsy(false 등) = 기본 메시지로 거부.
+   */
+  function validationMessage(result) {
+    if (result === true || result === undefined || result === null) return null;
+    return typeof result === 'string' && result !== '' ? result : 'Invalid value';
+  }
+
+  /**
    * 헤더 필터 행(floatingFilter)의 입력값 → 컬럼 필터 모델.
    * - raw가 null/undefined이거나 (set 제외) 공백뿐이면 null(필터 해제).
    * - 이미 적용된 모델의 연산자는 유지하되, 단일 입력으로 표현할 수 없는
@@ -1528,28 +1538,66 @@
 
     var self = this;
     var finished = false;
+    var markInvalid = function (message) {
+      input.classList.add('dg-invalid');
+      input.setAttribute('aria-invalid', 'true');
+      if (message) input.title = message;
+      input.focus();
+    };
+    var clearInvalid = function () {
+      input.classList.remove('dg-invalid');
+      input.removeAttribute('aria-invalid');
+      input.removeAttribute('title');
+    };
+    /* commit=true 커밋 시도: validator 실패 또는 beforeCellSave 취소면
+     * 편집기를 닫지 않고 유지한다(사용자가 고치거나 Esc로 취소하도록). */
     var finish = function (commit) {
       if (finished) return;
-      finished = true;
       var newValue = input.value;
-      self._editing = null;
+      var committed = false;
       if (commit) {
         if (editorType === 'number') {
           var n = Number(newValue);
           newValue = newValue === '' || isNaN(n) ? value : n;
         }
         if (newValue !== value) {
-          row[col.field] = newValue;
+          if (col.validator) {
+            var result;
+            try { result = col.validator(newValue, row); }
+            catch (e) {
+              console.error('[DataGrid] validator failed for "' + col.field + '":', e);
+              result = true; /* validator 자체 오류는 편집을 막지 않는다 */
+            }
+            var message = validationMessage(result);
+            if (message) { markInvalid(message); return; }
+          }
+          var evt = { data: row, colDef: col, oldValue: value, newValue: newValue, cancel: false };
+          self._emitter.emit('beforeCellSave', evt);
+          if (evt.cancel) { markInvalid(); return; }
+          clearInvalid();
+          row[col.field] = evt.newValue;
+          newValue = evt.newValue;
+          committed = true;
           self._emitter.emit('cellValueChanged', {
-            data: row, colDef: col, oldValue: value, newValue: newValue,
+            data: row, colDef: col, oldValue: value, newValue: evt.newValue,
           });
         }
       }
+      finished = true;
+      self._editing = null;
       /* re-render the cell in place */
       cellEl.innerHTML = '';
       self._renderCellValue(cellEl, col, row);
+      self._emitter.emit('editingStopped', {
+        data: row,
+        colDef: col,
+        oldValue: value,
+        newValue: committed ? newValue : value,
+        committed: committed,
+      });
     };
 
+    input.addEventListener('input', clearInvalid);
     input.addEventListener('keydown', function (e) {
       e.stopPropagation();
       if (e.key === 'Enter') finish(true);
@@ -1557,12 +1605,50 @@
     });
     input.addEventListener('blur', function () { finish(true); });
 
-    this._editing = { finish: finish };
+    this._editing = { finish: finish, row: row, col: col };
+    this._emitter.emit('editingStarted', { data: row, colDef: col, value: value });
   };
 
   DataGrid.prototype._cancelEdit = function () {
     if (this._editing) this._editing.finish(false);
   };
+
+  /* ---- programmatic edit control ---- */
+
+  /** 지정한 행/필드의 편집을 시작한다. 페이지 밖이면 해당 페이지로 이동 후 시작.
+   *  편집 불가 컬럼·미표시 행이면 false를 반환한다. */
+  DataGrid.prototype.startEdit = function (row, field) {
+    var col = this._visibleColumns().find(function (c) { return c.field === field; });
+    if (!col || !col.editable || !row) return false;
+
+    var displayIndex = this._displayRows.indexOf(row);
+    if (displayIndex === -1) return false;
+
+    if (this._pagination) {
+      var page = Math.floor(displayIndex / this._pageSize);
+      if (page !== this._currentPage) this.setPage(page);
+    }
+    var pageIndex = this._pageRows.indexOf(row);
+    if (pageIndex === -1) return false;
+
+    this._scrollRowIntoView(pageIndex);
+    this._renderVisibleRows();
+    var rowEl = this._renderedRows[pageIndex];
+    var cellEl = rowEl && rowEl.querySelector('[data-col-id="' + col.colId + '"]');
+    if (!cellEl) return false;
+
+    var cIdx = Number(cellEl.dataset.colIndex);
+    this._setFocusedCell(pageIndex, cIdx);
+    this._startEdit({ cellEl: cellEl, r: pageIndex, c: cIdx, row: row, col: col });
+    return true;
+  };
+
+  /** 진행 중인 편집을 종료한다. commit=false면 취소(기본 커밋). */
+  DataGrid.prototype.stopEdit = function (commit) {
+    if (this._editing) this._editing.finish(commit !== false);
+  };
+
+  DataGrid.prototype.isEditing = function () { return !!this._editing; };
 
   /* ---- column resize ---- */
 
@@ -1905,6 +1991,7 @@
     filterRows: filterRows,
     quickFilterRows: quickFilterRows,
     buildFloatingFilterModel: buildFloatingFilterModel,
+    validationMessage: validationMessage,
     aggregateValues: aggregateValues,
     buildGroupView: buildGroupView,
     paginate: paginate,

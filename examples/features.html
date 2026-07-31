@@ -276,6 +276,87 @@
     </script>
   </div>
 
+  <!-- ======================================================== Edit validation -->
+  <h2 class="section">Edit Validation &amp; Programmatic Control</h2>
+  <p class="section-desc">
+    <code class="inline">column.validator(value, row)</code>가 <code class="inline">true</code>가 아닌 값(오류 메시지 문자열)을
+    반환하면 커밋이 거부되고 편집기가 빨간 테두리로 유지됩니다(Esc로 취소).
+    <code class="inline">beforeCellSave</code> 이벤트에서 <code class="inline">e.cancel = true</code>로 저장을 막을 수 있고,
+    <code class="inline">startEdit(row, field)</code> / <code class="inline">stopEdit(commit)</code> /
+    <code class="inline">isEditing()</code>으로 편집을 코드로 제어합니다.
+    편집 수명주기는 <code class="inline">editingStarted</code> / <code class="inline">editingStopped</code>로 관찰합니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn" id="startEditBtn" type="button">startEdit(첫 행, salary)</button>
+        <button class="tb-btn" id="commitEditBtn" type="button">stopEdit() 커밋</button>
+        <button class="tb-btn" id="cancelEditBtn" type="button">stopEdit(false) 취소</button>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px">
+          <input type="checkbox" class="dg-checkbox" id="lockSaves"> 모든 저장 잠금 (beforeCellSave 취소)
+        </label>
+      </div>
+      <div id="gridValidate" class="grid-wrap-sm"></div>
+      <div class="status-line" id="validateStatus">
+        Name은 2자 이상, Salary는 0 ~ 1,000,000만 저장됩니다. 셀을 더블클릭해 잘못된 값을 넣어 보세요.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridValidate'), {
+        rowData: DemoData.makeEmployees(15, 21),
+        columnDefs: [
+          { field: 'name', headerName: 'Name (2자 이상)', width: 190, editable: true,
+            validator: function (v) {
+              return String(v).trim().length >= 2 || '이름은 2자 이상이어야 합니다';
+            } },
+          { field: 'department', headerName: 'Department', width: 160 },
+          { field: 'salary', headerName: 'Salary (0~1,000,000)', width: 190, align: 'right',
+            editable: true, editor: 'number',
+            validator: function (v) {
+              if (v < 0) return '급여는 0 이상이어야 합니다';
+              if (v > 1000000) return '급여는 1,000,000 이하여야 합니다';
+              return true;
+            },
+            valueFormatter: function (v) { return '$' + v.toLocaleString(); } },
+          { field: 'city', headerName: 'City (읽기 전용)', width: 140 },
+        ],
+      });
+
+      var status = document.getElementById('validateStatus');
+      var lockSaves = document.getElementById('lockSaves');
+
+      /* e.cancel = true로 저장 자체를 거부할 수 있습니다 (검증과 별개의 거부권) */
+      grid.on('beforeCellSave', function (e) {
+        if (lockSaves.checked) {
+          e.cancel = true;
+          status.textContent = 'beforeCellSave 취소됨 — 저장 잠금이 켜져 있습니다 (Esc로 편집 종료)';
+        }
+      });
+
+      grid.on('editingStarted', function (e) {
+        status.textContent = '편집 시작: ' + e.colDef.headerName + ' (현재 값: ' + e.value + ')';
+      });
+      grid.on('editingStopped', function (e) {
+        status.textContent = e.committed
+          ? '커밋됨: ' + e.oldValue + ' → ' + e.newValue
+          : '취소됨 (값 유지: ' + e.oldValue + ')';
+      });
+
+      /* 프로그래매틱 제어 */
+      document.getElementById('startEditBtn').addEventListener('click', function () {
+        grid.startEdit(grid.getDisplayedRows()[0], 'salary');
+      });
+      document.getElementById('commitEditBtn').addEventListener('click', function () {
+        if (grid.isEditing()) grid.stopEdit();
+        else status.textContent = '진행 중인 편집이 없습니다 (isEditing() === false)';
+      });
+      document.getElementById('cancelEditBtn').addEventListener('click', function () {
+        if (grid.isEditing()) grid.stopEdit(false);
+        else status.textContent = '진행 중인 편집이 없습니다 (isEditing() === false)';
+      });
+    </script>
+  </div>
+
   <!-- ======================================================== Pagination -->
   <h2 class="section">Pagination</h2>
   <p class="section-desc">

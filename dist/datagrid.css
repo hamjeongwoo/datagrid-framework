@@ -332,6 +332,12 @@
   outline: none;
 }
 
+/* validator 거부 / beforeCellSave 취소 상태 */
+.dg-cell-editor.dg-invalid {
+  border-color: var(--dg-invalid-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dg-invalid-color) 18%, transparent);
+}
+
 /* ==========================================================================
    Row grouping + summary rows
    ========================================================================== */

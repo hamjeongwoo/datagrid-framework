@@ -75,6 +75,7 @@ node demo/server.js 8087
 | `filter` | `'text'` \| `'number'` \| `'set'` (`true` = text) |
 | `editable` | 더블클릭/Enter로 인라인 편집 |
 | `editor` | `'text'` \| `'number'` \| `'select'` (+ `editorOptions`) |
+| `validator(value, row)` | `true` 또는 오류 메시지 반환 — 거부 시 커밋 차단 + 빨간 표시 |
 | `valueFormatter(value, row)` | 표시 문자열 (기본 HTML 이스케이프) |
 | `cellRenderer(params)` | HTML/Node 반환 커스텀 렌더러 |
 | `cellClass` | string 또는 `fn(value, row)` |
@@ -96,6 +97,7 @@ cellRenderer: DataGrid.renderers.progress()   // 0–100 진행 바
 
 `setRowData(rows)` · `getRowData()` · `addRow(row)` / `addRows(rows)` · `updateRow(row, changes)` ·
 `removeRows(rows)` / `removeSelectedRows()` · `getSelectedRows()` · `selectAll()` / `deselectAll()` ·
+`startEdit(row, field)` / `stopEdit(commit)` / `isEditing()` ·
 `setQuickFilter(text)` · `applyColumnFilter(field, model)` · `getFilterModel()` · `clearFilters()` ·
 `setSortModel(model)` / `getSortModel()` · `setGroupBy(fields)` / `getGroupBy()` ·
 `expandAllGroups()` / `collapseAllGroups()` · `setPage(n)` / `setPageSize(n)` ·
@@ -109,8 +111,11 @@ cellRenderer: DataGrid.renderers.progress()   // 0–100 진행 바
 grid.on('selectionChanged', function (e) { e.selectedRows });
 grid.on('cellValueChanged', function (e) { e.data, e.colDef, e.oldValue, e.newValue });
 grid.on('sortChanged' | 'filterChanged' | 'paginationChanged' | 'groupChanged' |
-        'groupToggled' | 'rowClicked' | 'rowDoubleClicked' | 'cellClicked' |
-        'columnResized' | 'columnMoved', fn);
+        'groupToggled' | 'editingStarted' | 'editingStopped' | 'rowClicked' |
+        'rowDoubleClicked' | 'cellClicked' | 'columnResized' | 'columnMoved', fn);
+
+// 취소 가능 이벤트: e.cancel = true로 저장 거부
+grid.on('beforeCellSave', function (e) { if (e.newValue < 0) e.cancel = true; });
 ```
 
 ## 테마 커스터마이징

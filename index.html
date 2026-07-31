@@ -67,7 +67,10 @@
             checkboxSelection: true, headerCheckboxSelection: true,
             sortable: false, resizable: false },
           { field: 'id', headerName: 'ID', width: 76, pinned: 'left', align: 'right', filter: 'number' },
-          { field: 'name', headerName: 'Name', width: 170, filter: 'text', editable: true },
+          { field: 'name', headerName: 'Name', width: 170, filter: 'text', editable: true,
+            validator: function (v) {
+              return String(v).trim().length >= 2 || '이름은 2자 이상이어야 합니다';
+            } },
           { field: 'email', headerName: 'Email', width: 230, filter: 'text' },
           { field: 'department', headerName: 'Department', width: 140, filter: 'set',
             editable: true, editor: 'select',
@@ -79,7 +82,8 @@
             }) },
           { field: 'salary', headerName: 'Salary', width: 120, align: 'right',
             filter: 'number', editable: true, editor: 'number',
-            aggFunc: 'sum', valueFormatter: money },
+            aggFunc: 'sum', valueFormatter: money,
+            validator: function (v) { return v >= 0 || '급여는 0 이상이어야 합니다'; } },
           { field: 'progress', headerName: 'Onboarding', width: 150,
             cellRenderer: DataGrid.renderers.progress() },
           { field: 'remote', headerName: 'Remote', width: 90, align: 'center',
