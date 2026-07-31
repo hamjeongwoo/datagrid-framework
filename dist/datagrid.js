@@ -971,6 +971,38 @@
   }
 
   /**
+   * 컬럼 가상화(virtualX)의 렌더 윈도우 계산.
+   * colSpecs: [{ width, pinned }] — 표시 순서(좌고정 → 일반 → 우고정).
+   * 고정 컬럼은 항상 렌더링되므로, 일반 컬럼 중 가로 뷰포트
+   * [scrollLeft + 좌고정 폭, scrollLeft + viewportWidth - 우고정 폭]과
+   * 겹치는 범위에 buffer(기본 2)를 더한 인덱스 창을 반환한다.
+   */
+  function computeColumnWindow(colSpecs, scrollLeft, viewportWidth, buffer) {
+    var pinnedLeftW = 0;
+    var pinnedRightW = 0;
+    colSpecs.forEach(function (s) {
+      if (s.pinned === 'left') pinnedLeftW += s.width;
+      else if (s.pinned === 'right') pinnedRightW += s.width;
+    });
+    var viewL = scrollLeft + pinnedLeftW;
+    var viewR = scrollLeft + viewportWidth - pinnedRightW;
+    var x = 0;
+    var c1 = -1;
+    var c2 = -1;
+    for (var i = 0; i < colSpecs.length; i++) {
+      var w = colSpecs[i].width;
+      if (!colSpecs[i].pinned && x + w > viewL && x < viewR) {
+        if (c1 === -1) c1 = i;
+        c2 = i;
+      }
+      x += w;
+    }
+    if (c1 === -1) return { c1: 0, c2: colSpecs.length - 1 }; /* 일반 컬럼 없음 → 전부 */
+    var b = buffer === undefined ? 2 : buffer;
+    return { c1: Math.max(0, c1 - b), c2: Math.min(colSpecs.length - 1, c2 + b) };
+  }
+
+  /**
    * getState()의 컬럼 상태를 현재 컬럼 목록에 적용한 결과를 계산한다.
    * - stateColumns 순서대로 재배열, 목록에 없는 colId는 무시
    * - state에 빠진 컬럼은 원래 상대 순서를 유지한 채 뒤에 붙인다
@@ -1203,7 +1235,11 @@
     this._bodyEl.addEventListener('scroll', function () {
       self._headerEl.scrollLeft = self._bodyEl.scrollLeft;
       self._footerEl.scrollLeft = self._bodyEl.scrollLeft;
-      self._renderVisibleRows();
+      if (self.options.virtualX && self._updateColWindow()) {
+        self._renderBody(); /* 컬럼 창이 바뀌면 행 셀을 새 창으로 재구성 */
+      } else {
+        self._renderVisibleRows();
+      }
     });
 
     this._canvasEl.addEventListener('click', function (e) { self._onCellClick(e); });
@@ -1277,7 +1313,10 @@
     this._docListeners.push(['mousedown', closeMenus]);
 
     if (typeof ResizeObserver !== 'undefined') {
-      this._resizeObserver = new ResizeObserver(function () { self._layoutColumns(); });
+      this._resizeObserver = new ResizeObserver(function () {
+        self._layoutColumns();
+        if (self.options.virtualX && self._updateColWindow()) self._renderBody();
+      });
       this._resizeObserver.observe(this._rootEl);
     }
   };
@@ -1794,6 +1833,7 @@
 
     var widths = computeColumnWidths(cols, this._colWidths, available);
     this._computedWidths = widths;
+    if (this.options.virtualX) this._updateColWindow();
 
     /* pinned offsets */
     var leftOffset = 0;
@@ -1854,6 +1894,25 @@
         this._applyCellLayout(rowEl.children[j], rowEl.children[j].dataset.colId);
       }
     }
+  };
+
+  /** 현재 스크롤 기준 컬럼 렌더 창을 갱신한다. 창이 바뀌었으면 true. */
+  DataGrid.prototype._updateColWindow = function () {
+    if (!this.options.virtualX) { this._colWindow = null; return false; }
+    var self = this;
+    var specs = this._visibleColumns().map(function (c) {
+      return { width: (self._computedWidths && self._computedWidths[c.colId]) || c.width, pinned: c.pinned };
+    });
+    var next = computeColumnWindow(
+      specs,
+      this._bodyEl.scrollLeft,
+      this._bodyEl.clientWidth || 800
+    );
+    if (this._colWindow && this._colWindow.c1 === next.c1 && this._colWindow.c2 === next.c2) {
+      return false;
+    }
+    this._colWindow = next;
+    return true;
   };
 
   DataGrid.prototype._applyCellLayout = function (cellEl, colId) {
@@ -1946,7 +2005,25 @@
     var rangeRect = this._cellSelection ? this._normalizedRange() : null;
     if (rangeRect && (pageIndex < rangeRect.r1 || pageIndex > rangeRect.r2)) rangeRect = null;
 
+    /* virtualX: 창 밖 일반 컬럼은 셀 대신 폭 스페이서로 대체 */
+    var colWindow = this.options.virtualX ? this._colWindow : null;
+    var leftSpacer = null;
+    var rightSpacer = null;
+    var skippedBefore = 0;
+    var skippedAfter = 0;
+
     this._visibleColumns().forEach(function (col, cIdx) {
+      if (colWindow && !col.pinned && (cIdx < colWindow.c1 || cIdx > colWindow.c2)) {
+        var w = (self._computedWidths && self._computedWidths[col.colId]) || col.width;
+        if (cIdx < colWindow.c1) {
+          if (!leftSpacer) leftSpacer = el('div', 'dg-cell dg-colspacer', rowEl);
+          skippedBefore += w;
+        } else {
+          if (!rightSpacer) rightSpacer = el('div', 'dg-cell dg-colspacer', rowEl);
+          skippedAfter += w;
+        }
+        return;
+      }
       var cell = el('div', 'dg-cell', rowEl);
       cell.setAttribute('role', 'gridcell');
       cell.dataset.colId = col.colId;
@@ -2016,6 +2093,9 @@
 
       self._renderCellValue(cell, col, row);
     });
+
+    if (leftSpacer) leftSpacer.style.width = skippedBefore + 'px';
+    if (rightSpacer) rightSpacer.style.width = skippedAfter + 'px';
 
     return rowEl;
   };
@@ -4166,6 +4246,7 @@
     normalizeColumns: normalizeColumns,
     applyColumnState: applyColumnState,
     computeColumnWidths: computeColumnWidths,
+    computeColumnWindow: computeColumnWindow,
     escapeHtml: escapeHtml,
   };
 

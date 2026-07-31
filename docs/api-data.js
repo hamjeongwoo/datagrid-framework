@@ -343,6 +343,18 @@ window.ApiDocs = {
             '<code>cellRangeChanged</code> 이벤트가 발생합니다.',
         },
         {
+          name: 'virtualX',
+          type: 'boolean',
+          default: 'false',
+          since: '2.0.0',
+          description:
+            '컬럼 가상화. 가로 뷰포트에 보이는 일반 컬럼(+양쪽 버퍼 2개)만 셀을 렌더링하고 ' +
+            '창 밖 컬럼은 폭 스페이서로 대체합니다 — 수백 개 컬럼에서 행 DOM을 가볍게 유지합니다. ' +
+            '고정(pinned) 컬럼은 항상 렌더링되고, 헤더는 전체를 렌더링합니다(1회성). ' +
+            '가로 스크롤로 창이 바뀌면 보이는 행만 재구성됩니다.',
+          example: 'virtualX: true  // 300+ 컬럼 시나리오',
+        },
+        {
           name: 'mergeCells',
           type: 'string[]',
           since: '2.0.0',

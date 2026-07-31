@@ -546,6 +546,34 @@ suite('buildGroupHeaderRuns', function () {
   assertEq(T.buildGroupHeaderRuns([], groups), [], 'no columns → empty');
 });
 
+/* ---------------- computeColumnWindow ---------------- */
+suite('computeColumnWindow', function () {
+  var W = T.computeColumnWindow;
+  function cols(n, w, pinnedMap) {
+    var out = [];
+    for (var i = 0; i < n; i++) out.push({ width: w, pinned: (pinnedMap || {})[i] || null });
+    return out;
+  }
+
+  /* 10개 × 100px, 뷰포트 300px, 스크롤 0 → 컬럼 0-2 가시 + 버퍼 2 */
+  assertEq(W(cols(10, 100), 0, 300), { c1: 0, c2: 4 }, 'window at origin with buffer');
+  /* 스크롤 450 → 450~750 → 컬럼 4-7 가시, 버퍼 → 2-9 */
+  assertEq(W(cols(10, 100), 450, 300), { c1: 2, c2: 9 }, 'window mid-scroll');
+  /* 스크롤 끝 (700~1000) → 7-9 가시, 버퍼 → 5-9 */
+  assertEq(W(cols(10, 100), 700, 300), { c1: 5, c2: 9 }, 'window at end clamped');
+
+  /* 좌고정 1개: 가시 영역이 고정 폭만큼 좁아진다 */
+  var pinned = cols(10, 100, { 0: 'left' });
+  var win = W(pinned, 0, 300);
+  assertEq(win, { c1: 0, c2: 4 }, 'pinned-left narrows middle viewport (cols 1-2 visible + buffer)');
+
+  /* 버퍼 0 지정 */
+  assertEq(W(cols(10, 100), 0, 300, 0), { c1: 0, c2: 2 }, 'explicit zero buffer');
+
+  /* 일반 컬럼이 없으면 전체 */
+  assertEq(W(cols(2, 100, { 0: 'left', 1: 'right' }), 0, 300), { c1: 0, c2: 1 }, 'all pinned → full range');
+});
+
 /* ---------------- computeMergeContinuation ---------------- */
 suite('computeMergeContinuation', function () {
   var M = T.computeMergeContinuation;

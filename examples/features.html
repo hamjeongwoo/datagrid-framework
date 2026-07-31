@@ -1446,6 +1446,54 @@
     </script>
   </div>
 
+  <!-- ======================================================== 컬럼 가상화 -->
+  <h2 class="section">Column Virtualization — 300 columns (virtualX)</h2>
+  <p class="section-desc">
+    <code class="inline">virtualX: true</code>는 가로 뷰포트에 보이는 컬럼(+버퍼 2)만 셀을 렌더링하고
+    나머지는 폭 스페이서로 대체합니다 — 수백 개 컬럼에서도 행 DOM이 가볍게 유지됩니다.
+    가로 스크롤 시 컬럼 창이 갱신되고, 고정(pinned) 컬럼은 항상 렌더링됩니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div id="gridVirtualX" class="grid-wrap-sm"></div>
+      <div class="status-line" id="vxStatus">가로로 스크롤해 보세요.</div>
+    </div>
+    <script type="text/x-example">
+      // 300개 지표 컬럼을 가진 넓은 데이터 (시드 고정)
+      var COLS = 300;
+      var seed = 91;
+      var rnd = function () { seed = (seed * 48271) % 2147483647; return seed / 2147483647; };
+      var rows = [];
+      for (var r = 0; r < 200; r++) {
+        var row = { id: r + 1 };
+        for (var c = 0; c < COLS; c++) row['m' + c] = Math.round(rnd() * 1000) / 10;
+        rows.push(row);
+      }
+      var columnDefs = [{ field: 'id', headerName: 'ID', width: 70, pinned: 'left' }];
+      for (var i = 0; i < COLS; i++) {
+        columnDefs.push({ field: 'm' + i, headerName: 'M' + (i + 1), width: 90, dataType: 'number' });
+      }
+
+      var grid = new DataGrid(document.getElementById('gridVirtualX'), {
+        rowData: rows,
+        columnDefs: columnDefs,
+        virtualX: true,
+      });
+
+      var update = function () {
+        var firstRow = document.querySelector('#gridVirtualX .dg-row');
+        if (!firstRow) return;
+        var rendered = firstRow.querySelectorAll('.dg-cell:not(.dg-colspacer)').length;
+        document.getElementById('vxStatus').textContent =
+          '전체 ' + (COLS + 1) + '컬럼 중 행마다 ' + rendered + '개 셀만 렌더링 중 (나머지는 스페이서).';
+      };
+      grid.on('viewRendered', update);
+      document.querySelector('#gridVirtualX .dg-body').addEventListener('scroll', function () {
+        setTimeout(update, 0);
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

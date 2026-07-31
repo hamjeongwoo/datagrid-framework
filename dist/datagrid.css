@@ -427,6 +427,9 @@
   );
 }
 
+/* 컬럼 가상화 (virtualX): 창 밖 컬럼을 대신하는 폭 스페이서 */
+.dg-cell.dg-colspacer { padding: 0; }
+
 /* 셀 병합 (mergeCells): 이어지는 셀은 값 없이 위 경계선만 지운다 */
 .dg-cell.dg-cell-merged:not(.dg-pinned-left):not(.dg-pinned-right) { position: relative; }
 .dg-cell.dg-cell-merged::before {

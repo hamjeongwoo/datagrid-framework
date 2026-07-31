@@ -98,7 +98,7 @@
 | [ ] | `column > halign` (헤더만 다른 정렬) | `headerAlign` | P3 |
 | [ ] | `hwrap/wrap` (셀 줄바꿈 + 행 높이 자동) | `wrapText` + `autoRowHeight` | P3 |
 | [ ] | `freezeRows` (상단 행 고정) | `pinnedTopRows` | P3 |
-| [ ] | `virtualX` (컬럼 가상화) | 컬럼 수백 개 시나리오용 | P3 |
+| [x] | `virtualX` (컬럼 가상화) | `virtualX: true` — 가시 컬럼 + 버퍼만 렌더, 창 밖은 스페이서 (computeColumnWindow) — v2.0.0 | P3 |
 | [ ] | `flexHeight/flexWidth` (콘텐츠 크기에 맞춘 그리드) | `domLayout: 'autoHeight'` | P3 |
 
 ### 2.5 선택 · 탐색 · 상호작용
