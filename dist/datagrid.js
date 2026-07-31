@@ -611,6 +611,28 @@
   }
 
   /**
+   * 채우기 핸들의 연속 값 생성 (엑셀 방식).
+   * - 원본이 모두 숫자이고 2개 이상이면 등차 수열로 외삽
+   *   ([1, 3] → 5, 7, 9 …, 부동소수 오차는 10자리에서 반올림)
+   * - 그 외에는 원본 패턴을 순환 반복
+   */
+  function fillSeries(source, count) {
+    var out = [];
+    if (!source || source.length === 0 || count <= 0) return out;
+    var allNumbers = source.every(function (v) { return typeof v === 'number' && isFinite(v); });
+    if (allNumbers && source.length >= 2) {
+      var step = (source[source.length - 1] - source[0]) / (source.length - 1);
+      var last = source[source.length - 1];
+      for (var i = 1; i <= count; i++) {
+        out.push(Math.round((last + step * i) * 1e10) / 1e10);
+      }
+    } else {
+      for (var j = 0; j < count; j++) out.push(source[j % source.length]);
+    }
+    return out;
+  }
+
+  /**
    * findNext()의 다음 매치 탐색. rows에는 그룹 헤더 항목이 섞여 있을 수 있다
    * (건너뜀). cursor: { index, col } 직전 매치 위치 또는 null(처음부터).
    * 끝에 닿으면 처음으로 감싸서 계속 찾고, 없으면 null.
@@ -1192,12 +1214,19 @@
         e.preventDefault(); /* 텍스트 선택 방지 */
       });
       this._canvasEl.addEventListener('mouseover', function (e) {
-        if (!self._rangeDragging || !self._cellRange) return;
         var hit = self._cellFromEvent(e);
         if (!hit || !hit.row || hit.row.__group) return;
+        if (self._fillDrag) { self._previewFill(hit.r); return; }
+        if (!self._rangeDragging || !self._cellRange) return;
         self._setCellRange(self._cellRange.anchor, { r: hit.r, c: hit.c });
       });
-      var endDrag = function () { self._rangeDragging = false; };
+      var endDrag = function () {
+        self._rangeDragging = false;
+        if (self._fillDrag) {
+          self._applyFillDrag();
+          self._fillDrag = null;
+        }
+      };
       document.addEventListener('mouseup', endDrag);
       this._docListeners.push(['mouseup', endDrag]);
     }
@@ -2478,6 +2507,112 @@
         cell.classList.toggle('dg-cell-range', inRange);
       }
     }
+    if (this.options.fillHandle) this._positionFillHandle(range);
+  };
+
+  /* ---- fill handle (fillHandle — 엑셀식 채우기) ---- */
+
+  /** 범위 우하단 셀에 채우기 핸들을 붙인다. 화면 밖이면 숨긴다. */
+  DataGrid.prototype._positionFillHandle = function (range) {
+    if (this._fillHandleEl && this._fillHandleEl.parentNode) {
+      this._fillHandleEl.parentNode.removeChild(this._fillHandleEl);
+    }
+    if (!range) return;
+    var rowEl = this._renderedRows[range.r2];
+    if (!rowEl || rowEl.classList.contains('dg-group-row') || rowEl.classList.contains('dg-detail-row')) return;
+    var cell = rowEl.querySelector('[data-col-index="' + range.c2 + '"]');
+    if (!cell) return;
+    if (!this._fillHandleEl) {
+      var self = this;
+      this._fillHandleEl = document.createElement('div');
+      this._fillHandleEl.className = 'dg-fill-handle';
+      this._fillHandleEl.addEventListener('mousedown', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        self._fillDrag = { range: self._normalizedRange(), target: null };
+      });
+    }
+    /* 핸들의 absolute 기준점 — 고정(sticky) 셀은 이미 positioned */
+    if (!cell.classList.contains('dg-pinned-left') && !cell.classList.contains('dg-pinned-right')) {
+      cell.classList.add('dg-cell-fill-anchor');
+    }
+    cell.appendChild(this._fillHandleEl);
+  };
+
+  /** 드래그 중 채우기 대상 미리보기(세로 확장만 지원). */
+  DataGrid.prototype._previewFill = function (hitR) {
+    var d = this._fillDrag;
+    if (!d) return;
+    var range = d.range;
+    d.target = hitR > range.r2 ? { from: range.r2 + 1, to: hitR, dir: 1 }
+      : hitR < range.r1 ? { from: hitR, to: range.r1 - 1, dir: -1 }
+      : null;
+    for (var idx in this._renderedRows) {
+      var rowEl = this._renderedRows[idx];
+      var r = Number(idx);
+      var inRows = !!d.target && r >= d.target.from && r <= d.target.to;
+      for (var j = 0; j < rowEl.children.length; j++) {
+        var cell = rowEl.children[j];
+        var c = Number(cell.dataset.colIndex);
+        cell.classList.toggle('dg-cell-fill-preview', inRows && c >= range.c1 && c <= range.c2);
+      }
+    }
+  };
+
+  /** 드래그 종료: 원본 범위의 컬럼별 값으로 대상 행을 채운다 (숫자 등차 외삽/패턴 반복). */
+  DataGrid.prototype._applyFillDrag = function () {
+    var d = this._fillDrag;
+    var self = this;
+    if (!d || !d.target) { this._previewFill(-1); return; }
+    var range = d.range;
+    var target = d.target;
+    var cols = this._visibleColumns();
+    var updated = 0;
+
+    for (var c = range.c1; c <= range.c2; c++) {
+      var col = cols[c];
+      if (!col || !col.editable || !this._editable || col.field === undefined) continue;
+      var source = [];
+      for (var r = range.r1; r <= range.r2; r++) {
+        var srow = this._pageRows[r];
+        if (srow && !srow.__group && !srow.__detail) source.push(srow[col.field]);
+      }
+      if (source.length === 0) continue;
+      var count = target.to - target.from + 1;
+      var seq = target.dir === 1 ? fillSeries(source, count) : fillSeries(source.slice().reverse(), count);
+      for (var i = 0; i < count; i++) {
+        var tr = target.dir === 1 ? target.from + i : target.to - i;
+        var trow = this._pageRows[tr];
+        if (!trow || trow.__group || trow.__detail) continue;
+        var value = seq[i];
+        var oldValue = trow[col.field];
+        if (value === oldValue) continue;
+        if (col.validator) {
+          var result;
+          try { result = col.validator(value, trow); }
+          catch (e) { result = true; }
+          if (validationMessage(result)) continue;
+        }
+        var evt = { data: trow, colDef: col, oldValue: oldValue, newValue: value, cancel: false };
+        this._emitter.emit('beforeCellSave', evt);
+        if (evt.cancel) continue;
+        trow[col.field] = evt.newValue;
+        this._recordUpdate(trow, col.field, oldValue, evt.newValue);
+        updated++;
+        this._emitter.emit('cellValueChanged', {
+          data: trow, colDef: col, oldValue: oldValue, newValue: evt.newValue,
+        });
+      }
+    }
+
+    /* 범위를 채운 영역까지 확장하고 다시 그린다 */
+    this._cellRange = {
+      anchor: { r: Math.min(range.r1, target.from), c: range.c1 },
+      focus: { r: Math.max(range.r2, target.to), c: range.c2 },
+    };
+    this.refresh();
+    this._syncRangeDom();
+    if (updated > 0) this._emitter.emit('fillApplied', { updatedCells: updated });
   };
 
   /** 현재 셀 범위(페이지 좌표 정규화 + 대상 컬럼/리프 행)를 반환. 없으면 null. */
@@ -3972,6 +4107,7 @@
     applyValueGetters: applyValueGetters,
     rollbackRows: rollbackRows,
     findNextMatch: findNextMatch,
+    fillSeries: fillSeries,
     buildGroupHeaderRuns: buildGroupHeaderRuns,
     buildDataSourceRequest: buildDataSourceRequest,
     parseDataSourceResponse: parseDataSourceResponse,

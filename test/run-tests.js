@@ -546,6 +546,18 @@ suite('buildGroupHeaderRuns', function () {
   assertEq(T.buildGroupHeaderRuns([], groups), [], 'no columns → empty');
 });
 
+/* ---------------- fillSeries ---------------- */
+suite('fillSeries', function () {
+  assertEq(T.fillSeries([1, 3], 3), [5, 7, 9], 'arithmetic extrapolation');
+  assertEq(T.fillSeries([10], 3), [10, 10, 10], 'single number copied');
+  assertEq(T.fillSeries([0.1, 0.2], 2), [0.3, 0.4], 'float step rounded (no 0.30000000004)');
+  assertEq(T.fillSeries(['a', 'b'], 5), ['a', 'b', 'a', 'b', 'a'], 'pattern repeats cyclically');
+  assertEq(T.fillSeries([5, 'x'], 2), [5, 'x'], 'mixed types → pattern repeat');
+  assertEq(T.fillSeries([10, 5], 2), [0, -5], 'descending series');
+  assertEq(T.fillSeries([], 3), [], 'empty source');
+  assertEq(T.fillSeries([1, 2], 0), [], 'zero count');
+});
+
 /* ---------------- findNextMatch ---------------- */
 suite('findNextMatch', function () {
   var rows = [

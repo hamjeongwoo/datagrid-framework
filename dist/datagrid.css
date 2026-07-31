@@ -427,6 +427,25 @@
   );
 }
 
+/* 채우기 핸들 (fillHandle) */
+.dg-cell-fill-anchor { position: relative; }
+.dg-fill-handle {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 9px;
+  height: 9px;
+  background: var(--dg-accent-color);
+  border: 1.5px solid var(--dg-background-color);
+  border-radius: 1px;
+  cursor: crosshair;
+  z-index: 2;
+}
+.dg-cell.dg-cell-fill-preview {
+  outline: 1.5px dashed var(--dg-accent-color);
+  outline-offset: -2px;
+}
+
 /* 변경 추적 (trackChanges): dirty 셀 모서리 마커 + 추가 행 배경 */
 .dg-cell.dg-cell-dirty:not(.dg-pinned-left):not(.dg-pinned-right) { position: relative; }
 .dg-cell.dg-cell-dirty::before {

@@ -112,7 +112,7 @@
 | [x] | `cellKeyDown` | `cellKeyDown` 이벤트 (payload에 `originalEvent`) — v1.2.0 | **P2** |
 | [x] | `cellDblClick` | `cellDoubleClicked` 이벤트 (payload: data/colDef/value/rowIndex) — v1.1.0 | **P1** (쉬움) |
 | [ ] | `swipeModel` (모바일 킨네틱 스크롤) | 터치 스크롤은 네이티브로 충분 — 필요 시 재검토 | P3 |
-| [ ] | `autofill / fillHandle` (엑셀식 채우기 핸들, 패턴 인식) | 셀 선택 + 편집 위에 `fillHandle: true` | P3 |
+| [x] | `autofill / fillHandle` (엑셀식 채우기 핸들, 패턴 인식) | `fillHandle: true` (cellSelection 필요) — 세로 드래그, 숫자 등차 외삽/패턴 반복, `fillApplied` — v2.0.0 | P3 |
 | [ ] | `hoverMode` (`cell` 호버) | 현재 row 호버로 충분 | P3 |
 
 ### 2.6 라이프사이클 · 렌더링 제어

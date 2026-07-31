@@ -1373,6 +1373,44 @@
     </script>
   </div>
 
+  <!-- ======================================================== 채우기 핸들 -->
+  <h2 class="section">Fill Handle (엑셀식 채우기)</h2>
+  <p class="section-desc">
+    <code class="inline">fillHandle: true</code>(<code class="inline">cellSelection</code> 필요)는
+    선택 범위 우하단에 채우기 핸들을 표시합니다. 핸들을 세로로 드래그하면
+    숫자 2개 이상은 등차 수열로 외삽하고(1, 3 → 5, 7, 9…), 그 외에는 패턴을 반복합니다.
+    편집 가능한 셀에만 쓰이고 <code class="inline">validator</code>·
+    <code class="inline">beforeCellSave</code>를 통과한 값만 반영됩니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div id="gridFill" class="grid-wrap-sm"></div>
+      <div class="status-line" id="fillStatus">
+        Salary 셀 두 개를 세로로 드래그해 선택한 뒤, 파란 핸들을 아래로 끌어 보세요.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridFill'), {
+        rowData: DemoData.makeEmployees(30, 79),
+        cellSelection: true,
+        fillHandle: true,
+        columnDefs: [
+          { field: 'name', headerName: 'Name', width: 160, editable: true },
+          { field: 'department', headerName: 'Department', width: 150, editable: true },
+          { field: 'salary', headerName: 'Salary', dataType: 'number', format: '$#,##0',
+            width: 130, editable: true },
+          { field: 'rating', headerName: 'Rating', dataType: 'number', format: '0.0',
+            width: 110, editable: true },
+        ],
+      });
+
+      grid.on('fillApplied', function (e) {
+        document.getElementById('fillStatus').textContent =
+          'fillApplied: ' + e.updatedCells + '개 셀이 채워졌습니다 (숫자는 등차 외삽, 문자열은 패턴 반복).';
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

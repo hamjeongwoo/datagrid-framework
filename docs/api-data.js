@@ -343,6 +343,18 @@ window.ApiDocs = {
             '<code>cellRangeChanged</code> 이벤트가 발생합니다.',
         },
         {
+          name: 'fillHandle',
+          type: 'boolean',
+          default: 'false',
+          since: '2.0.0',
+          description:
+            '선택 범위 우하단에 엑셀식 채우기 핸들을 표시합니다(<code>cellSelection: true</code> 필요). ' +
+            '세로 드래그로 채우며, 원본이 모두 숫자이고 2개 이상이면 등차 수열로 외삽하고 ' +
+            '그 외에는 패턴을 순환 반복합니다. 편집 가능한 셀에만 쓰이고 ' +
+            '<code>validator</code>/<code>beforeCellSave</code>를 통과한 값만 반영되며, ' +
+            '완료 시 <code>fillApplied</code> 이벤트가 발생합니다.',
+        },
+        {
           name: 'trackChanges',
           type: 'boolean',
           default: 'false',
@@ -1411,6 +1423,12 @@ window.ApiDocs = {
           since: '1.2.0',
           description:
             '셀/블록 범위가 바뀔 때(드래그 중 계속). <code>range</code>는 <code>getCellRange()</code> 결과와 같습니다.',
+        },
+        {
+          name: 'fillApplied',
+          payload: '{ updatedCells }',
+          since: '2.0.0',
+          description: '채우기 핸들 드래그가 끝나 셀이 채워졌을 때. 셀별로는 <code>cellValueChanged</code>도 발생합니다.',
         },
         {
           name: 'cellContextMenu',
