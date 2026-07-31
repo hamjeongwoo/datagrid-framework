@@ -2122,7 +2122,14 @@
         cb.setAttribute('aria-label', 'Select all rows');
         cb.addEventListener('click', function (e) { e.stopPropagation(); });
         cb.addEventListener('change', function () {
-          if (cb.checked) self.selectAll(); else self.deselectAll();
+          if (self._hasTreeCheckbox()) {
+            /* 트리 모드: 캐스케이드와 동일 규칙 — checkboxDisabled 행은 건드리지 않는다 */
+            self._treeCheckAll(cb.checked);
+          } else if (cb.checked) {
+            self.selectAll();
+          } else {
+            self.deselectAll();
+          }
         });
         self._headerSelectAllEl = cb;
       }
@@ -3207,6 +3214,37 @@
     }
   };
 
+  /**
+   * 헤더 체크박스의 트리 모드 전체 체크/해제: 모든 루트에 캐스케이드를 적용한다.
+   * checkboxDisabled 행은 건드리지 않으므로(캐스케이드와 동일 규칙),
+   * 해제 시에도 비활성 행의 기존 선택은 유지된다.
+   */
+  DataGrid.prototype._treeCheckAll = function (checked) {
+    var self = this;
+    var getId = function (r) { return self._rowId(r); };
+    var opts = this._treeCheckOpts();
+    var next = {};
+    if (opts.cascade) {
+      var states = this._treeChecked || {};
+      this._treeRoots.forEach(function (n) {
+        states = applyTreeCheck(self._treeRoots, getId, states, n.row, !!checked, opts);
+      });
+      collectTreeNodes(this._treeRoots).forEach(function (n) {
+        if (states[getId(n.row)] === true) next[getId(n.row)] = n.row;
+      });
+    } else {
+      /* 비캐스케이드: 노드를 개별 설정 (disabled 행은 기존 선택 유지) */
+      collectTreeNodes(this._treeRoots).forEach(function (n) {
+        var id = getId(n.row);
+        var selected = opts.isDisabled(n.row) ? !!self._selection[id] : !!checked;
+        if (selected) next[id] = n.row;
+      });
+    }
+    if (!this._commitSelection(next)) {
+      this._syncSelectionDom(); /* 취소 → 헤더 체크박스 원복 */
+    }
+  };
+
   /* ---- pinned top rows ---- */
 
   /** 헤더 아래 고정 행(표시 전용 — 정렬·필터·선택·편집 대상 아님)을 렌더링한다. */
@@ -3351,8 +3389,27 @@
       }
     }
     if (this._headerSelectAllEl) {
-      var count = this.getSelectedRows().length;
-      var total = this._viewRows.length;
+      var count;
+      var total;
+      if (this._treeChecked && this._treeRoots) {
+        /* 트리 모드: 체크 가능한(비활성 아닌) 행만 기준으로 전체/일부 판단.
+         * 캐스케이드에서는 부모 선택이 자식에서 유도되고, 비활성 자손을 가진
+         * 부모는 결코 true가 될 수 없으므로 리프만 센다 — 아니면 헤더가
+         * indeterminate에 갇혀 전체 해제가 불가능해진다. */
+        var opts = this._treeCheckOpts();
+        count = 0;
+        total = 0;
+        var sel = this._selection;
+        collectTreeNodes(this._treeRoots).forEach(function (n) {
+          if (opts.isDisabled(n.row)) return;
+          if (opts.cascade && n.children.length > 0) return;
+          total++;
+          if (sel[self._rowId(n.row)]) count++;
+        });
+      } else {
+        count = this.getSelectedRows().length;
+        total = this._viewRows.length;
+      }
       this._headerSelectAllEl.checked = count > 0 && count >= total && total > 0;
       this._headerSelectAllEl.indeterminate = count > 0 && count < total;
     }

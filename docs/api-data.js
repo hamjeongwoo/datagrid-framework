@@ -801,7 +801,9 @@ window.ApiDocs = {
           default: 'false',
           description:
             '헤더에 전체 선택 체크박스를 표시합니다(<code>rowSelection: \'multiple\'</code> 필요). ' +
-            '일부만 선택된 상태에서는 indeterminate로 표시됩니다. 전체 선택은 필터가 적용된 현재 뷰 전체를 선택합니다.',
+            '일부만 선택된 상태에서는 indeterminate로 표시됩니다. 전체 선택은 필터가 적용된 현재 뷰 전체를 선택합니다. ' +
+            '<code>treeData</code> 그리드에서는 트리 규칙을 따릅니다 — 전체 체크/해제 시 ' +
+            '<code>treeData.checkboxDisabled(row)</code> 행은 건드리지 않고, 표시 상태도 체크 가능한 행만 기준으로 계산합니다.',
         },
         {
           name: 'resizable',
