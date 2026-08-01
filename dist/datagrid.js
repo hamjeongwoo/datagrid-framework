@@ -774,6 +774,43 @@
   }
 
   /**
+   * 파라미터 객체 → 쿼리스트링. 중첩 객체·배열은 브래킷 표기로 편다:
+   *   { page: { selectPage: 1 } }        → page[selectPage]=1
+   *   { sorts: [{ field: 'a' }] }        → sorts[0][field]=a
+   *   { tags: ['x', 'y'] }               → tags[0]=x&tags[1]=y
+   * qs(Express)·PHP·Rails·Spring이 그대로 파싱하는 표기다. 서버가 다른 형식을
+   * 원하면 dataSource.paramsSerializer로 통째로 대체할 수 있다.
+   *
+   * - undefined 값은 생략(조건부 파라미터), null은 빈 값(`key=`)
+   * - Date는 ISO 문자열 (String(date)의 장황한 표기 대신)
+   * - 순환 참조는 건너뛴다 — 소비자가 준 객체 때문에 그리드가 스택 오버플로로
+   *   죽지 않게. 형제로 같은 객체가 두 번 나오는 것은 정상이므로 경로 기준으로 본다.
+   */
+  function buildQueryString(params) {
+    const parts = [];
+    const path = new WeakSet();
+    const walk = (key, value) => {
+      if (value === undefined) return;
+      if (value === null) { parts.push(`${encodeURIComponent(key)}=`); return; }
+      if (value instanceof Date) {
+        parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(value.toISOString())}`);
+        return;
+      }
+      if (typeof value === 'object') {
+        if (path.has(value)) return; /* 순환 참조 */
+        path.add(value);
+        if (Array.isArray(value)) value.forEach((v, i) => walk(`${key}[${i}]`, v));
+        else Object.keys(value).forEach(k => walk(`${key}[${k}]`, value[k]));
+        path.delete(value);
+        return;
+      }
+      parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
+    };
+    Object.keys(params || {}).forEach(k => walk(k, params[k]));
+    return parts.join('&');
+  }
+
+  /**
    * dataSource + 현재 그리드 상태 → fetch 요청 스펙 { url, method, body }.
    * GET이면 파라미터를 쿼리스트링으로, 그 외에는 JSON body로 보낸다.
    * server 모드인 축의 상태만 파라미터에 포함된다:
@@ -848,9 +885,20 @@
     let url = dataSource.url;
     let body = null;
     if (method === 'GET') {
-      const qs = Object.keys(params)
-        .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
-        .join('&');
+      /* paramsSerializer가 있으면 직렬화를 통째로 위임한다 (repeat key·JSON 등
+       * 브래킷 표기로 표현 못 하는 서버 스펙용). 예외 시 기본 직렬화로 폴백. */
+      let qs;
+      if (typeof dataSource.paramsSerializer === 'function') {
+        try {
+          qs = String(dataSource.paramsSerializer(params) || '');
+        } catch (e) {
+          console.error('[DataGrid] dataSource.paramsSerializer failed:', e);
+          qs = buildQueryString(params);
+        }
+      } else {
+        qs = buildQueryString(params);
+      }
+      qs = qs.replace(/^[?&]+/, ''); /* '?a=1'처럼 반환해도 안전하게 */
       if (qs) url += (!url.includes('?') ? '?' : '&') + qs;
     } else {
       body = JSON.stringify(params);
@@ -5937,7 +5985,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.9.0';
+  DataGrid.version = '2.10.0';
 
   /* Internals exposed for headless unit tests (not part of the public API). */
   DataGrid._test = {
@@ -5991,6 +6039,7 @@
     subtreeFullyChecked,
     computeTreeSummary,
     buildGroupHeaderRuns,
+    buildQueryString,
     buildDataSourceRequest,
     parseDataSourceResponse,
     computeRowTops,

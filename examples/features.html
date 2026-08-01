@@ -2888,6 +2888,101 @@
     </script>
   </div>
 
+  <!-- ======================================================== 중첩 파라미터 직렬화 -->
+  <h2 class="section" id="nested-params">Nested Request Params (중첩 파라미터 직렬화)</h2>
+  <p class="section-desc">
+    <code class="inline">dataSource.request</code>가 <strong>중첩 객체·배열</strong>을 반환해도 쿼리스트링으로 올바르게 펼쳐집니다 —
+    <code class="inline">{ page: { selectPage: 1 } }</code> → <code class="inline">page[selectPage]=1</code>,
+    <code class="inline">{ sorts: [{ field, dir }] }</code> → <code class="inline">sorts[0][field]=…</code>.
+    qs(Express)·PHP·Rails·Spring이 그대로 파싱하는 표기입니다.
+    서버가 브래킷 표기를 못 받으면 <code class="inline">dataSource.paramsSerializer</code>로 직렬화를 통째로 대체하세요.
+    아래 status line은 <strong>데모 서버가 실제로 복원한 구조</strong>를 그대로 보여줍니다
+    (<code class="inline">node demo/server.js 8087</code>로 띄워야 동작합니다).
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn" id="npSerializerBtn" type="button">직렬화 바꾸기 — paramsSerializer 사용</button>
+      </div>
+      <div id="gridNestedParams" class="grid-wrap-sm"></div>
+      <div class="status-line" id="npStatus">헤더를 클릭해 정렬하거나 페이지를 넘기면 서버가 받은 파라미터가 표시됩니다.</div>
+    </div>
+    <script type="text/x-example">
+      var status = document.getElementById('npStatus');
+      var serverParams = null;   // 서버가 복원해 돌려준 구조 (parse에서 채움)
+      var useSerializer = false;
+
+      /* 서버 스펙: { page: { selectPage(1-based), pageSize }, sorts: [{ field, dir }] } */
+      function buildRequest(state) {
+        return {
+          page: { selectPage: state.page + 1, pageSize: state.pageSize },  // 그리드는 0-based
+          sorts: state.sortModel.map(function (m) { return { field: m.field, dir: m.dir }; }),
+        };
+      }
+
+      function parseResponse(res) {
+        serverParams = res.receivedParams;
+        return { rows: res.rows, total: res.total };
+      }
+
+      /* paramsSerializer — 브래킷 표기 대신 compact 표기(sortSpec=name:asc,salary:desc)로.
+         반환 문자열이 그대로 쿼리스트링이 되므로 인코딩도 직접 책임집니다. */
+      function compactSerializer(params) {
+        var parts = [];
+        if (params.page) {
+          parts.push('page[selectPage]=' + params.page.selectPage);
+          parts.push('page[pageSize]=' + params.page.pageSize);
+        }
+        if (params.sorts && params.sorts.length) {
+          parts.push('sortSpec=' + encodeURIComponent(params.sorts.map(function (s) {
+            return s.field + ':' + s.dir;
+          }).join(',')));
+        }
+        return parts.join('&');
+      }
+
+      function makeDataSource() {
+        return {
+          url: '/api/employees-v3',
+          request: buildRequest,
+          parse: parseResponse,
+          paramsSerializer: useSerializer ? compactSerializer : undefined,
+        };
+      }
+
+      var grid = new DataGrid(document.getElementById('gridNestedParams'), {
+        pagination: true,
+        paginationPageSize: 10,
+        sortMode: 'server',    // 정렬·페이징은 그리드 옵션으로 서버 위임
+        pageMode: 'server',
+        dataSource: makeDataSource(),
+        columnDefs: [
+          { field: 'name', headerName: 'Name', flex: 1, sortable: true },
+          { field: 'department', headerName: 'Department', width: 150, sortable: true },
+          { field: 'salary', headerName: 'Salary', width: 110, align: 'right', sortable: true },
+        ],
+      });
+
+      grid.on('dataChanged', function () {
+        status.textContent = (useSerializer ? '[paramsSerializer] ' : '[기본 브래킷 표기] ') +
+          '서버가 복원한 파라미터 → ' + JSON.stringify(serverParams);
+      });
+
+      grid.on('dataLoadError', function (e) {
+        status.textContent = '로드 실패: ' + e.error.message +
+          ' — node demo/server.js 8087 로 띄웠는지 확인하세요.';
+      });
+
+      document.getElementById('npSerializerBtn').addEventListener('click', function () {
+        useSerializer = !useSerializer;
+        grid.setDataSource(makeDataSource());
+        this.textContent = useSerializer
+          ? '직렬화 되돌리기 — 기본 브래킷 표기'
+          : '직렬화 바꾸기 — paramsSerializer 사용';
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

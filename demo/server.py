@@ -10,6 +10,7 @@ demo/server.js와 동일하게 프로젝트 루트를 정적으로 서빙한다.
 (file:// 직접 열기는 브라우저 제약이 있으므로 반드시 HTTP로 띄울 것)
 """
 import json
+import re
 import sys
 import time
 import webbrowser
@@ -20,6 +21,43 @@ from urllib.parse import parse_qs, urlparse
 
 ROOT = Path(__file__).resolve().parent.parent  # 프로젝트 루트 (index.html 위치)
 DEFAULT_PORT = 8087
+
+
+def _split_param_keys(raw_key):
+    """'sorts[0][field]' → ['sorts', '0', 'field']"""
+    open_at = raw_key.find("[")
+    if open_at == -1:
+        return [raw_key]
+    return [raw_key[:open_at]] + re.findall(r"\[([^\]]*)\]", raw_key)
+
+
+def _parse_nested_query(query):
+    """브래킷 표기를 중첩 객체로 되돌린다 (server.js의 parseNestedQuery와 동일 규칙).
+    qs·PHP·Rails와 같이 숫자 키가 이어지면 배열로 만든다."""
+    out = {}
+    for raw_key, values in query.items():
+        keys = _split_param_keys(raw_key)
+        node = out
+        for i in range(len(keys) - 1):
+            next_is_index = keys[i + 1].isdigit()
+            key = int(keys[i]) if isinstance(node, list) else keys[i]
+            if isinstance(node, list):
+                while len(node) <= key:
+                    node.append([] if next_is_index else {})
+                node = node[key]
+            else:
+                if key not in node:
+                    node[key] = [] if next_is_index else {}
+                node = node[key]
+        last = keys[-1]
+        if isinstance(node, list):
+            idx = int(last)
+            while len(node) <= idx:
+                node.append(None)
+            node[idx] = values[0]
+        else:
+            node[last] = values[0]
+    return out
 
 
 def _mulberry32(seed):
@@ -102,6 +140,9 @@ class DemoHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/employees-v2":
             self._serve_employees_v2(parse_qs(parsed.query))
             return
+        if parsed.path == "/api/employees-v3":
+            self._serve_employees_v3(parse_qs(parsed.query))
+            return
         super().do_GET()
 
     def _serve_employees(self, query):
@@ -174,6 +215,50 @@ class DemoHandler(SimpleHTTPRequestHandler):
             "totalCount": total_count,
             "receivedToken": self.headers.get("X-Demo-Token"),
         }}).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _serve_employees_v3(self, query):
+        """v3: 중첩 파라미터를 쓰는 서버 (server.js와 동일) —
+        page[selectPage]/page[pageSize], sorts[i][field]/sorts[i][dir] 브래킷 표기.
+        selectPage는 1-based(그리드는 0-based)라 dataSource.request로 변환해야 한다.
+        paramsSerializer 데모용 compact 표기(sortSpec=name:asc,salary:desc)도 받는다."""
+        parsed = _parse_nested_query(query)
+        rows = list(_EMPLOYEES)
+
+        sorts = []
+        if isinstance(parsed.get("sorts"), list):
+            sorts = [s for s in parsed["sorts"] if isinstance(s, dict) and s.get("field")]
+        elif parsed.get("sortSpec"):
+            for spec in str(parsed["sortSpec"]).split(","):
+                if not spec:
+                    continue
+                field, _, direction = spec.partition(":")
+                sorts.append({"field": field, "dir": direction or "asc"})
+        for spec in reversed(sorts):  # 안정 정렬이므로 뒤 기준부터
+            field = spec["field"]
+            rows.sort(key=lambda r: (r.get(field) is None, r.get(field)),
+                      reverse=spec.get("dir") == "desc")
+
+        page = parsed.get("page") or {}
+        try:
+            select_page = int(page.get("selectPage", 1)) or 1  # 1-based
+        except (TypeError, ValueError):
+            select_page = 1
+        try:
+            page_size = int(page.get("pageSize", 20)) or 20
+        except (TypeError, ValueError):
+            page_size = 20
+        total = len(rows)
+        rows = rows[(select_page - 1) * page_size:select_page * page_size]
+
+        time.sleep(0.12)
+        body = json.dumps({
+            "rows": rows, "total": total, "receivedParams": parsed,
+        }).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))

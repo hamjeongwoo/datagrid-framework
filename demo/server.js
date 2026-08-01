@@ -8,6 +8,11 @@
  * "우리 스펙과 다른 서버" 시연용 v2 (dataSource.request/parse/headers 데모):
  *   GET /api/employees-v2?offset=0&limit=25&orderBy=salary:desc&q=text&dept=Engineering
  *   → { result: { items: [...], totalCount: n, receivedToken: 'X-Demo-Token 헤더 값' | null } }
+ *
+ * 중첩 파라미터 시연용 v3 (BUG-009 — 브래킷 표기 직렬화 데모):
+ *   GET /api/employees-v3?page[selectPage]=1&page[pageSize]=20&sorts[0][field]=name&sorts[0][dir]=asc
+ *   (paramsSerializer용 compact 표기 sortSpec=name:asc,salary:desc도 수용)
+ *   → { rows: [...], total: n, receivedParams: 서버가 복원한 중첩 구조 }
  */
 'use strict';
 var http = require('http');
@@ -130,11 +135,85 @@ function handleEmployeesV2Api(req, res, query) {
   }, 120);
 }
 
+/* "page[selectPage]=1&sorts[0][field]=name" 같은 브래킷 표기를 중첩 객체로 되돌린다.
+ * qs(Express)·PHP·Rails가 하는 것과 같은 규칙 — 숫자 키가 이어지면 배열로 만든다.
+ * (데모 서버는 의존성 0 원칙을 지키므로 qs 패키지 대신 직접 파싱한다) */
+function splitParamKeys(rawKey) {
+  var open = rawKey.indexOf('[');
+  if (open === -1) return [rawKey];
+  var keys = [rawKey.slice(0, open)];
+  var re = /\[([^\]]*)\]/g;
+  var m;
+  while ((m = re.exec(rawKey)) !== null) keys.push(m[1]);
+  return keys;
+}
+
+function parseNestedQuery(searchParams) {
+  var out = {};
+  searchParams.forEach(function (value, rawKey) {
+    var keys = splitParamKeys(rawKey);
+    var node = out;
+    for (var i = 0; i < keys.length - 1; i++) {
+      var nextIsIndex = /^\d+$/.test(keys[i + 1]);
+      if (node[keys[i]] === undefined) node[keys[i]] = nextIsIndex ? [] : {};
+      node = node[keys[i]];
+    }
+    node[keys[keys.length - 1]] = value;
+  });
+  return out;
+}
+
+/* v3: 중첩 파라미터를 쓰는 서버 — { page: { selectPage, pageSize }, sorts: [{ field, dir }] }.
+ * selectPage는 1-based(그리드는 0-based)라 dataSource.request로 변환해야 하는 스펙이다.
+ * 서버가 실제로 복원한 구조를 receivedParams로 그대로 돌려줘 데모에서 확인할 수 있게 한다.
+ * compact 표기(sortSpec=name:asc,salary:desc — paramsSerializer 데모용)도 함께 받는다. */
+function handleEmployeesV3Api(req, res, query) {
+  var parsed = parseNestedQuery(query);
+  var rows = EMPLOYEES.slice();
+
+  var sorts = [];
+  if (Array.isArray(parsed.sorts)) {
+    sorts = parsed.sorts.filter(function (s) { return s && s.field; });
+  } else if (parsed.sortSpec) {
+    sorts = String(parsed.sortSpec).split(',').filter(Boolean).map(function (s) {
+      var p = s.split(':');
+      return { field: p[0], dir: p[1] || 'asc' };
+    });
+  }
+  if (sorts.length > 0) {
+    rows.sort(function (a, b) {
+      for (var i = 0; i < sorts.length; i++) {
+        var f = sorts[i].field;
+        var dir = sorts[i].dir === 'desc' ? -1 : 1;
+        var av = a[f], bv = b[f];
+        var cmp = typeof av === 'number' && typeof bv === 'number'
+          ? av - bv
+          : String(av).localeCompare(String(bv));
+        if (cmp !== 0) return cmp * dir;
+      }
+      return 0;
+    });
+  }
+
+  var page = parsed.page || {};
+  var selectPage = Number(page.selectPage) || 1; /* 1-based */
+  var pageSize = Number(page.pageSize) || 20;
+  var total = rows.length;
+  rows = rows.slice((selectPage - 1) * pageSize, selectPage * pageSize);
+
+  setTimeout(function () {
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ rows: rows, total: total, receivedParams: parsed }));
+  }, 120);
+}
+
 http.createServer(function (req, res) {
   var urlPath = decodeURIComponent(req.url.split('?')[0]);
-  if (urlPath === '/api/employees' || urlPath === '/api/employees-v2') {
+  if (urlPath === '/api/employees' || urlPath === '/api/employees-v2' ||
+      urlPath === '/api/employees-v3') {
     var query = new URL(req.url, 'http://localhost').searchParams;
-    if (urlPath === '/api/employees-v2') handleEmployeesV2Api(req, res, query);
+    if (urlPath === '/api/employees-v3') handleEmployeesV3Api(req, res, query);
+    else if (urlPath === '/api/employees-v2') handleEmployeesV2Api(req, res, query);
     else handleEmployeesApi(req, res, query);
     return;
   }

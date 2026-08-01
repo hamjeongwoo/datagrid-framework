@@ -22,7 +22,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.9.0',
+  version: '2.10.0',
   updated: '2026-08-01',
 
   sections: [
@@ -323,7 +323,7 @@ window.ApiDocs = {
         {
           name: 'dataSource',
           demo: 'remote-data',
-          type: '{ url, method?, params?, request?, parse?, headers? }',
+          type: '{ url, method?, params?, request?, parse?, headers?, paramsSerializer? }',
           since: '1.2.0',
           description:
             '원격 데이터 소스. <code>fetch</code>로 <code>url</code>을 호출해 행을 불러옵니다. ' +
@@ -332,7 +332,9 @@ window.ApiDocs = {
             '<code>request(state)</code>는 기본 파라미터 매핑을 서버 스펙으로 대체하는 훅(since 2.5.0), ' +
             '<code>parse(json)</code>은 응답을 <code>{ rows, total }</code>로 바꾸는 훅' +
             '(기본: 배열 또는 <code>{ rows, total }</code> 그대로), ' +
-            '<code>headers</code>는 인증 토큰 등 요청 헤더(객체 또는 함수, since 2.5.0)입니다. ' +
+            '<code>headers</code>는 인증 토큰 등 요청 헤더(객체 또는 함수, since 2.5.0), ' +
+            '<code>paramsSerializer(params)</code>는 GET 쿼리스트링 생성을 통째로 대체하는 훅' +
+            '(since 2.10.0 — 기본은 중첩 구조를 브래킷 표기로 펼침)입니다. ' +
             '로딩 중 오버레이가 표시되고 실패 시 <code>dataLoadError</code> 이벤트가 발생합니다. ' +
             '<code>reloadData()</code>로 다시 불러오고 <code>setDataSource()</code>로 교체합니다. ' +
             '<strong>단계별 레시피는 <a href="#remote-data-guide">Remote Data Source 가이드</a> 참고.</strong>',
@@ -683,12 +685,30 @@ window.ApiDocs = {
             '<strong>병합 우선순위:</strong> <code>params</code>와 같은 키를 반환하면 <code>request</code>가 ' +
             '이깁니다(나중에 병합). 단 <code>undefined</code> 반환은 "생략"이지 "삭제"가 아니므로 ' +
             '<code>params</code>가 준 키를 지우지는 못합니다 — 조건부 제거는 <code>params</code> 쪽에서 하세요. ' +
-            '<strong>직렬화:</strong> GET은 모든 값이 쿼리스트링 문자열이 되므로 배열·객체는 직접 문자열로 ' +
-            '만들어야 합니다(객체를 그대로 반환하면 <code>[object Object]</code>). POST는 body 전체가 ' +
-            '<code>JSON.stringify</code>되므로 <code>sort: state.sortModel</code>처럼 중첩 배열/객체를 ' +
-            '그대로 반환해도 온전히 나갑니다.',
+            '<strong>직렬화:</strong> GET에서 <strong>중첩 객체·배열도 그대로 반환할 수 있습니다</strong>(v2.10.0) — ' +
+            '브래킷 표기로 펼쳐집니다: <code>{ page: { selectPage: 1 } }</code> → ' +
+            '<code>page[selectPage]=1</code>, <code>{ sorts: [{ field, dir }] }</code> → ' +
+            '<code>sorts[0][field]=…</code>. qs(Express)·PHP·Rails·Spring이 그대로 파싱하는 표기이며, ' +
+            '<code>Date</code>는 ISO 문자열, <code>null</code>은 빈 값(<code>key=</code>)이 됩니다. ' +
+            '서버가 다른 표기를 원하면 아래 <code>paramsSerializer</code>로 대체하세요. ' +
+            '(v2.9.0까지는 값에 <code>String()</code>이 걸려 중첩 구조가 ' +
+            '<code>[object Object]</code>로 뭉개졌습니다 — BUG-009.) POST는 body 전체가 ' +
+            '<code>JSON.stringify</code>되므로 예나 지금이나 중첩 구조가 온전히 나갑니다.',
           example:
-            '// GET — 값은 전부 문자열/숫자로 (쿼리스트링에 들어간다)\n' +
+            '// GET — 중첩 구조 그대로 반환 (page[selectPage]=1&sorts[0][field]=… 로 나간다)\n' +
+            'dataSource: {\n' +
+            "  url: '/api/employees-v3',\n" +
+            '  request: function (state) {\n' +
+            '    return {\n' +
+            '      page: { selectPage: state.page + 1, pageSize: state.pageSize },  // 서버는 1-based\n' +
+            '      sorts: state.sortModel.map(function (m) {\n' +
+            '        return { field: m.field, dir: m.dir };\n' +
+            '      }),\n' +
+            '    };\n' +
+            '  },\n' +
+            '}\n' +
+            '\n' +
+            '// GET — 평면 파라미터를 쓰는 서버\n' +
             'dataSource: {\n' +
             "  url: '/api/employees-v2',\n" +
             '  request: function (state) {\n' +
@@ -713,6 +733,37 @@ window.ApiDocs = {
             '      sort: state.sortModel,       // [{ field, dir }] 배열 그대로\n' +
             '      q: state.quickFilter || undefined,\n' +
             '    };\n' +
+            '  },\n' +
+            '}',
+        },
+        {
+          name: 'Step 3-1. 직렬화 자체를 바꿔야 할 때 — paramsSerializer',
+          demo: 'nested-params',
+          since: '2.10.0',
+          description:
+            '기본 브래킷 표기(<code>sorts[0][field]=name</code>)로 표현할 수 없는 서버 ' +
+            '— 반복 키(<code>tags=a&amp;tags=b</code>), JSON-in-query, ' +
+            '<code>sortSpec=name:asc,pay:desc</code> 같은 compact 표기 등 — 을 만나면 ' +
+            '<code>paramsSerializer(params)</code>로 <strong>쿼리스트링 생성 전체를 대체</strong>합니다. ' +
+            '<code>params</code>는 <code>params</code> + <code>request</code>가 합쳐진 최종 객체이고, ' +
+            '반환한 문자열이 그대로 <code>?</code> 뒤에 붙습니다 — ' +
+            '<strong>인코딩도 직접 책임집니다</strong>(<code>encodeURIComponent</code>). ' +
+            '앞에 <code>?</code>나 <code>&amp;</code>가 붙어 있으면 떼고 붙입니다. ' +
+            '예외가 나면 <code>console.error</code> 후 기본 직렬화로 폴백합니다. ' +
+            'GET에서만 쓰입니다(POST는 body가 JSON).',
+          example:
+            'dataSource: {\n' +
+            "  url: '/api/employees',\n" +
+            '  request: function (state) {\n' +
+            '    return { sorts: state.sortModel };\n' +
+            '  },\n' +
+            '  // sorts=[{field,dir}] → sortSpec=name:asc,salary:desc\n' +
+            '  paramsSerializer: function (params) {\n' +
+            '    if (!params.sorts || !params.sorts.length) return "";\n' +
+            '    var spec = params.sorts.map(function (s) {\n' +
+            "      return s.field + ':' + s.dir;\n" +
+            "    }).join(',');\n" +
+            "    return 'sortSpec=' + encodeURIComponent(spec);\n" +
             '  },\n' +
             '}',
         },

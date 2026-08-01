@@ -176,6 +176,13 @@
 ### v2.1 — "TreeGrid" (§6 T1~T4)
 - treeData 코어(계층 표시·펼침/접힘·계층 정렬/필터), 체크박스 캐스케이드, 부모 요약, 지연 로딩
 
+### v2.10 — 중첩 요청 파라미터 직렬화 (사용자 제보 버그 + 탈출구)
+- [BUG-009](bug-reports/2026-08-02-009-nested-params-querystring.md) — `dataSource.request`/`params`가 중첩 객체·배열을 반환하면 GET 쿼리스트링에서 `[object Object]`가 되던 문제. `encodeURIComponent(value)`가 값에 `String()`을 걸기 때문. v2.5에서 `request` 훅으로 반환 구조를 자유화하면서 직렬화는 평면 전제 그대로 둔 것이 원인.
+- 순수 함수 `buildQueryString(params)` — 중첩을 브래킷 표기로 전개(`page[selectPage]=1`, `sorts[0][field]=name`, `tags[0]=x`). qs(Express)·PHP·Rails·Spring이 설정 없이 파싱하는 표준 표기를 골랐고, 배열 인덱스 규칙은 `qs.stringify` 기본값과 맞췄다. `undefined` 생략 · `null`은 `key=` · `Date`는 ISO · 순환 참조는 경로 기준으로 건너뜀(소비자 객체 때문에 그리드가 스택 오버플로로 죽지 않게). `_test` 노출.
+- `dataSource.paramsSerializer(params) => string` — 브래킷 표기로 표현 못 하는 서버(반복 키·JSON-in-query·compact 표기)를 위해 쿼리스트링 생성을 통째로 대체. `request`/`parse`/`headers`와 같은 "기본 동작 대체 훅" 패턴이며 예외 시 기본 직렬화로 폴백. 반환값 앞의 `?`/`&`는 떼고 붙인다.
+- 데모 서버에 `/api/employees-v3` 추가(브래킷 표기 파싱 + compact `sortSpec` 수용 + `receivedParams` 에코) — server.js·server.py 양쪽. features.html `#nested-params` 카드에서 서버가 복원한 구조를 status line에 그대로 노출하고 paramsSerializer 토글도 제공.
+- 검증: 실제 `qs` 파서로 왕복(구조 완전 복원) + 데모 서버 실요청.
+
 ### v2.9 — 편집 가능 컬럼 표시 + 템플릿 데모 에디터 전수 (사용자 요청)
 - `editableIndicator: true` — 편집 가능한 컬럼 헤더에 연필 아이콘. **opt-in**으로 둔 이유: 기존 그리드(데모 54개 포함)의 외형을 바꾸지 않고, `rowNumbers`·`floatingFilter`·`zebra`처럼 시각 요소는 옵션으로 켜는 이 프로젝트의 관례를 따르기 위함.
 - 표시 기준은 "지금 실제로 편집 가능한가" — `col.editable && grid._editable`. `setEditable(false)`로 잠그면 아이콘도 사라진다(편집 불가인데 아이콘이 남으면 거짓 정보). `setOptions({ editableIndicator })`로 런타임 토글 가능(둘 다 `refresh()`가 헤더를 재생성하므로 별도 처리 불필요).

@@ -569,6 +569,51 @@ suite('computeRowTops / findRowAtOffset', function () {
   assertEq(T.findRowAtOffset([], 100), 0, 'empty tops → 0');
 });
 
+/* ---------------- buildQueryString ---------------- */
+suite('buildQueryString', function () {
+  var dec = function (params) { return decodeURIComponent(T.buildQueryString(params)); };
+
+  assertEq(dec({ a: 1, b: 'x' }), 'a=1&b=x', '평면 파라미터');
+  assertEq(dec({}), '', '빈 객체 → 빈 문자열');
+  assertEq(T.buildQueryString(null), '', 'null → 빈 문자열');
+
+  /* BUG-009 — 중첩 객체/배열이 [object Object]로 뭉개지던 케이스 */
+  assertEq(dec({ page: { selectPage: 1, pageSize: 20 } }),
+    'page[selectPage]=1&page[pageSize]=20', '중첩 객체 → 브래킷 표기');
+  assertEq(dec({ sorts: [{ field: 'name', dir: 'asc' }, { field: 'pay', dir: 'desc' }] }),
+    'sorts[0][field]=name&sorts[0][dir]=asc&sorts[1][field]=pay&sorts[1][dir]=desc',
+    '객체 배열 → 인덱스 + 브래킷');
+  assertEq(dec({ tags: ['x', 'y'] }), 'tags[0]=x&tags[1]=y', '원시값 배열 → 인덱스');
+  assertEq(dec({ a: { b: { c: 1 } } }), 'a[b][c]=1', '3단 중첩');
+  assert(T.buildQueryString({ a: { b: 1 } }).indexOf('%5B') !== -1, '브래킷은 인코딩된다');
+
+  /* 빈 값 규칙 */
+  assertEq(dec({ a: 1, b: undefined, c: 2 }), 'a=1&c=2', 'undefined는 생략');
+  assertEq(dec({ a: null }), 'a=', 'null은 빈 값');
+  assertEq(dec({ a: '' }), 'a=', '빈 문자열도 빈 값');
+  assertEq(dec({ a: {} }), '', '빈 객체는 아무것도 안 남김');
+  assertEq(dec({ a: [] }), '', '빈 배열은 아무것도 안 남김');
+  assertEq(dec({ a: false, b: 0 }), 'a=false&b=0', 'false/0은 값으로 유지');
+
+  /* Date는 ISO — String(date)의 장황한 표기 대신 */
+  assertEq(dec({ from: new Date(Date.UTC(2024, 2, 15)) }), 'from=2024-03-15T00:00:00.000Z',
+    'Date → ISO 문자열');
+
+  /* 인코딩 */
+  assertEq(T.buildQueryString({ 'q v': 'a&b=c' }), 'q%20v=a%26b%3Dc', '키·값 모두 인코딩');
+  assertEq(dec({ q: '한글' }), 'q=한글', '유니코드');
+
+  /* 순환 참조가 있어도 죽지 않는다 */
+  var cyc = { name: 'root' };
+  cyc.self = cyc;
+  var out = dec({ node: cyc });
+  assert(out.indexOf('node[name]=root') !== -1, '순환 참조: 도달 가능한 값은 살린다');
+  assert(out.indexOf('node[self][self]') === -1, '순환 참조: 무한 재귀 없음');
+  /* 형제로 같은 객체가 두 번 나오는 것은 순환이 아니다 */
+  var shared = { v: 1 };
+  assertEq(dec({ a: shared, b: shared }), 'a[v]=1&b[v]=1', '공유 참조는 양쪽 다 직렬화');
+});
+
 /* ---------------- buildDataSourceRequest / parseDataSourceResponse ---------------- */
 suite('dataSource request/response', function () {
   var state = {
