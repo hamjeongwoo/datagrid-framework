@@ -72,6 +72,7 @@
 | [x] | **`trackModel` + `getChanges() · isDirty() · commit() · rollback()`** (변경 추적) | `trackChanges: true` 옵션 + `getChanges()` (added/updated/deleted) / `commitChanges()` / `rollbackChanges()` + dirty 셀·추가 행 표시 — v1.2.0 | **P2** |
 | [x] | `historyModel` + `history({method:'undo'\|'redo'})` | `undoRedo: true` 옵션 + `undo()` / `redo()` / `canUndo()/canRedo()` + Ctrl+Z/Y — v1.2.0 | **P2** (변경 추적 위에) |
 | [x] | `change` 이벤트 (행 단위 변경 묶음) | `rowValueChanged` — 편집·붙여넣기·채우기 공통, payload `{ data, changes }` — v2.0.0 | P3 |
+| [x] | 날짜 에디터 (`column > editor: 'date'` — ParamQuery는 jQuery UI datepicker 연동) | `editor: 'date' \| 'datetime'` — 네이티브 `<input type="date">` / `datetime-local`, 커밋 값은 원본 타입 보존(문자열/`Date`/타임스탬프), `editorOptions: { min, max, step, valueType }`, `dataType: 'date'`면 자동 선택 — v2.8.0 | **P2** (사용자 요청) |
 
 ### 2.3 클립보드 · 내보내기 · 상태
 
@@ -173,6 +174,17 @@
 
 ### v2.1 — "TreeGrid" (§6 T1~T4)
 - treeData 코어(계층 표시·펼침/접힘·계층 정렬/필터), 체크박스 캐스케이드, 부모 요약, 지연 로딩
+
+### v2.8 — date / datetime 에디터 (사용자 요청)
+- `editor: 'date' | 'datetime'` — 네이티브 `<input type="date">` / `<input type="datetime-local">`로 편집(의존성 0 원칙에 따라 자체 달력 UI 대신 브라우저 기본 피커). 값 표시는 로컬 시각 기준 `'yyyy-MM-dd(THH:mm)'`.
+- **커밋 값은 원본 타입을 보존한다** (select 에디터가 `editorOptions`의 value 타입을 보존하는 것과 같은 규약): `Date` → `Date`, 숫자(타임스탬프) → 숫자, 그 밖 → 문자열(컬럼 `format`이 날짜 패턴이면 그 표기로 맞춰 원시 값과 화면 표기를 일치시킴). 한 컬럼에 `Date`와 문자열이 섞이면 정렬·비교가 깨지므로 **붙여넣기(`pasteTsv`) 경로도 같은 규약을 따른다**(날짜로 못 읽는 값은 그 셀만 건너뜀).
+- 빈 입력은 `null` 커밋(날짜 지우기). 단 원본도 빈 값(`null`/`undefined`/`''`)이면 원본을 그대로 둔다 — 열었다 그냥 닫았을 때의 스퓨리어스 커밋 방지(multiselect의 `null → []` 가드와 같은 취지).
+- `editorOptions: { min, max, step, valueType }` — `min`/`max`는 선택 범위(문자열·`Date`·타임스탬프 모두 허용), `step`은 초 단위 정밀도, `valueType`은 커밋 타입 강제(`'date' | 'timestamp' | 'string'`, 생략 시 `'auto'`).
+- `dataType: 'date'`면 `editor` 생략 시 date 에디터가 자동 선택된다 — `dataType`이 "기본 에디터를 자동 결정"한다는 §2.4 스펙(v1.1.0)의 date 축을 뒤늦게 채운 것.
+- 순수 함수: `toDateInputValue(value, withTime)`, `parseDateInputValue(inputValue, originalValue, opts)`, `editValueEquals(a, b)`(Date를 참조가 아니라 시각으로 비교 — 없으면 열었다 닫을 때마다 변경으로 잡힘), `defaultEditorType(col)`, `dateEditorOptions(col)` — `_test` 노출.
+- CSS: `.dg-cell-editor { color-scheme }` 라이트/다크 — 명시하지 않으면 네이티브 달력 피커가 OS 설정을 따라가 그리드 테마와 어긋난다.
+- 전제 작업: [BUG-008](bug-reports/2026-08-01-008-formatdate-timezone-day-shift.md) — `formatDate`가 `'2024-03-15'`를 UTC로 파싱해 음수 오프셋 지역에서 하루 밀리던 문제. 에디터(로컬 기준)와 셀 표시가 어긋나므로 `parseLocalDate` 도입으로 선행 수정.
+- 데모: features.html `#date-datetime-editor` — 문자열 / `Date` / 타임스탬프 세 컬럼으로 타입 보존을 상태 줄에 그대로 노출.
 
 ### v2.7 — addRow 삽입 위치 (사용자 요청)
 - `addRow(row, index?)` / `addRows(rows, index?)` — `index`를 주면 그 위치에 삽입(`0` = 맨 앞), 생략하면 기존처럼 맨 뒤. `[0, 행 수]`로 클램프, 소수는 내림. index는 원본 배열 기준 — 정렬/그룹핑이 켜져 있으면 표시 순서는 뷰 파이프라인이 결정(문서 명시).

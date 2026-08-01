@@ -2765,6 +2765,70 @@
     </script>
   </div>
 
+  <!-- ======================================================== date / datetime 에디터 -->
+  <h2 class="section" id="date-datetime-editor">Date / DateTime Editor (editor: 'date' | 'datetime')</h2>
+  <p class="section-desc">
+    <code class="inline">editor: 'date'</code> / <code class="inline">editor: 'datetime'</code>은 브라우저 기본 날짜 피커
+    (<code class="inline">&lt;input type="date"&gt;</code> / <code class="inline">datetime-local</code>)로 편집합니다.
+    <code class="inline">dataType: 'date'</code>만 줘도 date 에디터가 자동 선택됩니다.
+    커밋 값은 <strong>원본 타입을 보존</strong>합니다 — 문자열이었으면 문자열(컬럼 <code class="inline">format</code> 표기),
+    <code class="inline">Date</code>였으면 <code class="inline">Date</code>, 타임스탬프 숫자였으면 숫자.
+    <code class="inline">editorOptions: { min, max }</code>로 선택 범위를 제한하고, 입력을 비우면 <code class="inline">null</code>로 지워집니다.
+    아래 상태 줄에서 커밋된 값의 <strong>타입</strong>을 확인해 보세요.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div id="gridDateEditor" class="grid-wrap-md"></div>
+      <div class="status-line" id="dateEditorStatus">날짜 셀을 더블클릭해 편집해 보세요 — 커밋된 값과 타입이 여기에 표시됩니다.</div>
+    </div>
+    <script type="text/x-example">
+      var status = document.getElementById('dateEditorStatus');
+
+      /* 시드 고정 데이터에서 세 가지 타입의 날짜 값을 만든다 (문자열 / Date / 타임스탬프) */
+      var rows = DemoData.makeEmployees(14, 5).map(function (r, i) {
+        return {
+          name: r.name,
+          department: r.department,
+          hireDate: r.hireDate,                                       // 문자열
+          reviewAt: new Date(2026, (i * 5) % 12, 1 + (i * 3) % 27,     // Date 인스턴스
+                             9 + (i % 8), (i % 4) * 15),
+          deadline: new Date(2026, 5, 1 + (i % 28)).getTime(),         // 타임스탬프(숫자)
+        };
+      });
+
+      var grid = new DataGrid(document.getElementById('gridDateEditor'), {
+        rowData: rows,
+        columnDefs: [
+          { field: 'name', headerName: 'Name', flex: 1 },
+          { field: 'department', headerName: 'Department', width: 140 },
+          // dataType: 'date'만 주면 date 에디터가 자동 선택된다 (editor 생략)
+          { field: 'hireDate', headerName: 'Hire Date (문자열)', width: 165,
+            dataType: 'date', format: 'yyyy-MM-dd', editable: true },
+          // Date 인스턴스 → datetime 에디터, 커밋도 Date
+          { field: 'reviewAt', headerName: 'Review At (Date)', width: 175,
+            editor: 'datetime', format: 'yyyy-MM-dd HH:mm' },
+          // 타임스탬프 숫자 → 커밋도 숫자. min/max로 선택 범위 제한
+          { field: 'deadline', headerName: 'Deadline (타임스탬프)', width: 180,
+            editor: 'date', format: 'yyyy-MM-dd',
+            editorOptions: { min: '2026-06-01', max: '2026-06-30' } },
+        ],
+      });
+
+      /* 커밋된 값의 타입을 그대로 보여준다 — 타입 보존 규약 확인용 */
+      function describe(v) {
+        if (v === null || v === undefined) return String(v);
+        if (v instanceof Date) return 'Date(' + DataGrid.format(v, 'yyyy-MM-dd HH:mm') + ')';
+        if (typeof v === 'number') return 'number(' + v + ')';
+        return 'string("' + v + '")';
+      }
+
+      grid.on('cellValueChanged', function (e) {
+        status.textContent = e.colDef.field + ' 커밋 → ' + describe(e.newValue) +
+          '   (이전: ' + describe(e.oldValue) + ')';
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

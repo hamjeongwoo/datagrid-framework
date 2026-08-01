@@ -178,6 +178,77 @@
       .replace(/ss/g, p2(d.getSeconds()));
   }
 
+  /**
+   * date/datetime 에디터의 `<input>` 표시 값 — 'yyyy-MM-dd' | 'yyyy-MM-ddTHH:mm'.
+   * 네이티브 date/datetime-local 입력이 요구하는 형식이며 로컬 시간 기준이다.
+   * 빈 값이거나 날짜로 해석할 수 없으면 ''(빈 입력으로 연다).
+   */
+  function toDateInputValue(value, withTime) {
+    if (value === null || value === undefined || value === '') return '';
+    const d = parseLocalDate(value);
+    if (isNaN(d.getTime())) return '';
+    return formatDate(d, withTime ? 'yyyy-MM-ddTHH:mm' : 'yyyy-MM-dd');
+  }
+
+  /**
+   * date/datetime 에디터의 커밋 값 — 원본 값의 타입을 보존한다
+   * (select 에디터가 editorOptions의 value 타입을 보존하는 것과 같은 규약).
+   *   Date 인스턴스 → Date · 숫자(타임스탬프) → 숫자 · 그 밖 → 문자열
+   * 문자열일 때 opts.format이 날짜 패턴이면 그 표기로 맞춘다(원시 값과 화면 표기 일치).
+   * opts.valueType으로 'date'|'timestamp'|'string' 강제 지정 가능('auto'/생략은 위 규칙).
+   *
+   * 빈 입력은 null(날짜 지우기). 단 원본도 빈 값이면 원본을 그대로 반환한다 —
+   * 열었다 그냥 닫았을 때 '' → null 스퓨리어스 커밋이 나지 않게 하는 가드.
+   */
+  function parseDateInputValue(inputValue, originalValue, opts) {
+    opts = opts || {};
+    if (inputValue === null || inputValue === undefined || inputValue === '') {
+      const nilOriginal =
+        originalValue === null || originalValue === undefined || originalValue === '';
+      return nilOriginal ? originalValue : null;
+    }
+    const d = parseLocalDate(inputValue);
+    if (isNaN(d.getTime())) return originalValue; /* 해석 불가 입력은 변경 없음 */
+    let type = opts.valueType;
+    if (!type || type === 'auto') {
+      type = originalValue instanceof Date ? 'date'
+        : typeof originalValue === 'number' ? 'timestamp'
+        : 'string';
+    }
+    if (type === 'date') return d;
+    if (type === 'timestamp') return d.getTime();
+    /* 숫자 마스크(#/0)는 날짜 패턴이 아니므로 입력 원문을 그대로 둔다 (formatValue와 같은 판별) */
+    return opts.format && !/[#0]/.test(String(opts.format))
+      ? formatDate(d, opts.format)
+      : String(inputValue);
+  }
+
+  /**
+   * 편집 커밋 여부 판정용 값 비교. Date는 참조가 아니라 시각으로 비교한다 —
+   * 안 그러면 date 에디터를 열었다 그대로 닫을 때마다 새 Date 인스턴스가
+   * 만들어져 매번 변경으로 잡힌다.
+   */
+  function editValueEquals(a, b) {
+    if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
+    return a === b;
+  }
+
+  /** column.editor 미지정 시 dataType/filter로 정하는 기본 에디터 종류. */
+  function defaultEditorType(col) {
+    if (col.dataType === 'number' || col.filter === 'number') return 'number';
+    if (col.dataType === 'date') return 'date';
+    return 'text';
+  }
+
+  /**
+   * date/datetime 에디터의 editorOptions — `{ min, max, step, valueType }`.
+   * select 계열이 쓰는 배열 형식은 날짜 에디터와 무관하므로 무시한다.
+   */
+  function dateEditorOptions(col) {
+    const o = col.editorOptions;
+    return o && typeof o === 'object' && !Array.isArray(o) ? o : null;
+  }
+
   /** column.format / DataGrid.format() 진입점 — '#'나 '0'이 있으면 숫자, 아니면 날짜 패턴. */
   function formatValue(value, pattern) {
     if (pattern === null || pattern === undefined || pattern === '') {
@@ -4296,8 +4367,7 @@
 
       /* 에디터 준비 — 내장(input/select) 또는 커스텀 객체({ init, getValue, destroy }) */
       const isCustom = col.editor && typeof col.editor === 'object';
-      const editorType = isCustom ? 'custom'
-        : col.editor || (col.dataType === 'number' || col.filter === 'number' ? 'number' : 'text');
+      const editorType = isCustom ? 'custom' : col.editor || defaultEditorType(col);
       let input = null;
       let invalidEl; /* dg-invalid 표시 대상 */
       let getValue;
@@ -4571,6 +4641,24 @@
             }
             return picked;
           };
+        } else if (editorType === 'date' || editorType === 'datetime') {
+          /* 네이티브 date/datetime-local 입력 — 브라우저 기본 날짜 피커를 그대로 쓴다.
+           * 값은 로컬 시각 기준 'yyyy-MM-dd(THH:mm)' 문자열이고, 커밋할 때
+           * 원본 값의 타입(Date/타임스탬프/문자열)으로 되돌린다. */
+          const withTime = editorType === 'datetime';
+          const dateOpts = dateEditorOptions(col);
+          input = document.createElement('input');
+          input.type = withTime ? 'datetime-local' : 'date';
+          input.value = toDateInputValue(value, withTime);
+          if (dateOpts) {
+            if (dateOpts.min !== undefined) input.min = toDateInputValue(dateOpts.min, withTime);
+            if (dateOpts.max !== undefined) input.max = toDateInputValue(dateOpts.max, withTime);
+            if (dateOpts.step !== undefined) input.step = String(dateOpts.step);
+          }
+          getValue = () => parseDateInputValue(input.value, value, {
+            valueType: dateOpts && dateOpts.valueType,
+            format: col.format,
+          });
         } else {
           input = document.createElement('input');
           input.type = editorType === 'number' ? 'number' : 'text';
@@ -4580,7 +4668,9 @@
         input.className = 'dg-cell-editor';
         cellEl.appendChild(input);
         input.focus();
-        if (input.select) input.select();
+        /* 전체 선택은 텍스트 계열에만 — date/datetime-local 등은 선택 API를
+         * 지원하지 않아 select()가 InvalidStateError를 던진다 */
+        if (input.select && (input.type === 'text' || input.type === 'number')) input.select();
         invalidEl = input;
       }
 
@@ -4612,7 +4702,7 @@
            * 닫았을 때 null → [] 스퓨리어스 커밋 방지). */
           const changed = editorType === 'multiselect'
             ? !shallowArrayEquals(newValue, normalizeMultiValue(value))
-            : newValue !== value;
+            : !editValueEquals(newValue, value);
           if (changed) {
             if (col.validator) {
               let result;
@@ -4865,15 +4955,26 @@
           const col = cols[startC + j];
           if (!col || !col.editable || col.field === undefined) return;
           let value = raw;
-          const editorType = col.editor ||
-            (col.dataType === 'number' || col.filter === 'number' ? 'number' : 'text');
+          const editorType = col.editor || defaultEditorType(col);
           if (editorType === 'number') {
             const n = Number(value);
             if (value === '' || isNaN(n)) return;
             value = n;
+          } else if (editorType === 'date' || editorType === 'datetime') {
+            /* 붙여넣기도 에디터와 같은 타입 규약을 따라야 한 컬럼에 Date와 문자열이
+             * 섞이지 않는다(섞이면 정렬·비교가 깨진다). 날짜로 못 읽으면 그 셀은 건너뛴다.
+             * 분 단위까지만 반영 — 에디터 기본 정밀도와 동일. */
+            const withTime = editorType === 'datetime';
+            const parsed = parseLocalDate(value);
+            if (value === '' || isNaN(parsed.getTime())) return;
+            const dateOpts = dateEditorOptions(col);
+            value = parseDateInputValue(toDateInputValue(parsed, withTime), row[col.field], {
+              valueType: dateOpts && dateOpts.valueType,
+              format: col.format,
+            });
           }
           const oldValue = row[col.field];
-          if (value === oldValue) return;
+          if (editValueEquals(value, oldValue)) return;
           if (col.validator) {
             let result;
             try { result = col.validator(value, row); }
@@ -5816,13 +5917,17 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.7.0';
+  DataGrid.version = '2.8.0';
 
   /* Internals exposed for headless unit tests (not part of the public API). */
   DataGrid._test = {
     defaultComparator,
     typeComparator,
     parseLocalDate,
+    toDateInputValue,
+    parseDateInputValue,
+    editValueEquals,
+    defaultEditorType,
     formatNumber,
     formatDate,
     formatValue,

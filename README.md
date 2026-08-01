@@ -99,13 +99,13 @@ python demo/server.py
 | `width` / `minWidth` / `maxWidth` / `flex` | 픽셀 폭 / 최소·최대 폭 / 남은 공간 비율 |
 | `sortable` (기본 true) | 헤더 클릭 정렬, Shift+클릭 다중 정렬 |
 | `comparator(a, b, rowA, rowB)` | 커스텀 정렬 |
-| `dataType` | `'string'` \| `'number'` \| `'date'` \| `'bool'` — 정렬 비교·필터 종류·정렬 방향 자동 결정 |
+| `dataType` | `'string'` \| `'number'` \| `'date'` \| `'bool'` — 정렬 비교·필터 종류·정렬 방향·기본 에디터 자동 결정 |
 | `format` | `'$#,##0.00'` \| `'yyyy-MM-dd'` 선언적 포맷 (`DataGrid.format()` 유틸과 동일 패턴) |
 | `aggFunc` | `'sum'` \| `'avg'` \| `'min'` \| `'max'` \| `'count'` — 그룹/전체 요약 집계 |
 | `filter` | `'text'` \| `'number'` \| `'set'` (`true` = text) |
 | `editable` | 더블클릭/Enter로 인라인 편집 — `editor` 선언 시 생략 가능 (명시적 `false`가 우선) |
-| `editor` | `'text'` \| `'number'` \| `'select'` \| `'multiselect'`(배열 값) \| `'radio'` \| `'checkbox'` 또는 `{ init, getValue, destroy }` 커스텀 객체 |
-| `editorOptions` | select/multiselect/radio 선택지 — `['a', 'b']` 또는 `[{ label: '한국', value: 'kr' }]` (label 표시, value 저장·타입 보존). checkbox는 `{ checked: 'Y', unchecked: 'N' }` 매핑 |
+| `editor` | `'text'` \| `'number'` \| `'date'` \| `'datetime'` \| `'select'` \| `'multiselect'`(배열 값) \| `'radio'` \| `'checkbox'` 또는 `{ init, getValue, destroy }` 커스텀 객체. 생략 시 `dataType`이 `number`/`date`면 그에 맞는 에디터 |
+| `editorOptions` | select/multiselect/radio 선택지 — `['a', 'b']` 또는 `[{ label: '한국', value: 'kr' }]` (label 표시, value 저장·타입 보존). checkbox는 `{ checked: 'Y', unchecked: 'N' }` 매핑. date/datetime은 `{ min, max, step, valueType }` |
 | `editorSearch` | select를 검색 패널로 — `true`(정적 목록 로컬 필터) 또는 `{ fetch(query) => Promise<options>, debounce, minLength, placeholder }` (lazy 검색) |
 | `validator(value, row)` | `true` 또는 오류 메시지 반환 — 거부 시 커밋 차단 + 빨간 표시 |
 | `suppressCopy` | 클립보드 복사에서 제외 (CSV에는 영향 없음) |

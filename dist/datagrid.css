@@ -445,6 +445,12 @@
   outline: none;
 }
 
+/* date/datetime-local 에디터의 네이티브 달력 아이콘·피커를 테마에 맞춘다.
+   color-scheme를 명시하지 않으면 OS 설정을 따라가서 라이트 그리드 위에
+   다크 피커가 뜨는 식으로 어긋난다. */
+.dg-cell-editor { color-scheme: light; }
+.dg-theme-dark .dg-cell-editor { color-scheme: dark; }
+
 /* validator 거부 / beforeCellSave 취소 상태 */
 .dg-cell-editor.dg-invalid {
   border-color: var(--dg-invalid-color);

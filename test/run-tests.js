@@ -1213,6 +1213,90 @@ suite('parseLocalDate', function () {
   assert(isNaN(T.parseLocalDate('garbage').getTime()), 'unparsable → Invalid Date');
 });
 
+/* ---------------- date/datetime 에디터 ---------------- */
+suite('toDateInputValue', function () {
+  assertEq(T.toDateInputValue('2024-03-15', false), '2024-03-15', 'ISO date → date input');
+  assertEq(T.toDateInputValue('2024-03-15', true), '2024-03-15T00:00', 'ISO date → datetime input');
+  assertEq(T.toDateInputValue(new Date(2024, 2, 15, 14, 30), true), '2024-03-15T14:30', 'Date → datetime input');
+  assertEq(T.toDateInputValue(new Date(2024, 2, 15, 14, 30), false), '2024-03-15', 'datetime → date input drops time');
+  assertEq(T.toDateInputValue('2024/03/15', false), '2024-03-15', 'slash format normalized');
+  assertEq(T.toDateInputValue(new Date(2024, 0, 5).getTime(), false), '2024-01-05', 'timestamp → date input');
+
+  assertEq(T.toDateInputValue(null, false), '', 'null → empty input');
+  assertEq(T.toDateInputValue(undefined, false), '', 'undefined → empty input');
+  assertEq(T.toDateInputValue('', false), '', 'empty string → empty input');
+  assertEq(T.toDateInputValue('나중에', false), '', 'unparsable → empty input (no crash)');
+});
+
+suite('parseDateInputValue', function () {
+  /* 타입 보존 (auto) — 원본이 무엇이었냐로 커밋 타입이 정해진다 */
+  var asDate = T.parseDateInputValue('2024-03-15', new Date(2020, 0, 1));
+  assert(asDate instanceof Date, 'Date 원본 → Date 커밋');
+  assertEq(asDate.getFullYear(), 2024, 'Date 커밋: 연도');
+  assertEq(asDate.getDate(), 15, 'Date 커밋: 일 (로컬, 하루 안 밀림)');
+  assertEq(asDate.getHours(), 0, 'Date 커밋: 로컬 자정');
+
+  assertEq(T.parseDateInputValue('2024-03-15', 1700000000000), new Date(2024, 2, 15).getTime(),
+    '숫자 원본 → 타임스탬프 커밋');
+  assertEq(T.parseDateInputValue('2024-03-15', '2020-01-01'), '2024-03-15', '문자열 원본 → 문자열 커밋');
+  assertEq(T.parseDateInputValue('2024-03-15T14:30', '2020-01-01T00:00'), '2024-03-15T14:30',
+    'datetime 문자열 원문 유지');
+
+  /* column.format이 날짜 패턴이면 그 표기로 커밋 (원시 값 = 화면 표기) */
+  assertEq(T.parseDateInputValue('2024-03-15', '2020/01/01', { format: 'yyyy/MM/dd' }), '2024/03/15',
+    'format 패턴으로 커밋');
+  assertEq(T.parseDateInputValue('2024-03-15', '2020-01-01', { format: '#,##0' }), '2024-03-15',
+    '숫자 마스크는 날짜 패턴이 아니므로 입력 원문 유지');
+
+  /* valueType 강제 지정 */
+  assert(T.parseDateInputValue('2024-03-15', '2020-01-01', { valueType: 'date' }) instanceof Date,
+    "valueType: 'date' 강제");
+  assertEq(T.parseDateInputValue('2024-03-15', '2020-01-01', { valueType: 'timestamp' }),
+    new Date(2024, 2, 15).getTime(), "valueType: 'timestamp' 강제");
+  assertEq(T.parseDateInputValue('2024-03-15', new Date(2020, 0, 1), { valueType: 'string' }),
+    '2024-03-15', "valueType: 'string' 강제");
+  assert(T.parseDateInputValue('2024-03-15', '2020-01-01', { valueType: 'auto' }) === '2024-03-15',
+    "valueType: 'auto'는 생략과 동일");
+
+  /* 빈 입력 = 날짜 지우기, 단 원본도 빈 값이면 변경 없음 (스퓨리어스 커밋 가드) */
+  assertEq(T.parseDateInputValue('', '2020-01-01'), null, '빈 입력 → null (지우기)');
+  assertEq(T.parseDateInputValue('', new Date(2020, 0, 1)), null, '빈 입력 → null (Date 원본도)');
+  assertEq(T.parseDateInputValue('', null), null, '원본 null + 빈 입력 → null 그대로');
+  assertEq(T.parseDateInputValue('', ''), '', "원본 '' + 빈 입력 → '' 유지 (스퓨리어스 커밋 방지)");
+  assertEq(T.parseDateInputValue('', undefined), undefined, '원본 undefined + 빈 입력 → undefined 유지');
+
+  /* 해석 불가 입력은 원본 유지 */
+  assertEq(T.parseDateInputValue('garbage', '2020-01-01'), '2020-01-01', '해석 불가 입력 → 원본 유지');
+
+  /* 왕복: 에디터를 열었다 그대로 닫으면 값이 변하지 않아야 한다 */
+  ['2024-03-15', '2024-12-31', '2024-01-01'].forEach(function (s) {
+    assertEq(T.parseDateInputValue(T.toDateInputValue(s, false), s), s, 'round-trip 문자열 ' + s);
+  });
+  var dRound = new Date(2024, 6, 4, 9, 5);
+  assertEq(T.parseDateInputValue(T.toDateInputValue(dRound, true), dRound).getTime(), dRound.getTime(),
+    'round-trip Date (분 단위)');
+});
+
+suite('editValueEquals', function () {
+  assert(T.editValueEquals(1, 1), '원시값 동일');
+  assert(!T.editValueEquals(1, 2), '원시값 상이');
+  assert(T.editValueEquals(null, null), 'null 동일');
+  assert(!T.editValueEquals(null, ''), "null !== ''");
+  /* Date는 참조가 아니라 시각으로 — 이게 아니면 date 에디터가 매번 변경으로 잡힌다 */
+  assert(T.editValueEquals(new Date(2024, 2, 15), new Date(2024, 2, 15)), '같은 시각의 다른 Date 인스턴스는 동일');
+  assert(!T.editValueEquals(new Date(2024, 2, 15), new Date(2024, 2, 16)), '다른 시각의 Date는 상이');
+  assert(!T.editValueEquals(new Date(2024, 2, 15), '2024-03-15'), 'Date와 문자열은 상이');
+});
+
+suite('defaultEditorType', function () {
+  assertEq(T.defaultEditorType({}), 'text', '기본은 text');
+  assertEq(T.defaultEditorType({ dataType: 'number' }), 'number', "dataType: 'number' → number");
+  assertEq(T.defaultEditorType({ filter: 'number' }), 'number', "filter: 'number' → number");
+  assertEq(T.defaultEditorType({ dataType: 'date' }), 'date', "dataType: 'date' → date");
+  assertEq(T.defaultEditorType({ dataType: 'bool' }), 'text', "dataType: 'bool' → text (전용 에디터 없음)");
+  assertEq(T.defaultEditorType({ dataType: 'string' }), 'text', "dataType: 'string' → text");
+});
+
 /* ---------------- formatNumber / formatDate / formatValue ---------------- */
 suite('format', function () {
   assertEq(T.formatNumber(1234567.891, '#,##0.00'), '1,234,567.89', 'grouping + 2 decimals');

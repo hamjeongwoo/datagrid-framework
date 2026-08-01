@@ -22,7 +22,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.7.0',
+  version: '2.8.0',
   updated: '2026-08-01',
 
   sections: [
@@ -967,7 +967,9 @@ window.ApiDocs = {
             '컬럼 값의 데이터 타입 선언. 지정하면 ① 정렬이 타입 기준 비교로 동작하고' +
             '(문자열로 저장된 숫자·날짜도 올바르게 정렬, 해석 불가/빈 값은 마지막), ' +
             '② <code>filter: true</code>의 필터 종류가 자동 결정되며, ' +
-            '③ <code>\'number\'</code>는 <code>align</code> 미지정 시 오른쪽 정렬 + 숫자 에디터가 기본이 됩니다. ' +
+            '③ <code>\'number\'</code>는 <code>align</code> 미지정 시 오른쪽 정렬 + 숫자 에디터가 기본이 되고, ' +
+            '④ <code>\'date\'</code>는 <a href="#column-defs-editor"><code>editor</code></a> 미지정 시 ' +
+            'date 에디터(날짜 피커)가 기본이 됩니다 (v2.8.0). ' +
             '<code>comparator</code>를 함께 주면 그것이 우선합니다.',
           example: "{ field: 'hireDate', dataType: 'date', filter: true, format: 'yyyy-MM-dd' }",
         },
@@ -1016,11 +1018,20 @@ window.ApiDocs = {
         {
           name: 'editor',
           demo: 'cell-editing',
-          type: "'text' | 'number' | 'select' | 'multiselect' | 'radio' | 'checkbox' | { init, getValue, destroy? }",
+          type: "'text' | 'number' | 'date' | 'datetime' | 'select' | 'multiselect' | 'radio' | 'checkbox' | { init, getValue, destroy? }",
           default: "'text'",
           since: '1.2.0',
           description:
-            '인라인 에디터 종류. <code>\'number\'</code>는 커밋 시 숫자로 변환하고 숫자가 아니면 이전 값으로 되돌립니다. ' +
+            '인라인 에디터 종류. <code>\'number\'</code>는 커밋 시 숫자로 변환하고 숫자가 아니면 이전 값으로 되돌립니다. '
+            + "<code>'date'</code>·<code>'datetime'</code>(v2.8.0)은 브라우저 기본 날짜 피커"
+            + '(<code>&lt;input type="date"&gt;</code> / <code>datetime-local</code>)로 편집하며, '
+            + '커밋 값은 <strong>원본 타입을 보존</strong>합니다 — 원본이 문자열이면 문자열'
+            + '(<a href="#column-defs-format"><code>format</code></a>이 날짜 패턴이면 그 표기로), '
+            + '<code>Date</code>면 <code>Date</code>, 타임스탬프 숫자면 숫자입니다. '
+            + '입력을 비우면 <code>null</code>로 커밋해 날짜를 지웁니다(원본도 빈 값이면 변경 없음). '
+            + '선택 범위·정밀도·커밋 타입은 <a href="#column-defs-editorOptions"><code>editorOptions</code></a>의 '
+            + '<code>{ min, max, step, valueType }</code>로 조정합니다 '
+            + '(<a href="../examples/features.html#date-datetime-editor">date/datetime 데모 ↗</a>). ' +
             '<code>\'select\'</code>·<code>\'radio\'</code>는 <code>editorOptions</code>에서 단일 선택 ' +
             '(select는 드롭다운, radio는 multiselect와 같은 셀 앵커 라디오 패널). ' +
             "select는 <a href='#column-defs-editorSearch'><code>editorSearch</code></a>를 주면 " +
@@ -1038,8 +1049,16 @@ window.ApiDocs = {
             '<code>getValue()</code>가 새 값을 반환하며, 닫힐 때 <code>destroy()</code>(선택)가 호출됩니다. ' +
             '커스텀 에디터에서도 <kbd>Enter</kbd>/<kbd>Esc</kbd>/포커스 이탈과 ' +
             '<code>validator</code>·<code>beforeCellSave</code> 검증이 동일하게 동작합니다. ' +
-            '생략 시 <code>dataType</code>/<code>filter</code>가 number면 숫자, 아니면 텍스트 에디터입니다.',
+            '생략 시 <code>dataType</code>/<code>filter</code>가 number면 숫자, '
+            + '<code>dataType: \'date\'</code>면 date 에디터, 아니면 텍스트 에디터입니다.',
           example:
+            "// dataType만 줘도 date 에디터가 자동 선택된다 (값은 'yyyy-MM-dd' 문자열로 커밋)\n" +
+            "{ field: 'hireDate', dataType: 'date', format: 'yyyy-MM-dd', editable: true }\n" +
+            '\n' +
+            "// 값이 Date 인스턴스면 커밋도 Date — 선택 범위는 editorOptions로 제한\n" +
+            "{ field: 'reviewAt', editor: 'datetime', format: 'yyyy-MM-dd HH:mm',\n" +
+            "  editorOptions: { min: '2026-01-01', max: '2026-12-31' } }\n" +
+            '\n' +
             "{ field: 'skills', editor: 'multiselect',   // 값은 ['js', 'css'] 같은 배열\n" +
             "  editorOptions: [{ label: 'JavaScript', value: 'js' }, { label: 'CSS', value: 'css' }],\n" +
             '  cellRenderer: DataGrid.renderers.multiselect() }\n' +
@@ -1057,17 +1076,24 @@ window.ApiDocs = {
         {
           name: 'editorOptions',
           demo: 'select-label-value',
-          type: 'Array<string | { label, value }>',
+          type: 'Array<string | { label, value }> | { checked, unchecked } | { min, max, step, valueType }',
           description:
             "<code>editor: 'select' | 'multiselect' | 'radio'</code>의 선택지 목록. " +
-            "<code>editor: 'checkbox'</code>에서는 배열 대신 <code>{ checked, unchecked }</code> " +
-            "매핑 객체를 받습니다 (예: <code>{ checked: 'Y', unchecked: 'N' }</code> — 읽기/커밋 모두 그 값 사용). " +
             '문자열 배열이면 표시와 저장에 같은 값을 쓰고, ' +
             '<code>{ label, value }</code> 객체 배열이면 편집 UI에는 <code>label</code>이 표시되고 ' +
             '선택 시 <code>value</code>가 데이터에 저장됩니다 (셀에는 저장된 value가 보입니다 — ' +
             'label로 표시하려면 짝꿍 렌더러 <code>DataGrid.renderers.select()/radio()/multiselect()</code>를 쓰세요). ' +
             '<code>value</code>의 원본 타입은 보존됩니다 — 숫자 value를 고르면 숫자로 커밋됩니다. ' +
-            '객체 형식은 v2.2.0부터 지원.',
+            '객체 형식은 v2.2.0부터 지원. ' +
+            "<code>editor: 'checkbox'</code>에서는 배열 대신 <code>{ checked, unchecked }</code> " +
+            "매핑 객체를 받습니다 (예: <code>{ checked: 'Y', unchecked: 'N' }</code> — 읽기/커밋 모두 그 값 사용). " +
+            "<code>editor: 'date' | 'datetime'</code>에서는 <code>{ min, max, step, valueType }</code>을 " +
+            '받습니다 (v2.8.0): <code>min</code>/<code>max</code>는 선택 가능한 날짜 범위' +
+            "(<code>'yyyy-MM-dd'</code> 문자열·<code>Date</code>·타임스탬프 모두 가능), " +
+            '<code>step</code>은 초 단위 정밀도(예: <code>60</code>), ' +
+            "<code>valueType</code>은 커밋 타입을 <code>'date'</code>(Date)·<code>'timestamp'</code>(숫자)·" +
+            "<code>'string'</code>(문자열) 중 하나로 고정합니다 " +
+            "(생략 시 <code>'auto'</code> — 원본 값의 타입을 보존).",
           example:
             "{ field: 'country', editor: 'select',\n" +
             "  editorOptions: [\n" +
