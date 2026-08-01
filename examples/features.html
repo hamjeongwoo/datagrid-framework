@@ -29,7 +29,7 @@
   </p>
 
   <!-- ======================================================== Sorting -->
-  <h2 class="section">Sorting</h2>
+  <h2 class="section" id="sorting">Sorting</h2>
   <p class="section-desc">
     헤더 클릭으로 오름차순 → 내림차순 → 해제 순환. <strong>Shift+클릭</strong>으로 다중 정렬(정렬 순서 배지 표시).
     <code class="inline">sortModel</code>로 초기 정렬을 지정할 수 있습니다.
@@ -58,7 +58,7 @@
   </div>
 
   <!-- ======================================================== Filters -->
-  <h2 class="section">Column Filters</h2>
+  <h2 class="section" id="column-filters">Column Filters</h2>
   <p class="section-desc">
     헤더에 마우스를 올리면 나타나는 메뉴 버튼으로 컬럼별 필터를 엽니다.
     <code class="inline">filter: 'text'</code> · <code class="inline">'number'</code> ·
@@ -87,7 +87,7 @@
   </div>
 
   <!-- ======================================================== Quick filter -->
-  <h2 class="section">Quick Filter</h2>
+  <h2 class="section" id="quick-filter">Quick Filter</h2>
   <p class="section-desc">모든 컬럼을 대상으로 한 전역 검색 — 공백으로 구분된 모든 단어가 일치해야 합니다.</p>
   <div class="example-card">
     <div class="example-html">
@@ -116,7 +116,7 @@
   </div>
 
   <!-- ======================================================== Selection -->
-  <h2 class="section">Row Selection</h2>
+  <h2 class="section" id="row-selection">Row Selection</h2>
   <p class="section-desc">
     <code class="inline">rowSelection: 'multiple'</code> — 체크박스, 헤더 전체 선택(부분 선택 시 indeterminate),
     Ctrl/⌘+클릭 토글, Shift+클릭 범위 선택.
@@ -153,7 +153,7 @@
   </div>
 
   <!-- ======================================================== Editing -->
-  <h2 class="section">Cell Editing</h2>
+  <h2 class="section" id="cell-editing">Cell Editing</h2>
   <p class="section-desc">
     <code class="inline">editable: true</code> 셀을 더블클릭(또는 Enter)하면 편집 시작 — text / number / select
     에디터, Enter 커밋, Esc 취소, <code class="inline">cellValueChanged</code> 이벤트 발행.
@@ -186,7 +186,7 @@
   </div>
 
   <!-- ======================================================== Pagination -->
-  <h2 class="section">Pagination</h2>
+  <h2 class="section" id="pagination">Pagination</h2>
   <p class="section-desc">
     페이지 크기 선택, 처음/이전/번호/다음/마지막 버튼, "X to Y of Z" 요약. 페이지네이션을 끄면 전체 가상 스크롤로 동작합니다.
   </p>
@@ -213,7 +213,7 @@
   </div>
 
   <!-- ======================================================== Pinning -->
-  <h2 class="section">Column Pinning · Resize · Reorder</h2>
+  <h2 class="section" id="column-pinning-resize-reorder">Column Pinning · Resize · Reorder</h2>
   <p class="section-desc">
     <code class="inline">pinned: 'left' | 'right'</code> 고정 컬럼(스크롤 시 그림자), 헤더 경계 드래그로 크기 조절,
     경계 더블클릭으로 자동 맞춤, 헤더 드래그로 순서 변경.
@@ -243,7 +243,7 @@
   </div>
 
   <!-- ======================================================== Virtualization -->
-  <h2 class="section">Row Virtualization — 100,000 rows</h2>
+  <h2 class="section" id="row-virtualization">Row Virtualization — 100,000 rows</h2>
   <p class="section-desc">
     보이는 범위(±6행 버퍼)만 DOM으로 렌더링해 10만 행도 지연 없이 스크롤합니다.
   </p>
@@ -279,7 +279,7 @@
   </div>
 
   <!-- ======================================================== CSV -->
-  <h2 class="section">CSV Export</h2>
+  <h2 class="section" id="csv-export">CSV Export</h2>
   <p class="section-desc">필터·정렬이 적용된 현재 뷰 데이터를 그대로 내보냅니다(포매터 적용, RFC 4180 이스케이프).</p>
   <div class="example-card">
     <div class="example-html">
@@ -307,7 +307,7 @@
   </div>
 
   <!-- ======================================================== Overlays -->
-  <h2 class="section">Overlays</h2>
+  <h2 class="section" id="overlays">Overlays</h2>
   <p class="section-desc">로딩 스피너 오버레이와 "No rows to show" 빈 상태.</p>
   <div class="example-card">
     <div class="example-html">
@@ -345,7 +345,7 @@
   </div>
 
   <!-- ======================================================== Row grouping -->
-  <h2 class="section">Row Grouping &amp; Aggregation</h2>
+  <h2 class="section" id="row-grouping">Row Grouping &amp; Aggregation</h2>
   <p class="section-desc">
     <code class="inline">groupBy: ['department']</code>로 행을 그룹핑하고, 그룹 헤더 행을 클릭(또는 Enter)해 접고 펼칩니다.
     <code class="inline">aggFunc: 'sum' | 'avg' | 'min' | 'max' | 'count'</code>를 컬럼에 지정하면
@@ -402,7 +402,7 @@
   </div>
 
   <!-- ======================================================== Floating filter -->
-  <h2 class="section">Floating Filter (헤더 필터 행)</h2>
+  <h2 class="section" id="floating-filter">Floating Filter (헤더 필터 행)</h2>
   <p class="section-desc">
     <code class="inline">floatingFilter: true</code> — 헤더 바로 아래에 컬럼별 인라인 필터 입력을 표시합니다.
     text/number는 입력하는 대로(250ms 디바운스) 필터링되고, set은 드롭다운으로 단일 값을 고릅니다.
@@ -436,7 +436,7 @@
   </div>
 
   <!-- ======================================================== Edit validation -->
-  <h2 class="section">Edit Validation &amp; Programmatic Control</h2>
+  <h2 class="section" id="edit-validation">Edit Validation &amp; Programmatic Control</h2>
   <p class="section-desc">
     <code class="inline">column.validator(value, row)</code>가 <code class="inline">true</code>가 아닌 값(오류 메시지 문자열)을
     반환하면 커밋이 거부되고 편집기가 빨간 테두리로 유지됩니다(Esc로 취소).
@@ -517,7 +517,7 @@
   </div>
 
   <!-- ======================================================== Clipboard -->
-  <h2 class="section">Clipboard Copy &amp; Paste (TSV)</h2>
+  <h2 class="section" id="clipboard">Clipboard Copy &amp; Paste (TSV)</h2>
   <p class="section-desc">
     선택한 행을 <kbd>Ctrl+C</kbd>로 엑셀 호환 TSV로 복사하고(선택이 없으면 포커스 셀),
     포커스 셀을 시작점으로 <kbd>Ctrl+V</kbd>로 붙여넣습니다 — 편집 가능한 셀에만 쓰이고
@@ -580,7 +580,7 @@
   </div>
 
   <!-- ======================================================== 상태 저장/복원 -->
-  <h2 class="section">Grid State Save &amp; Restore</h2>
+  <h2 class="section" id="grid-state">Grid State Save &amp; Restore</h2>
   <p class="section-desc">
     <code class="inline">getState()</code>는 컬럼 순서·숨김·폭, 정렬, 필터, 퀵 필터, 그룹핑,
     페이지 상태를 JSON 직렬화 가능한 객체로 반환합니다. localStorage 등에 저장했다가
@@ -637,7 +637,7 @@
   </div>
 
   <!-- ======================================================== dataType & format -->
-  <h2 class="section">Column Data Type &amp; Declarative Format</h2>
+  <h2 class="section" id="data-type-format">Column Data Type &amp; Declarative Format</h2>
   <p class="section-desc">
     <code class="inline">dataType: 'number' | 'date' | 'bool'</code>은 정렬 비교·
     <code class="inline">filter: true</code>의 필터 종류·기본 정렬 방향(숫자는 오른쪽)을 자동 결정합니다.
@@ -681,7 +681,7 @@
   </div>
 
   <!-- ======================================================== rowNumbers · maxWidth · editable -->
-  <h2 class="section">Row Numbers · Max Width · Grid-level Editable</h2>
+  <h2 class="section" id="row-numbers-maxwidth-editable">Row Numbers · Max Width · Grid-level Editable</h2>
   <p class="section-desc">
     <code class="inline">rowNumbers: true</code>는 왼쪽에 고정된 행 번호 컬럼을 추가합니다(정렬·필터·복사 제외).
     <code class="inline">column.maxWidth</code>는 드래그 리사이즈·flex·자동 맞춤의 상한이 됩니다.
@@ -724,7 +724,7 @@
   </div>
 
   <!-- ======================================================== 탐색 API & getJson -->
-  <h2 class="section">Programmatic Navigation &amp; JSON Export</h2>
+  <h2 class="section" id="navigation-json">Programmatic Navigation &amp; JSON Export</h2>
   <p class="section-desc">
     <code class="inline">focusCell(rowIndex, field)</code>는 페이지 이동·스크롤을 포함해 셀에 포커스를 주고,
     <code class="inline">ensureRowVisible(row)</code> / <code class="inline">ensureColumnVisible(colId)</code>는
@@ -794,7 +794,7 @@
   </div>
 
   <!-- ======================================================== 라이프사이클 & before 이벤트 -->
-  <h2 class="section">Lifecycle &amp; Cancelable Events</h2>
+  <h2 class="section" id="lifecycle-events">Lifecycle &amp; Cancelable Events</h2>
   <p class="section-desc">
     <code class="inline">gridReady</code>(초기 렌더 후 1회) · <code class="inline">dataChanged</code>(행 추가/삭제/교체) ·
     <code class="inline">viewRendered</code>(모든 refresh 후) 라이프사이클 이벤트와,
@@ -855,7 +855,7 @@
   </div>
 
   <!-- ======================================================== valueGetter · getRowClass · suppressMove -->
-  <h2 class="section">Computed Columns &amp; Row Styling</h2>
+  <h2 class="section" id="computed-columns-row-styling">Computed Columns &amp; Row Styling</h2>
   <p class="section-desc">
     <code class="inline">column.valueGetter(row)</code>는 파생 값을 계산해 행에 기록합니다 —
     정렬·필터·CSV/JSON 내보내기 모두 같은 값을 봅니다.
@@ -899,7 +899,7 @@
   </div>
 
   <!-- ======================================================== 연속 편집 & 커스텀 에디터 -->
-  <h2 class="section">Continuous Editing &amp; Custom Editor</h2>
+  <h2 class="section" id="continuous-editing-custom-editor">Continuous Editing &amp; Custom Editor</h2>
   <p class="section-desc">
     <code class="inline">editOnSingleClick</code>(클릭 한 번 편집) ·
     <code class="inline">enterMovesDown</code>(Enter로 아래 셀 연속 편집) ·
@@ -955,7 +955,7 @@
   </div>
 
   <!-- ======================================================== 변경 추적 & undo/redo -->
-  <h2 class="section">Change Tracking &amp; Undo / Redo</h2>
+  <h2 class="section" id="change-tracking">Change Tracking &amp; Undo / Redo</h2>
   <p class="section-desc">
     <code class="inline">trackChanges: true</code>는 마지막 기준선 이후의 변경을 추적합니다 —
     수정 셀은 모서리 마커(dirty), 추가 행은 배경으로 표시되고
@@ -1034,7 +1034,7 @@
   </div>
 
   <!-- ======================================================== 셀/블록 선택 & 검색 -->
-  <h2 class="section">Cell / Block Selection &amp; Find</h2>
+  <h2 class="section" id="cell-selection-find">Cell / Block Selection &amp; Find</h2>
   <p class="section-desc">
     <code class="inline">cellSelection: true</code>는 셀 클릭·드래그·<kbd>Shift</kbd>+클릭/화살표로
     블록 범위를 선택합니다 — <kbd>Ctrl+C</kbd>는 범위를 그대로 TSV로 복사하고
@@ -1096,7 +1096,7 @@
   </div>
 
   <!-- ======================================================== 중첩 컬럼 헤더 -->
-  <h2 class="section">Column Group Headers</h2>
+  <h2 class="section" id="column-groups">Column Group Headers</h2>
   <p class="section-desc">
     <code class="inline">columnGroups: [{ headerName, children: ['field'...] }]</code>는
     헤더 위에 그룹 스팬 행을 추가합니다. 같은 그룹의 연속된 컬럼이 하나의 스팬으로 묶이고,
@@ -1137,7 +1137,7 @@
   </div>
 
   <!-- ======================================================== 원격 데이터 소스 -->
-  <h2 class="section">Remote Data Source (Server-side Sort / Filter / Paging)</h2>
+  <h2 class="section" id="remote-data">Remote Data Source (Server-side Sort / Filter / Paging)</h2>
   <p class="section-desc">
     <code class="inline">dataSource: { url, method, params, parse }</code>는 fetch로 데이터를 불러옵니다.
     <code class="inline">sortMode</code> / <code class="inline">filterMode</code> /
@@ -1195,7 +1195,7 @@
   </div>
 
   <!-- ======================================================== 마스터-디테일 -->
-  <h2 class="section">Master-Detail Rows</h2>
+  <h2 class="section" id="master-detail">Master-Detail Rows</h2>
   <p class="section-desc">
     <code class="inline">rowDetail: { renderer(row), height }</code>는 행 아래에 커스텀 디테일 패널을 펼칩니다.
     첫 컬럼의 셰브론(자동 추가)이나 <code class="inline">expandRow(row)</code> /
@@ -1250,7 +1250,7 @@
   </div>
 
   <!-- ======================================================== 부분 refresh · setOptions · title/toolbar -->
-  <h2 class="section">Partial Refresh · Runtime Options · Title / Toolbar</h2>
+  <h2 class="section" id="partial-refresh-options-toolbar">Partial Refresh · Runtime Options · Title / Toolbar</h2>
   <p class="section-desc">
     <code class="inline">refreshCell(row, field)</code> / <code class="inline">refreshRow(row)</code> /
     <code class="inline">refreshColumn(colId)</code>은 전체 재계산 없이 렌더된 DOM만 다시 그립니다
@@ -1322,7 +1322,7 @@
   </div>
 
   <!-- ======================================================== Excel 내보내기 & beforeExport -->
-  <h2 class="section">Excel Export &amp; beforeExport</h2>
+  <h2 class="section" id="excel-export">Excel Export &amp; beforeExport</h2>
   <p class="section-desc">
     <code class="inline">exportExcel(filename, sheetName)</code>은 의존성 없이 진짜 .xlsx 파일을 만듭니다
     (무압축 ZIP + SpreadsheetML — 포매터 없는 숫자는 숫자 셀로 나가 엑셀에서 바로 계산 가능).
@@ -1374,7 +1374,7 @@
   </div>
 
   <!-- ======================================================== 채우기 핸들 -->
-  <h2 class="section">Fill Handle (엑셀식 채우기)</h2>
+  <h2 class="section" id="fill-handle">Fill Handle (엑셀식 채우기)</h2>
   <p class="section-desc">
     <code class="inline">fillHandle: true</code>(<code class="inline">cellSelection</code> 필요)는
     선택 범위 우하단에 채우기 핸들을 표시합니다. 핸들을 세로로 드래그하면
@@ -1412,7 +1412,7 @@
   </div>
 
   <!-- ======================================================== 셀 병합 -->
-  <h2 class="section">Merge Cells (연속 값 세로 병합)</h2>
+  <h2 class="section" id="merge-cells">Merge Cells (연속 값 세로 병합)</h2>
   <p class="section-desc">
     <code class="inline">mergeCells: ['field'...]</code>는 표시 순서상 연속된 같은 값을 세로로 병합해
     보여줍니다 — 병합 구간이 하나의 셀이 되어 값이 세로 중앙에 표시됩니다. 해당 컬럼으로 정렬하면
@@ -1448,7 +1448,7 @@
   </div>
 
   <!-- ======================================================== 컬럼 가상화 -->
-  <h2 class="section">Column Virtualization — 300 columns (virtualX)</h2>
+  <h2 class="section" id="virtual-x">Column Virtualization — 300 columns (virtualX)</h2>
   <p class="section-desc">
     <code class="inline">virtualX: true</code>는 가로 뷰포트에 보이는 컬럼(+버퍼 2)만 셀을 렌더링하고
     나머지는 폭 스페이서로 대체합니다 — 수백 개 컬럼에서도 행 DOM이 가볍게 유지됩니다.
@@ -1496,7 +1496,7 @@
   </div>
 
   <!-- ======================================================== 고정 행 · 줄바꿈 · autoHeight -->
-  <h2 class="section">Pinned Top Rows · Wrap Text · Auto Height</h2>
+  <h2 class="section" id="pinned-rows-wrap-text">Pinned Top Rows · Wrap Text · Auto Height</h2>
   <p class="section-desc">
     <code class="inline">pinnedTopRows</code>는 헤더 아래에 스크롤과 무관한 고정 행(표시 전용)을 두고
     <code class="inline">setPinnedTopRows(rows)</code>로 갱신합니다.
@@ -1550,7 +1550,7 @@
   </div>
 
   <!-- ======================================================== domLayout autoHeight -->
-  <h2 class="section">Auto-Height Grid (domLayout)</h2>
+  <h2 class="section" id="auto-height">Auto-Height Grid (domLayout)</h2>
   <p class="section-desc">
     <code class="inline">domLayout: 'autoHeight'</code>는 컨테이너 높이 대신 <strong>내용 높이</strong>만큼
     그리드가 늘어납니다 — 세로 스크롤/가상화가 없어지므로 소량 데이터 전용입니다.
@@ -1574,7 +1574,7 @@
   </div>
 
   <!-- ======================================================== once · setEnabled · headerAlign · showHeader · rowValueChanged -->
-  <h2 class="section">Utility Options &amp; Events (v2.0)</h2>
+  <h2 class="section" id="utility-v2">Utility Options &amp; Events (v2.0)</h2>
   <p class="section-desc">
     <code class="inline">once(event, fn)</code>(1회 핸들러) ·
     <code class="inline">setEnabled(bool)</code>(전체 인터랙션 잠금 오버레이) ·
@@ -1629,7 +1629,7 @@
   </div>
 
   <!-- ======================================================== showHeader: false -->
-  <h2 class="section">Headerless Grid (showHeader)</h2>
+  <h2 class="section" id="headerless">Headerless Grid (showHeader)</h2>
   <p class="section-desc">
     <code class="inline">showHeader: false</code>는 헤더 영역 전체(정렬·필터 UI 포함)를 숨깁니다 —
     읽기 전용 리스트나 커스텀 헤더를 직접 만들 때 사용합니다.
@@ -1654,7 +1654,7 @@
   </div>
 
   <!-- ======================================================== 트리 그리드 -->
-  <h2 class="section">Tree Grid (treeData)</h2>
+  <h2 class="section" id="tree-grid">Tree Grid (treeData)</h2>
   <p class="section-desc">
     <code class="inline">treeData</code>는 계층 데이터를 트리로 표시합니다 — nested(<code class="inline">children</code> 배열)와
     flat(<code class="inline">parentId</code>) 형식을 모두 지원하고, 정렬은 형제끼리, 필터는 매치된 노드의 조상을 유지한 채 동작합니다.
@@ -1709,7 +1709,7 @@
   </div>
 
   <!-- ======================================================== 트리 체크박스 -->
-  <h2 class="section">Tree Checkbox — cascade (checkboxSelection)</h2>
+  <h2 class="section" id="tree-checkbox">Tree Checkbox — cascade (checkboxSelection)</h2>
   <p class="section-desc">
     트리 모드에서는 기존 <code class="inline">checkboxSelection</code> 컬럼이 3상태 캐스케이드 체크박스가 됩니다 —
     부모를 체크하면 자손 전체가 <strong>행 선택</strong>되고, 자식 일부만 선택되면 부모가
@@ -1771,7 +1771,7 @@
   </div>
 
   <!-- ======================================================== 트리 부모 요약 -->
-  <h2 class="section">Tree Summary (treeData.summary)</h2>
+  <h2 class="section" id="tree-summary">Tree Summary (treeData.summary)</h2>
   <p class="section-desc">
     <code class="inline">treeData.summary: true</code>는 <code class="inline">column.aggFunc</code>가 지정된 컬럼에서
     부모 노드 행에 자손 리프들의 집계값을 표시합니다 (표시 전용 — 데이터는 그대로).
@@ -1811,7 +1811,7 @@
   </div>
 
   <!-- ======================================================== 트리 지연 로딩 -->
-  <h2 class="section">Tree Lazy Loading (treeData.fetchChildren)</h2>
+  <h2 class="section" id="tree-lazy">Tree Lazy Loading (treeData.fetchChildren)</h2>
   <p class="section-desc">
     <code class="inline">treeData.fetchChildren(row)</code>는 노드를 처음 펼칠 때 자식을 비동기로 로드합니다
     (Promise 반환, 로딩 중 토글이 스피너로 회전). <code class="inline">hasChildren(row)</code>가 로드 전 토글 표시 여부를
@@ -1867,7 +1867,7 @@
   </div>
 
   <!-- ======================================================== select 에디터 label/value -->
-  <h2 class="section">Select Editor — label/value Options</h2>
+  <h2 class="section" id="select-label-value">Select Editor — label/value Options</h2>
   <p class="section-desc">
     <code class="inline">editorOptions</code>는 문자열 배열 외에
     <code class="inline">{ label: '한국', value: 'kr' }</code> 객체 배열도 받습니다 —
@@ -1922,7 +1922,7 @@
   </div>
 
   <!-- ======================================================== select 렌더러 -->
-  <h2 class="section">Select Renderer (DataGrid.renderers.select)</h2>
+  <h2 class="section" id="select-renderer">Select Renderer (DataGrid.renderers.select)</h2>
   <p class="section-desc">
     select 에디터의 짝꿍 렌더러입니다 — 셀에는 코드(value)가 저장돼 있어도
     <code class="inline">cellRenderer: DataGrid.renderers.select()</code>가 그 컬럼의
@@ -1972,7 +1972,7 @@
   </div>
 
   <!-- ======================================================== multiselect/radio/checkbox 에디터 -->
-  <h2 class="section">Multiselect · Radio · Checkbox Editors &amp; Renderers</h2>
+  <h2 class="section" id="multi-radio-checkbox-editors">Multiselect · Radio · Checkbox Editors &amp; Renderers</h2>
   <p class="section-desc">
     <code class="inline">editor</code>에 <code class="inline">'multiselect'</code>(체크리스트 패널, 값은 배열)·
     <code class="inline">'radio'</code>(단일 선택 라디오 패널)·<code class="inline">'checkbox'</code>(체크박스)를
@@ -2039,7 +2039,7 @@
   </div>
 
   <!-- ======================================================== 검색형 select 에디터 (editorSearch) -->
-  <h2 class="section">Searchable Select Editor (editorSearch)</h2>
+  <h2 class="section" id="searchable-select">Searchable Select Editor (editorSearch)</h2>
   <p class="section-desc">
     <code class="inline">editor: 'select'</code>에 <code class="inline">editorSearch</code>를 주면 네이티브 셀렉트 대신
     검색 입력이 있는 옵션 패널로 바뀝니다. <code class="inline">editorSearch: true</code>는 정적

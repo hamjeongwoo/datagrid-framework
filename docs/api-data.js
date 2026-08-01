@@ -17,6 +17,8 @@
  *   description : 설명 (HTML 허용 — <code>, <a href="#..."> 등)
  *   example     : 코드 예제 (문자열, JS로 하이라이팅)
  *   since       : 도입 버전 (생략 시 1.0.0)
+ *   demo        : examples/features.html의 데모 카드 앵커 id (있으면 "예제 ↗"
+ *                 링크 배지 표시 — 앵커는 features.html의 <h2 class="section" id>)
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
@@ -101,6 +103,7 @@ window.ApiDocs = {
         },
         {
           name: 'rowSelection',
+          demo: 'row-selection',
           type: "'single' | 'multiple'",
           default: 'undefined (선택 비활성)',
           description:
@@ -109,6 +112,7 @@ window.ApiDocs = {
         },
         {
           name: 'pagination',
+          demo: 'pagination',
           type: 'boolean',
           default: 'false',
           description:
@@ -116,12 +120,14 @@ window.ApiDocs = {
         },
         {
           name: 'paginationPageSize',
+          demo: 'pagination',
           type: 'number',
           default: '20',
           description: '페이지당 행 수.',
         },
         {
           name: 'paginationPageSizeOptions',
+          demo: 'pagination',
           type: 'number[]',
           default: '[10, 20, 50, 100]',
           description: '페이지 크기 셀렉트 박스에 표시할 선택지.',
@@ -155,6 +161,7 @@ window.ApiDocs = {
         },
         {
           name: 'sortModel',
+          demo: 'sorting',
           type: '{ field, dir }[]',
           description:
             '초기 정렬 상태. <code>dir</code>은 <code>\'asc\'</code> 또는 <code>\'desc\'</code>. ' +
@@ -172,6 +179,7 @@ window.ApiDocs = {
         },
         {
           name: 'columnReorder',
+          demo: 'column-pinning-resize-reorder',
           type: 'boolean',
           default: 'true',
           description:
@@ -179,6 +187,7 @@ window.ApiDocs = {
         },
         {
           name: 'floatingFilter',
+          demo: 'floating-filter',
           type: 'boolean',
           default: 'false',
           since: '1.1.0',
@@ -191,6 +200,7 @@ window.ApiDocs = {
         },
         {
           name: 'groupBy',
+          demo: 'row-grouping',
           type: 'string[]',
           default: '[]',
           since: '1.1.0',
@@ -203,6 +213,7 @@ window.ApiDocs = {
         },
         {
           name: 'groupDefaultExpanded',
+          demo: 'row-grouping',
           type: 'boolean',
           default: 'true',
           since: '1.1.0',
@@ -211,6 +222,7 @@ window.ApiDocs = {
         },
         {
           name: 'grandTotal',
+          demo: 'row-grouping',
           type: 'boolean',
           default: 'false',
           since: '1.1.0',
@@ -221,6 +233,7 @@ window.ApiDocs = {
         },
         {
           name: 'editOnSingleClick',
+          demo: 'continuous-editing-custom-editor',
           type: 'boolean',
           default: 'false',
           since: '1.2.0',
@@ -230,6 +243,7 @@ window.ApiDocs = {
         },
         {
           name: 'enterMovesDown',
+          demo: 'continuous-editing-custom-editor',
           type: 'boolean',
           default: 'false',
           since: '1.2.0',
@@ -239,6 +253,7 @@ window.ApiDocs = {
         },
         {
           name: 'tabMovesRight',
+          demo: 'continuous-editing-custom-editor',
           type: 'boolean',
           default: 'false',
           since: '1.2.0',
@@ -248,6 +263,7 @@ window.ApiDocs = {
         },
         {
           name: 'title',
+          demo: 'partial-refresh-options-toolbar',
           type: 'string',
           since: '1.2.0',
           description:
@@ -255,6 +271,7 @@ window.ApiDocs = {
         },
         {
           name: 'toolbar',
+          demo: 'partial-refresh-options-toolbar',
           type: 'HTMLElement | (grid) => HTMLElement',
           since: '1.2.0',
           description:
@@ -267,6 +284,7 @@ window.ApiDocs = {
         },
         {
           name: 'rowDetail',
+          demo: 'master-detail',
           type: '{ renderer: (row) => string | Node, height?: number }',
           since: '1.2.0',
           description:
@@ -285,6 +303,7 @@ window.ApiDocs = {
         },
         {
           name: 'dataSource',
+          demo: 'remote-data',
           type: '{ url, method?, params?, parse? }',
           since: '1.2.0',
           description:
@@ -304,6 +323,7 @@ window.ApiDocs = {
         },
         {
           name: 'sortMode',
+          demo: 'remote-data',
           type: "'client' | 'server'",
           default: "'client'",
           since: '1.2.0',
@@ -316,6 +336,7 @@ window.ApiDocs = {
         },
         {
           name: 'columnGroups',
+          demo: 'column-groups',
           type: '{ headerName: string, children: string[] }[]',
           since: '1.2.0',
           description:
@@ -332,6 +353,7 @@ window.ApiDocs = {
         },
         {
           name: 'cellSelection',
+          demo: 'cell-selection-find',
           type: 'boolean',
           default: 'false',
           since: '1.2.0',
@@ -344,6 +366,7 @@ window.ApiDocs = {
         },
         {
           name: 'showHeader',
+          demo: 'headerless',
           type: 'boolean',
           default: 'true',
           since: '2.0.0',
@@ -352,6 +375,7 @@ window.ApiDocs = {
         },
         {
           name: 'pinnedTopRows',
+          demo: 'pinned-rows-wrap-text',
           type: 'object[]',
           since: '2.0.0',
           description:
@@ -362,6 +386,7 @@ window.ApiDocs = {
         },
         {
           name: 'autoRowHeight',
+          demo: 'pinned-rows-wrap-text',
           type: 'boolean',
           default: 'false',
           since: '2.0.0',
@@ -372,6 +397,7 @@ window.ApiDocs = {
         },
         {
           name: 'domLayout',
+          demo: 'auto-height',
           type: "'normal' | 'autoHeight'",
           default: "'normal'",
           since: '2.0.0',
@@ -382,6 +408,7 @@ window.ApiDocs = {
         },
         {
           name: 'virtualX',
+          demo: 'virtual-x',
           type: 'boolean',
           default: 'false',
           since: '2.0.0',
@@ -394,6 +421,7 @@ window.ApiDocs = {
         },
         {
           name: 'mergeCells',
+          demo: 'merge-cells',
           type: 'string[]',
           since: '2.0.0',
           description:
@@ -405,6 +433,7 @@ window.ApiDocs = {
         },
         {
           name: 'treeData',
+          demo: 'tree-grid',
           type: 'object',
           since: '2.1.0',
           description:
@@ -429,6 +458,7 @@ window.ApiDocs = {
         },
         {
           name: 'fillHandle',
+          demo: 'fill-handle',
           type: 'boolean',
           default: 'false',
           since: '2.0.0',
@@ -441,6 +471,7 @@ window.ApiDocs = {
         },
         {
           name: 'trackChanges',
+          demo: 'change-tracking',
           type: 'boolean',
           default: 'false',
           since: '1.2.0',
@@ -453,6 +484,7 @@ window.ApiDocs = {
         },
         {
           name: 'undoRedo',
+          demo: 'change-tracking',
           type: 'boolean',
           default: 'false',
           since: '1.2.0',
@@ -464,6 +496,7 @@ window.ApiDocs = {
         },
         {
           name: 'getRowClass',
+          demo: 'computed-columns-row-styling',
           type: '(row, index) => string',
           since: '1.2.0',
           description:
@@ -474,6 +507,7 @@ window.ApiDocs = {
         },
         {
           name: 'rowNumbers',
+          demo: 'row-numbers-maxwidth-editable',
           type: 'boolean',
           default: 'false',
           since: '1.1.0',
@@ -484,6 +518,7 @@ window.ApiDocs = {
         },
         {
           name: 'editable',
+          demo: 'row-numbers-maxwidth-editable',
           type: 'boolean',
           default: 'true',
           since: '1.1.0',
@@ -540,6 +575,7 @@ window.ApiDocs = {
         },
         {
           name: 'maxWidth',
+          demo: 'row-numbers-maxwidth-editable',
           type: 'number',
           since: '1.1.0',
           description:
@@ -556,6 +592,7 @@ window.ApiDocs = {
         },
         {
           name: 'sortable',
+          demo: 'sorting',
           type: 'boolean',
           default: 'true',
           description:
@@ -564,6 +601,7 @@ window.ApiDocs = {
         },
         {
           name: 'comparator',
+          demo: 'sorting',
           type: '(a, b, rowA, rowB) => number',
           description:
             '커스텀 정렬 비교 함수. 기본 비교자는 숫자·날짜·불리언·문자열(자연 정렬, 대소문자 무시)을 처리하고 ' +
@@ -573,6 +611,7 @@ window.ApiDocs = {
         },
         {
           name: 'filter',
+          demo: 'column-filters',
           type: "true | 'text' | 'number' | 'set'",
           default: 'false',
           description:
@@ -582,6 +621,7 @@ window.ApiDocs = {
         },
         {
           name: 'headerAlign',
+          demo: 'utility-v2',
           type: "'left' | 'center' | 'right'",
           since: '2.0.0',
           description:
@@ -590,6 +630,7 @@ window.ApiDocs = {
         },
         {
           name: 'wrapText',
+          demo: 'pinned-rows-wrap-text',
           type: 'boolean',
           default: 'false',
           since: '2.0.0',
@@ -600,6 +641,7 @@ window.ApiDocs = {
         },
         {
           name: 'exportFormatter',
+          demo: 'excel-export',
           type: '(value, row) => any',
           since: '1.2.0',
           description:
@@ -612,6 +654,7 @@ window.ApiDocs = {
         },
         {
           name: 'valueGetter',
+          demo: 'computed-columns-row-styling',
           type: '(row) => any',
           since: '1.2.0',
           description:
@@ -625,6 +668,7 @@ window.ApiDocs = {
         },
         {
           name: 'suppressMove',
+          demo: 'computed-columns-row-styling',
           type: 'boolean',
           default: 'false',
           since: '1.2.0',
@@ -634,6 +678,7 @@ window.ApiDocs = {
         },
         {
           name: 'dataType',
+          demo: 'data-type-format',
           type: "'string' | 'number' | 'date' | 'bool'",
           since: '1.1.0',
           description:
@@ -646,6 +691,7 @@ window.ApiDocs = {
         },
         {
           name: 'format',
+          demo: 'data-type-format',
           type: 'string',
           since: '1.1.0',
           description:
@@ -661,6 +707,7 @@ window.ApiDocs = {
         },
         {
           name: 'aggFunc',
+          demo: 'row-grouping',
           type: "'sum' | 'avg' | 'min' | 'max' | 'count'",
           since: '1.1.0',
           description:
@@ -674,6 +721,7 @@ window.ApiDocs = {
         },
         {
           name: 'editable',
+          demo: 'cell-editing',
           type: 'boolean',
           default: 'false (editor 선언 시 true)',
           description:
@@ -685,6 +733,7 @@ window.ApiDocs = {
         },
         {
           name: 'editor',
+          demo: 'cell-editing',
           type: "'text' | 'number' | 'select' | 'multiselect' | 'radio' | 'checkbox' | { init, getValue, destroy? }",
           default: "'text'",
           since: '1.2.0',
@@ -725,6 +774,7 @@ window.ApiDocs = {
         },
         {
           name: 'editorOptions',
+          demo: 'select-label-value',
           type: 'Array<string | { label, value }>',
           description:
             "<code>editor: 'select' | 'multiselect' | 'radio'</code>의 선택지 목록. " +
@@ -745,6 +795,7 @@ window.ApiDocs = {
         },
         {
           name: 'editorSearch',
+          demo: 'searchable-select',
           type: 'true | { fetch?, debounce?, minLength?, placeholder? }',
           default: 'undefined',
           since: '2.3.0',
@@ -770,6 +821,7 @@ window.ApiDocs = {
         },
         {
           name: 'suppressCopy',
+          demo: 'clipboard',
           type: 'boolean',
           default: 'false',
           since: '1.1.0',
@@ -779,6 +831,7 @@ window.ApiDocs = {
         },
         {
           name: 'validator',
+          demo: 'edit-validation',
           type: "(value, row) => true | string",
           since: '1.1.0',
           description:
@@ -828,6 +881,7 @@ window.ApiDocs = {
         },
         {
           name: 'pinned',
+          demo: 'column-pinning-resize-reorder',
           type: "'left' | 'right'",
           description:
             '컬럼을 좌/우에 고정합니다. 가로 스크롤 시 sticky로 유지되고 경계에 그림자가 표시됩니다. ' +
@@ -835,6 +889,7 @@ window.ApiDocs = {
         },
         {
           name: 'checkboxSelection',
+          demo: 'row-selection',
           type: 'boolean',
           default: 'false',
           description:
@@ -849,6 +904,7 @@ window.ApiDocs = {
         },
         {
           name: 'headerCheckboxSelection',
+          demo: 'row-selection',
           type: 'boolean',
           default: 'false',
           description:
@@ -859,6 +915,7 @@ window.ApiDocs = {
         },
         {
           name: 'resizable',
+          demo: 'column-pinning-resize-reorder',
           type: 'boolean',
           default: 'true',
           description:
@@ -889,6 +946,7 @@ window.ApiDocs = {
       entries: [
         {
           name: 'TextFilterModel',
+          demo: 'column-filters',
           kind: 'type',
           description:
             '<code>op</code>: <code>contains</code> · <code>notContains</code> · <code>equals</code> · ' +
@@ -898,6 +956,7 @@ window.ApiDocs = {
         },
         {
           name: 'NumberFilterModel',
+          demo: 'column-filters',
           kind: 'type',
           description:
             '<code>op</code>: <code>equals</code> · <code>notEqual</code> · <code>lessThan</code> · ' +
@@ -908,6 +967,7 @@ window.ApiDocs = {
         },
         {
           name: 'SetFilterModel',
+          demo: 'column-filters',
           kind: 'type',
           description:
             '<code>values</code> 배열에 포함된 값(문자열 비교)만 통과시킵니다. ' +
@@ -956,6 +1016,7 @@ window.ApiDocs = {
         },
         {
           name: 'reloadData',
+          demo: 'remote-data',
           group: 'Data',
           signature: 'reloadData(): void',
           since: '1.2.0',
@@ -987,12 +1048,14 @@ window.ApiDocs = {
         /* ---- 선택 ---- */
         {
           name: 'getSelectedRows',
+          demo: 'row-selection',
           group: 'Selection',
           signature: 'getSelectedRows(): object[]',
           description: '선택된 행 배열을 반환합니다.',
         },
         {
           name: 'selectAll',
+          demo: 'row-selection',
           group: 'Selection',
           signature: 'selectAll(): void',
           description:
@@ -1003,6 +1066,7 @@ window.ApiDocs = {
         /* ---- 편집 ---- */
         {
           name: 'startEdit',
+          demo: 'edit-validation',
           group: 'Editing',
           signature: 'startEdit(row: object, field: string): boolean',
           since: '1.1.0',
@@ -1014,6 +1078,7 @@ window.ApiDocs = {
         },
         {
           name: 'stopEdit',
+          demo: 'edit-validation',
           group: 'Editing',
           signature: 'stopEdit(commit?: boolean): void',
           since: '1.1.0',
@@ -1023,6 +1088,7 @@ window.ApiDocs = {
         },
         {
           name: 'isEditing',
+          demo: 'edit-validation',
           group: 'Editing',
           signature: 'isEditing(): boolean',
           since: '1.1.0',
@@ -1030,6 +1096,7 @@ window.ApiDocs = {
         },
         {
           name: 'setEditable',
+          demo: 'row-numbers-maxwidth-editable',
           group: 'Editing',
           signature: 'setEditable(enabled: boolean): void',
           since: '1.1.0',
@@ -1042,6 +1109,7 @@ window.ApiDocs = {
         /* ---- 클립보드 ---- */
         {
           name: 'copy',
+          demo: 'clipboard',
           group: 'Clipboard',
           signature: 'copy(): string | null',
           since: '1.1.0',
@@ -1055,6 +1123,7 @@ window.ApiDocs = {
         },
         {
           name: 'pasteTsv',
+          demo: 'clipboard',
           group: 'Clipboard',
           signature: 'pasteTsv(text: string): number',
           since: '1.1.0',
@@ -1069,6 +1138,7 @@ window.ApiDocs = {
         /* ---- 필터/정렬 ---- */
         {
           name: 'setQuickFilter',
+          demo: 'quick-filter',
           group: 'Filter & Sort',
           signature: 'setQuickFilter(text: string): void',
           description:
@@ -1076,6 +1146,7 @@ window.ApiDocs = {
         },
         {
           name: 'applyColumnFilter',
+          demo: 'column-filters',
           group: 'Filter & Sort',
           signature: 'applyColumnFilter(field: string, model: FilterModel | null): void',
           description:
@@ -1084,18 +1155,21 @@ window.ApiDocs = {
         },
         {
           name: 'getFilterModel',
+          demo: 'column-filters',
           group: 'Filter & Sort',
           signature: 'getFilterModel(): { [field]: FilterModel }',
           description: '현재 컬럼 필터 상태를 반환합니다.',
         },
         {
           name: 'clearFilters',
+          demo: 'column-filters',
           group: 'Filter & Sort',
           signature: 'clearFilters(): void',
           description: '모든 컬럼 필터와 퀵 필터를 해제합니다.',
         },
         {
           name: 'setSortModel',
+          demo: 'sorting',
           group: 'Filter & Sort',
           signature: 'setSortModel(model: { field, dir }[]): void',
           description:
@@ -1106,6 +1180,7 @@ window.ApiDocs = {
         /* ---- 그룹핑 ---- */
         {
           name: 'setGroupBy',
+          demo: 'row-grouping',
           group: 'Grouping',
           signature: 'setGroupBy(fields: string[]): void',
           since: '1.1.0',
@@ -1116,6 +1191,7 @@ window.ApiDocs = {
         },
         {
           name: 'getGroupBy',
+          demo: 'row-grouping',
           group: 'Grouping',
           signature: 'getGroupBy(): string[]',
           since: '1.1.0',
@@ -1123,6 +1199,7 @@ window.ApiDocs = {
         },
         {
           name: 'expandAllGroups',
+          demo: 'row-grouping',
           group: 'Grouping',
           signature: 'expandAllGroups(): void',
           since: '1.1.0',
@@ -1133,12 +1210,14 @@ window.ApiDocs = {
         /* ---- 페이지네이션 ---- */
         {
           name: 'setPage',
+          demo: 'pagination',
           group: 'Pagination',
           signature: 'setPage(page: number): void',
           description: '0부터 시작하는 페이지 번호로 이동합니다. 범위를 벗어나면 자동 보정됩니다.',
         },
         {
           name: 'setPageSize',
+          demo: 'pagination',
           group: 'Pagination',
           signature: 'setPageSize(size: number): void',
           description: '페이지 크기를 변경합니다. 현재 보고 있던 첫 행이 포함된 페이지로 이동합니다.',
@@ -1147,6 +1226,7 @@ window.ApiDocs = {
         /* ---- 마스터-디테일 ---- */
         {
           name: 'expandRow',
+          demo: 'master-detail',
           group: 'Master-Detail',
           signature: 'expandRow(row: object): boolean',
           since: '1.2.0',
@@ -1160,6 +1240,7 @@ window.ApiDocs = {
         /* ---- 트리 그리드 ---- */
         {
           name: 'toggleNode',
+          demo: 'tree-grid',
           group: 'Tree',
           signature: 'toggleNode(row: object, expanded?: boolean): boolean',
           since: '2.1.0',
@@ -1174,6 +1255,7 @@ window.ApiDocs = {
         },
         {
           name: 'expandAllNodes',
+          demo: 'tree-grid',
           group: 'Tree',
           signature: 'expandAllNodes(level?: number): void',
           since: '2.1.0',
@@ -1186,6 +1268,7 @@ window.ApiDocs = {
         /* ---- 셀 선택 · 검색 ---- */
         {
           name: 'getCellRange',
+          demo: 'cell-selection-find',
           group: 'Selection',
           signature: 'getCellRange(): CellRange | null',
           since: '1.2.0',
@@ -1197,6 +1280,7 @@ window.ApiDocs = {
         },
         {
           name: 'findNext',
+          demo: 'cell-selection-find',
           group: 'Selection',
           signature: 'findNext(text: string): { data, field, rowIndex } | null',
           since: '1.2.0',
@@ -1211,6 +1295,7 @@ window.ApiDocs = {
         /* ---- 변경 추적 ---- */
         {
           name: 'getChanges',
+          demo: 'change-tracking',
           group: 'Change Tracking',
           signature: 'getChanges(): { added: object[], updated: object[], deleted: object[] }',
           since: '1.2.0',
@@ -1225,6 +1310,7 @@ window.ApiDocs = {
         },
         {
           name: 'isDirty',
+          demo: 'change-tracking',
           group: 'Change Tracking',
           signature: 'isDirty(): boolean',
           since: '1.2.0',
@@ -1232,6 +1318,7 @@ window.ApiDocs = {
         },
         {
           name: 'commitChanges',
+          demo: 'change-tracking',
           group: 'Change Tracking',
           signature: 'commitChanges(): void',
           since: '1.2.0',
@@ -1241,6 +1328,7 @@ window.ApiDocs = {
         },
         {
           name: 'rollbackChanges',
+          demo: 'change-tracking',
           group: 'Change Tracking',
           signature: 'rollbackChanges(): void',
           since: '1.2.0',
@@ -1250,6 +1338,7 @@ window.ApiDocs = {
         },
         {
           name: 'undo',
+          demo: 'change-tracking',
           group: 'Change Tracking',
           signature: 'undo(): boolean',
           since: '1.2.0',
@@ -1263,6 +1352,7 @@ window.ApiDocs = {
         /* ---- 탐색 ---- */
         {
           name: 'focusCell',
+          demo: 'navigation-json',
           group: 'Navigation',
           signature: 'focusCell(rowIndex: number, field?: string): boolean',
           since: '1.1.0',
@@ -1274,6 +1364,7 @@ window.ApiDocs = {
         },
         {
           name: 'ensureRowVisible',
+          demo: 'navigation-json',
           group: 'Navigation',
           signature: 'ensureRowVisible(row: object): boolean',
           since: '1.1.0',
@@ -1284,6 +1375,7 @@ window.ApiDocs = {
         },
         {
           name: 'ensureColumnVisible',
+          demo: 'navigation-json',
           group: 'Navigation',
           signature: 'ensureColumnVisible(colId: string): boolean',
           since: '1.1.0',
@@ -1295,6 +1387,7 @@ window.ApiDocs = {
         /* ---- 상태 저장/복원 ---- */
         {
           name: 'getState',
+          demo: 'grid-state',
           group: 'State',
           signature: 'getState(): GridState',
           since: '1.1.0',
@@ -1308,6 +1401,7 @@ window.ApiDocs = {
         },
         {
           name: 'setState',
+          demo: 'grid-state',
           group: 'State',
           signature: 'setState(state: GridState): void',
           since: '1.1.0',
@@ -1322,6 +1416,7 @@ window.ApiDocs = {
         },
         {
           name: 'resetState',
+          demo: 'grid-state',
           group: 'State',
           signature: 'resetState(parts?: { filter?, sort?, group?, columns?, page? }): void',
           since: '1.1.0',
@@ -1357,6 +1452,7 @@ window.ApiDocs = {
         /* ---- 내보내기 ---- */
         {
           name: 'getCsv',
+          demo: 'csv-export',
           group: 'Export',
           signature: 'getCsv(): string',
           description:
@@ -1365,6 +1461,7 @@ window.ApiDocs = {
         },
         {
           name: 'exportCsv',
+          demo: 'csv-export',
           group: 'Export',
           signature: "exportCsv(filename?: string): void",
           description:
@@ -1372,6 +1469,7 @@ window.ApiDocs = {
         },
         {
           name: 'exportExcel',
+          demo: 'excel-export',
           group: 'Export',
           signature: "exportExcel(filename?: string, sheetName?: string): void",
           since: '1.2.0',
@@ -1385,6 +1483,7 @@ window.ApiDocs = {
         },
         {
           name: 'getJson',
+          demo: 'navigation-json',
           group: 'Export',
           signature: 'getJson(): string',
           since: '1.1.0',
@@ -1398,6 +1497,7 @@ window.ApiDocs = {
         /* ---- 표시 ---- */
         {
           name: 'showLoadingOverlay',
+          demo: 'overlays',
           group: 'Display',
           signature: 'showLoadingOverlay(): void',
           description:
@@ -1420,6 +1520,7 @@ window.ApiDocs = {
         },
         {
           name: 'refreshCell',
+          demo: 'partial-refresh-options-toolbar',
           group: 'Display',
           signature: 'refreshCell(row: object, field: string): boolean',
           since: '1.2.0',
@@ -1434,6 +1535,7 @@ window.ApiDocs = {
         },
         {
           name: 'setOptions',
+          demo: 'partial-refresh-options-toolbar',
           group: 'Display',
           signature: 'setOptions(patch: object): void',
           since: '1.2.0',
@@ -1456,6 +1558,7 @@ window.ApiDocs = {
         /* ---- 유틸리티 (정적) ---- */
         {
           name: 'format',
+          demo: 'data-type-format',
           group: 'Utility',
           signature: 'DataGrid.format(value: any, pattern: string): string',
           since: '1.1.0',
@@ -1480,6 +1583,7 @@ window.ApiDocs = {
         },
         {
           name: 'once',
+          demo: 'utility-v2',
           group: 'Events',
           signature: 'once(eventName: string, handler: (e) => void): Function',
           since: '2.0.0',
@@ -1489,6 +1593,7 @@ window.ApiDocs = {
         },
         {
           name: 'setEnabled',
+          demo: 'utility-v2',
           group: 'Display',
           signature: 'setEnabled(enabled: boolean): void',
           since: '2.0.0',
@@ -1513,6 +1618,7 @@ window.ApiDocs = {
       entries: [
         {
           name: 'selectionChanged',
+          demo: 'row-selection',
           payload: '{ selectedRows: object[] }',
           description: '행 선택이 바뀔 때(클릭, 체크박스, 전체 선택, API 호출).',
           example:
@@ -1522,11 +1628,13 @@ window.ApiDocs = {
         },
         {
           name: 'cellValueChanged',
+          demo: 'cell-editing',
           payload: '{ data, colDef, oldValue, newValue }',
           description: '인라인 편집이 커밋되어 값이 실제로 바뀌었을 때. 서버 저장 훅으로 사용하세요.',
         },
         {
           name: 'rowValueChanged',
+          demo: 'utility-v2',
           payload: '{ data, changes: { field: { oldValue, newValue } } }',
           since: '2.0.0',
           description:
@@ -1535,12 +1643,14 @@ window.ApiDocs = {
         },
         {
           name: 'editingStarted',
+          demo: 'edit-validation',
           payload: '{ data, colDef, value }',
           since: '1.1.0',
           description: '인라인 편집이 시작될 때 (더블클릭·<kbd>Enter</kbd>·<code>startEdit()</code> 모두).',
         },
         {
           name: 'editingStopped',
+          demo: 'edit-validation',
           payload: '{ data, colDef, oldValue, newValue, committed }',
           since: '1.1.0',
           description:
@@ -1549,6 +1659,7 @@ window.ApiDocs = {
         },
         {
           name: 'beforeCellSave',
+          demo: 'edit-validation',
           payload: '{ data, colDef, oldValue, newValue, cancel }',
           since: '1.1.0',
           description:
@@ -1562,11 +1673,13 @@ window.ApiDocs = {
         },
         {
           name: 'sortChanged',
+          demo: 'sorting',
           payload: '{ sortModel: { field, dir }[] }',
           description: '정렬 상태가 바뀔 때(헤더 클릭 또는 <code>setSortModel</code>).',
         },
         {
           name: 'filterChanged',
+          demo: 'column-filters',
           payload: '{ filterModel, quickFilter? }',
           description: '컬럼 필터 또는 퀵 필터가 바뀔 때.',
         },
@@ -1577,12 +1690,14 @@ window.ApiDocs = {
         },
         {
           name: 'groupChanged',
+          demo: 'row-grouping',
           payload: '{ groupBy: string[] }',
           since: '1.1.0',
           description: '<code>setGroupBy()</code>로 그룹핑 필드가 바뀌었을 때.',
         },
         {
           name: 'groupToggled',
+          demo: 'row-grouping',
           payload: '{ field, value, path, expanded }',
           since: '1.1.0',
           description:
@@ -1600,6 +1715,7 @@ window.ApiDocs = {
         },
         {
           name: 'cellDoubleClicked',
+          demo: 'navigation-json',
           payload: '{ data, colDef, value, rowIndex }',
           since: '1.1.0',
           description:
@@ -1613,16 +1729,19 @@ window.ApiDocs = {
         },
         {
           name: 'columnResized',
+          demo: 'column-pinning-resize-reorder',
           payload: '{ colId, width }',
           description: '드래그 리사이즈가 끝났을 때.',
         },
         {
           name: 'columnMoved',
+          demo: 'column-pinning-resize-reorder',
           payload: '{ colId, toIndex }',
           description: '헤더 드래그로 컬럼 순서가 바뀌었을 때.',
         },
         {
           name: 'stateChanged',
+          demo: 'grid-state',
           payload: '{ state: GridState }',
           since: '1.1.0',
           description:
@@ -1631,6 +1750,7 @@ window.ApiDocs = {
         },
         {
           name: 'cellRangeChanged',
+          demo: 'cell-selection-find',
           payload: '{ range: CellRange | null }',
           since: '1.2.0',
           description:
@@ -1638,12 +1758,14 @@ window.ApiDocs = {
         },
         {
           name: 'fillApplied',
+          demo: 'fill-handle',
           payload: '{ updatedCells }',
           since: '2.0.0',
           description: '채우기 핸들 드래그가 끝나 셀이 채워졌을 때. 셀별로는 <code>cellValueChanged</code>도 발생합니다.',
         },
         {
           name: 'cellContextMenu',
+          demo: 'cell-selection-find',
           payload: '{ data, colDef, value, rowIndex, originalEvent }',
           since: '1.2.0',
           description:
@@ -1652,6 +1774,7 @@ window.ApiDocs = {
         },
         {
           name: 'headerClicked',
+          demo: 'cell-selection-find',
           payload: '{ colDef }',
           since: '1.2.0',
           description:
@@ -1659,6 +1782,7 @@ window.ApiDocs = {
         },
         {
           name: 'cellKeyDown',
+          demo: 'cell-selection-find',
           payload: '{ data, colDef, rowIndex, originalEvent }',
           since: '1.2.0',
           description:
@@ -1666,6 +1790,7 @@ window.ApiDocs = {
         },
         {
           name: 'beforeExport',
+          demo: 'excel-export',
           payload: '{ format, filename, rows, columns, cancel }',
           since: '1.2.0',
           description:
@@ -1680,6 +1805,7 @@ window.ApiDocs = {
         },
         {
           name: 'rowExpanded',
+          demo: 'master-detail',
           payload: '{ data }',
           since: '1.2.0',
           description:
@@ -1688,6 +1814,7 @@ window.ApiDocs = {
         },
         {
           name: 'beforeNodeToggle',
+          demo: 'tree-grid',
           payload: '{ data, expanded, cancel }',
           since: '2.1.0',
           description:
@@ -1699,6 +1826,7 @@ window.ApiDocs = {
         },
         {
           name: 'dataLoadError',
+          demo: 'remote-data',
           payload: '{ error }',
           since: '1.2.0',
           description:
@@ -1707,6 +1835,7 @@ window.ApiDocs = {
         },
         {
           name: 'gridReady',
+          demo: 'lifecycle-events',
           payload: '{ rowCount }',
           since: '1.1.0',
           description:
@@ -1717,6 +1846,7 @@ window.ApiDocs = {
         },
         {
           name: 'dataChanged',
+          demo: 'lifecycle-events',
           payload: '{ rowCount }',
           since: '1.1.0',
           description:
@@ -1726,6 +1856,7 @@ window.ApiDocs = {
         },
         {
           name: 'viewRendered',
+          demo: 'lifecycle-events',
           payload: '{ displayedRowCount, page }',
           since: '1.1.0',
           description:
@@ -1734,6 +1865,7 @@ window.ApiDocs = {
         },
         {
           name: 'beforeSort',
+          demo: 'lifecycle-events',
           payload: '{ sortModel, cancel }',
           since: '1.1.0',
           description:
@@ -1747,6 +1879,7 @@ window.ApiDocs = {
         },
         {
           name: 'beforeSelectionChange',
+          demo: 'lifecycle-events',
           payload: '{ selectedRows, cancel }',
           since: '1.1.0',
           description:
@@ -1792,6 +1925,7 @@ window.ApiDocs = {
         },
         {
           name: 'select',
+          demo: 'select-renderer',
           signature: 'DataGrid.renderers.select(options?: Array<string | { label, value }>)',
           since: '2.2.0',
           description:
@@ -1807,6 +1941,7 @@ window.ApiDocs = {
         },
         {
           name: 'radio',
+          demo: 'multi-radio-checkbox-editors',
           signature: 'DataGrid.renderers.radio(options?: Array<string | { label, value }>)',
           since: '2.2.0',
           description:
@@ -1818,6 +1953,7 @@ window.ApiDocs = {
         },
         {
           name: 'searchselect',
+          demo: 'searchable-select',
           signature: 'DataGrid.renderers.searchselect(options?: Array<string | { label, value }>)',
           since: '2.3.0',
           description:
@@ -1831,6 +1967,7 @@ window.ApiDocs = {
         },
         {
           name: 'multiselect',
+          demo: 'multi-radio-checkbox-editors',
           signature: 'DataGrid.renderers.multiselect(options?: Array<string | { label, value }>)',
           since: '2.2.0',
           description:
@@ -1841,6 +1978,7 @@ window.ApiDocs = {
         },
         {
           name: 'checkbox',
+          demo: 'multi-radio-checkbox-editors',
           signature: 'DataGrid.renderers.checkbox(options?: { checked, unchecked })',
           since: '2.2.0',
           description:

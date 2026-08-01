@@ -141,6 +141,9 @@
   .api-badge.required { background: rgba(224, 37, 37, 0.1); color: #d02020; }
   .api-badge.since { background: rgba(22, 160, 78, 0.12); color: #0d8a44; text-transform: none; }
   body.dark .api-badge.since { color: #4cd587; }
+  /* entry.demo — features.html 데모 카드로 가는 링크 배지 */
+  a.api-badge.demo { text-transform: none; text-decoration: none; cursor: pointer; }
+  a.api-badge.demo:hover { text-decoration: underline; }
   .api-type {
     font-family: ui-monospace, Consolas, monospace;
     font-size: 12px;
@@ -285,6 +288,11 @@
       if (e.kind) bodyHtml += '<span class="api-badge">' + esc(e.kind) + '</span>';
       if (e.required) bodyHtml += '<span class="api-badge required">required</span>';
       if (e.since) bodyHtml += '<span class="api-badge since">since v' + esc(e.since) + '</span>';
+      if (e.demo) {
+        bodyHtml += '<a class="api-badge demo" target="_blank" rel="noopener" ' +
+          'href="../examples/features.html#' + esc(e.demo) + '" ' +
+          'title="features.html에서 이 기능의 Example/View Source 카드로 이동">예제 ↗</a>';
+      }
       if (e.type) bodyHtml += '<span class="api-type">' + esc(e.type) + '</span>';
       if (e.payload) bodyHtml += '<span class="api-type">' + esc(e.payload) + '</span>';
       if (e.default !== undefined) {

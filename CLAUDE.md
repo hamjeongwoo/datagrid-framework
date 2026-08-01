@@ -74,7 +74,7 @@
 
 ```html
 <!-- ======================================================== 스펙 이름 -->
-<h2 class="section">스펙 이름 (영문 제목)</h2>
+<h2 class="section" id="kebab-case-anchor">스펙 이름 (영문 제목)</h2>  <!-- id 필수 — api.html의 demo 링크가 참조 -->
 <p class="section-desc">
   무엇을 하는 기능인지 + 핵심 API를 <code class="inline">코드</code>로 표기한 1~3문장 설명.
 </p>
@@ -103,7 +103,7 @@
 - 세부 마크업 규약이 바뀌면 `demo/example-tabs.js` 상단 주석이 최종 기준.
 
 ### 5. 문서 갱신 체크리스트 (전부 필수 — 하나라도 빠지면 미완성)
-- [ ] `docs/api-data.js` — 해당 섹션에 항목 추가, `since: '1.x.0'` 명시. 새 카테고리면 섹션 추가(구조는 파일 상단 주석 참조)
+- [ ] `docs/api-data.js` — 해당 섹션에 항목 추가, `since: '1.x.0'` 명시, `demo: '<features.html 섹션 앵커 id>'`로 데모 카드 연결. 새 카테고리면 섹션 추가(구조는 파일 상단 주석 참조)
 - [ ] 예제 페이지 — 위 §4 규칙대로 반영했는지 확인
 - [ ] `README.md` — 옵션/컬럼/API/이벤트 표에 항목 추가
 - [ ] `docs/spec-roadmap.md` — 체크박스 `[x]` 처리, API명 바뀌었으면 반영
