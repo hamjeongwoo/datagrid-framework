@@ -171,6 +171,7 @@ window.ApiDocs = {
         },
         {
           name: 'getRowId',
+          demo: 'row-data-api',
           type: '(row) => string',
           description:
             '행 식별자 함수. 생략하면 행 객체별 내부 id가 자동 발급됩니다. ' +
@@ -923,6 +924,7 @@ window.ApiDocs = {
         },
         {
           name: 'hide',
+          demo: 'column-visibility-autosize',
           type: 'boolean',
           default: 'false',
           description:
@@ -991,6 +993,7 @@ window.ApiDocs = {
         /* ---- 데이터 ---- */
         {
           name: 'setRowData',
+          demo: 'row-data-api',
           group: 'Data',
           signature: 'setRowData(rows: object[]): void',
           description:
@@ -998,18 +1001,21 @@ window.ApiDocs = {
         },
         {
           name: 'getRowData',
+          demo: 'row-data-api',
           group: 'Data',
           signature: 'getRowData(): object[]',
           description: '필터와 무관한 전체 행 배열(복사본)을 반환합니다.',
         },
         {
           name: 'getDisplayedRows',
+          demo: 'row-data-api',
           group: 'Data',
           signature: 'getDisplayedRows(): object[]',
           description: '필터·정렬이 적용된 현재 뷰의 행 배열(모든 페이지 포함)을 반환합니다.',
         },
         {
           name: 'getDisplayedRowCount',
+          demo: 'row-data-api',
           group: 'Data',
           signature: 'getDisplayedRowCount(): number',
           description: '현재 뷰의 행 수를 반환합니다.',
@@ -1027,12 +1033,14 @@ window.ApiDocs = {
         },
         {
           name: 'addRow',
+          demo: 'row-data-api',
           group: 'Data',
           signature: 'addRow(row: object): void',
           description: '행 하나를 추가합니다. <code>addRows(rows)</code>로 여러 행을 한 번에 추가할 수 있습니다.',
         },
         {
           name: 'updateRow',
+          demo: 'row-data-api',
           group: 'Data',
           signature: 'updateRow(row: object, changes: object): void',
           description: '행 객체에 <code>changes</code>를 병합하고 다시 렌더링합니다.',
@@ -1040,6 +1048,7 @@ window.ApiDocs = {
         },
         {
           name: 'removeRows',
+          demo: 'row-data-api',
           group: 'Data',
           signature: 'removeRows(rows: object[]): void',
           description: '지정한 행들을 제거합니다. <code>removeSelectedRows()</code>는 선택된 행을 제거합니다.',
@@ -1430,18 +1439,21 @@ window.ApiDocs = {
         /* ---- 컬럼 ---- */
         {
           name: 'setColumnVisible',
+          demo: 'column-visibility-autosize',
           group: 'Columns',
           signature: 'setColumnVisible(colId: string, visible: boolean): void',
           description: '컬럼을 표시하거나 숨깁니다. <code>colId</code> 또는 <code>field</code>로 찾습니다.',
         },
         {
           name: 'getColumns',
+          demo: 'column-visibility-autosize',
           group: 'Columns',
           signature: 'getColumns(): ColumnDef[]',
           description: '정규화된 컬럼 정의 배열을 반환합니다(현재 순서 반영).',
         },
         {
           name: 'autoSizeColumn',
+          demo: 'column-visibility-autosize',
           group: 'Columns',
           signature: 'autoSizeColumn(colId: string): void',
           description:
@@ -1685,6 +1697,7 @@ window.ApiDocs = {
         },
         {
           name: 'paginationChanged',
+          demo: 'basic-events',
           payload: '{ page, pageSize }',
           description: '페이지 이동 또는 페이지 크기 변경 시.',
         },
@@ -1705,11 +1718,13 @@ window.ApiDocs = {
         },
         {
           name: 'rowClicked',
+          demo: 'basic-events',
           payload: '{ data, rowIndex }',
           description: '행 클릭 시. <code>rowIndex</code>는 현재 페이지 기준 인덱스입니다.',
         },
         {
           name: 'rowDoubleClicked',
+          demo: 'basic-events',
           payload: '{ data, rowIndex }',
           description: '행 더블클릭 시(편집 시작 여부와 무관하게 발생).',
         },
@@ -1724,6 +1739,7 @@ window.ApiDocs = {
         },
         {
           name: 'cellClicked',
+          demo: 'basic-events',
           payload: '{ data, colDef, value }',
           description: '셀 클릭 시. <code>rowClicked</code>보다 먼저 발생합니다.',
         },
@@ -1902,6 +1918,7 @@ window.ApiDocs = {
       entries: [
         {
           name: 'tag',
+          demo: 'builtin-renderers',
           signature: 'DataGrid.renderers.tag(colorMap: { [value]: color })',
           description:
             '값을 색상 배지로 표시합니다. <code>color</code>: <code>green</code> · <code>red</code> · ' +
@@ -1913,12 +1930,14 @@ window.ApiDocs = {
         },
         {
           name: 'check',
+          demo: 'builtin-renderers',
           signature: 'DataGrid.renderers.check()',
           description: '불리언 값을 ✓ / – 로 표시합니다.',
           example: 'cellRenderer: DataGrid.renderers.check()',
         },
         {
           name: 'progress',
+          demo: 'builtin-renderers',
           signature: 'DataGrid.renderers.progress()',
           description: '0–100 값을 진행 바와 퍼센트 라벨로 표시합니다(범위 밖 값은 잘림).',
           example: 'cellRenderer: DataGrid.renderers.progress()',

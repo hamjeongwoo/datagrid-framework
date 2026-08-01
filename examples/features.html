@@ -2137,6 +2137,202 @@
     </script>
   </div>
 
+  <!-- ======================================================== 행 데이터 API (CRUD) -->
+  <h2 class="section" id="row-data-api">Row Data API (CRUD)</h2>
+  <p class="section-desc">
+    <code class="inline">setRowData</code> · <code class="inline">addRow</code> ·
+    <code class="inline">updateRow(row, changes)</code> · <code class="inline">removeRows</code>로 행을
+    프로그래매틱하게 관리합니다. <code class="inline">getRowId</code> 옵션은 행 식별 기준을 지정하고,
+    <code class="inline">getRowData()</code>는 전체 데이터, <code class="inline">getDisplayedRows()</code>/
+    <code class="inline">getDisplayedRowCount()</code>는 필터·정렬이 적용된 표시 뷰 기준입니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn" id="crudAddBtn" type="button">addRow — 행 추가</button>
+        <button class="tb-btn" id="crudUpdateBtn" type="button">updateRow — 선택 행 급여 +10%</button>
+        <button class="tb-btn" id="crudRemoveBtn" type="button">removeRows — 선택 행 삭제</button>
+        <button class="tb-btn" id="crudResetBtn" type="button">setRowData — 초기화</button>
+      </div>
+      <div id="gridRowApi" class="grid-wrap-sm"></div>
+      <div class="status-line" id="rowApiStatus">행을 선택하고 버튼으로 추가/수정/삭제해 보세요.</div>
+    </div>
+    <script type="text/x-example">
+      var initialRows = function () { return DemoData.makeEmployees(25, 5); };
+      var nextId = 1000;
+
+      var grid = new DataGrid(document.getElementById('gridRowApi'), {
+        rowData: initialRows(),
+        getRowId: function (row) { return row.id; },   // 행 식별 — 선택 상태가 id 기준으로 유지된다
+        rowSelection: 'multiple',
+        columnDefs: [
+          { field: 'id', headerName: 'ID', width: 80, checkboxSelection: true },
+          { field: 'name', headerName: 'Name', flex: 1 },
+          { field: 'department', headerName: 'Dept', width: 130 },
+          { field: 'salary', headerName: 'Salary', dataType: 'number', format: '$#,##0', width: 130 },
+        ],
+      });
+
+      function report(action) {
+        document.getElementById('rowApiStatus').textContent = action +
+          ' — getRowData(): ' + grid.getRowData().length + '행, getDisplayedRowCount(): ' +
+          grid.getDisplayedRowCount() + '행';
+      }
+      document.getElementById('crudAddBtn').addEventListener('click', function () {
+        nextId++;
+        grid.addRow({ id: nextId, name: 'New Employee ' + nextId, department: 'Engineering', salary: 50000 });
+        report('addRow(#' + nextId + ')');
+      });
+      document.getElementById('crudUpdateBtn').addEventListener('click', function () {
+        var sel = grid.getSelectedRows();
+        if (!sel.length) { report('updateRow — 먼저 행을 선택하세요'); return; }
+        sel.forEach(function (row) {
+          grid.updateRow(row, { salary: Math.round(row.salary * 1.1) });
+        });
+        report('updateRow(' + sel.length + '행 급여 +10%)');
+      });
+      document.getElementById('crudRemoveBtn').addEventListener('click', function () {
+        var sel = grid.getSelectedRows();
+        if (!sel.length) { report('removeRows — 먼저 행을 선택하세요'); return; }
+        grid.removeRows(sel);
+        report('removeRows(' + sel.length + '행)');
+      });
+      document.getElementById('crudResetBtn').addEventListener('click', function () {
+        grid.setRowData(initialRows());
+        report('setRowData(초기 데이터)');
+      });
+    </script>
+  </div>
+
+  <!-- ======================================================== 컬럼 표시/자동 폭 -->
+  <h2 class="section" id="column-visibility-autosize">Column Visibility &amp; Auto-size</h2>
+  <p class="section-desc">
+    <code class="inline">column.hide</code>로 초기 숨김을 지정하고, <code class="inline">setColumnVisible(colId, visible)</code>로
+    런타임에 토글합니다. <code class="inline">getColumns()</code>는 정규화된 컬럼 목록을 반환하고
+    (아래 체크박스가 이 목록으로 만들어집니다), <code class="inline">autoSizeColumn(colId)</code>은
+    내용 폭에 맞춰 컬럼 폭을 조정합니다 (헤더 경계 더블클릭과 동일).
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar" id="colVisToolbar">
+        <button class="tb-btn" id="colVisAutoBtn" type="button">autoSizeColumn — 전체 자동 폭</button>
+      </div>
+      <div id="gridColVis" class="grid-wrap-sm"></div>
+      <div class="status-line" id="colVisStatus">체크박스로 컬럼을 켜고 꺼 보세요. Email은 hide: true로 시작합니다.</div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridColVis'), {
+        rowData: DemoData.makeEmployees(30, 9),
+        columnDefs: [
+          { field: 'name', headerName: 'Name', width: 150 },
+          { field: 'email', headerName: 'Email', width: 220, hide: true },  // 초기 숨김
+          { field: 'department', headerName: 'Dept', width: 130 },
+          { field: 'city', headerName: 'City', width: 120 },
+          { field: 'salary', headerName: 'Salary', dataType: 'number', format: '$#,##0', width: 120 },
+        ],
+      });
+
+      /* getColumns()로 컬럼별 표시 토글 체크박스 구성 */
+      var toolbar = document.getElementById('colVisToolbar');
+      grid.getColumns().forEach(function (col) {
+        var label = document.createElement('label');
+        label.style.cssText = 'display:flex;align-items:center;gap:5px;cursor:pointer';
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = !col.hide;
+        cb.addEventListener('change', function () {
+          grid.setColumnVisible(col.colId, cb.checked);
+          document.getElementById('colVisStatus').textContent =
+            'setColumnVisible("' + col.colId + '", ' + cb.checked + ')';
+        });
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(col.headerName));
+        toolbar.appendChild(label);
+      });
+
+      document.getElementById('colVisAutoBtn').addEventListener('click', function () {
+        grid.getColumns().forEach(function (col) {
+          if (!col.hide) grid.autoSizeColumn(col.colId);
+        });
+        document.getElementById('colVisStatus').textContent =
+          '표시 중인 모든 컬럼에 autoSizeColumn() 적용';
+      });
+    </script>
+  </div>
+
+  <!-- ======================================================== 기본 클릭·페이징 이벤트 -->
+  <h2 class="section" id="basic-events">Basic Click &amp; Pagination Events</h2>
+  <p class="section-desc">
+    <code class="inline">cellClicked</code> · <code class="inline">rowClicked</code> ·
+    <code class="inline">rowDoubleClicked</code> 이벤트는 클릭한 셀/행의 payload를 전달하고,
+    <code class="inline">paginationChanged</code>는 페이지 이동·페이지 크기 변경 때
+    <code class="inline">{ page, pageSize }</code>를 전달합니다 (page는 0부터).
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div id="gridBasicEv" class="grid-wrap-sm"></div>
+      <div class="status-line" id="basicEvStatus">셀 클릭·더블클릭, 페이지 이동을 해보면 이벤트가 표시됩니다.</div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridBasicEv'), {
+        rowData: DemoData.makeEmployees(45, 13),
+        pagination: true,
+        paginationPageSize: 8,
+        columnDefs: [
+          { field: 'name', headerName: 'Name', flex: 1 },
+          { field: 'department', headerName: 'Dept', width: 130 },
+          { field: 'city', headerName: 'City', width: 120 },
+        ],
+      });
+
+      var status = document.getElementById('basicEvStatus');
+      grid.on('cellClicked', function (e) {
+        status.textContent = 'cellClicked: ' + e.colDef.field + ' = ' + JSON.stringify(e.value);
+      });
+      grid.on('rowClicked', function (e) {
+        /* cellClicked 직후 같은 클릭으로 발생 — 행 단위 정보 */
+        status.textContent += '  |  rowClicked: #' + e.rowIndex + ' ' + e.data.name;
+      });
+      grid.on('rowDoubleClicked', function (e) {
+        status.textContent = 'rowDoubleClicked: #' + e.rowIndex + ' ' + e.data.name;
+      });
+      grid.on('paginationChanged', function (e) {
+        status.textContent = 'paginationChanged: page ' + (e.page + 1) + ', pageSize ' + e.pageSize;
+      });
+    </script>
+  </div>
+
+  <!-- ======================================================== 내장 렌더러 (tag/check/progress) -->
+  <h2 class="section" id="builtin-renderers">Built-in Renderers (tag / check / progress)</h2>
+  <p class="section-desc">
+    <code class="inline">DataGrid.renderers.tag(colorMap)</code>은 상태 값을 색상 배지로,
+    <code class="inline">renderers.check()</code>는 불리언을 ✓/–로,
+    <code class="inline">renderers.progress()</code>는 0–100 값을 진행 바로 표시합니다.
+    렌더러는 표시만 바꾸며 정렬·필터·내보내기는 원시 값 기준입니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div id="gridRenderers" class="grid-wrap-sm"></div>
+      <div class="status-line">Status로 정렬해 보면 표시는 배지지만 정렬은 원시 문자열 기준임을 확인할 수 있습니다.</div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridRenderers'), {
+        rowData: DemoData.makeEmployees(30, 17),
+        columnDefs: [
+          { field: 'name', headerName: 'Name', flex: 1 },
+          { field: 'status', headerName: 'Status (tag)', width: 140,
+            cellRenderer: DataGrid.renderers.tag({
+              Active: 'green', 'On Leave': 'yellow', Contract: 'blue', Inactive: 'gray',
+            }) },
+          { field: 'remote', headerName: 'Remote (check)', width: 130, align: 'center',
+            cellRenderer: DataGrid.renderers.check() },
+          { field: 'progress', headerName: 'Progress (progress)', width: 190,
+            cellRenderer: DataGrid.renderers.progress() },
+        ],
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>
