@@ -2508,6 +2508,130 @@
     </script>
   </div>
 
+  <!-- ======================================================== 원격 데이터 CRUD 스테이징 -->
+  <h2 class="section" id="remote-crud-staging">Remote Data + CRUD Staging (신규 / 수정 / 삭제 상태 컬럼)</h2>
+  <p class="section-desc">
+    서버에서 불러온 데이터를 로컬에서 편집해 두었다가 한 번에 저장하는 실무 패턴입니다.
+    상태 컬럼(<code class="inline">_rowStatus</code>)을 <code class="inline">renderers.tag</code>로 표시하고 —
+    <strong>신규</strong>는 <code class="inline">addRow</code>로 추가된 로컬 행,
+    <strong>수정</strong>은 서버 행을 편집(<code class="inline">rowValueChanged</code>)하거나 수정 버튼을 누른 행,
+    <strong>삭제</strong>는 서버 행에 삭제 표시(<code class="inline">getRowClass</code>로 취소선).
+    <strong>신규 행을 삭제하면 서버에 없는 데이터이므로 로우 자체가 제거</strong>됩니다(<code class="inline">removeRows</code>).
+    삭제 표시된 행은 <code class="inline">beforeCellSave</code>로 편집이 차단됩니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn" id="crudStageAddBtn" type="button">신규</button>
+        <button class="tb-btn" id="crudStageEditBtn" type="button">선택 수정 (급여 +5%)</button>
+        <button class="tb-btn" id="crudStageDelBtn" type="button">선택 삭제</button>
+        <button class="tb-btn" id="crudStageReloadBtn" type="button">서버에서 다시 불러오기</button>
+      </div>
+      <div id="gridRemoteCrud" class="grid-wrap-sm"></div>
+      <div class="status-line" id="remoteCrudStatus">
+        서버 데이터 로드 중… 이름/급여 셀은 더블클릭으로 직접 편집해도 &lsquo;수정&rsquo;으로 표시됩니다.
+      </div>
+    </div>
+    <script type="text/x-example">
+      /* 삭제 표시 행 스타일 — 자체 완결을 위해 카드 스크립트에서 주입 */
+      var style = document.createElement('style');
+      style.textContent = '#gridRemoteCrud .row-staged-deleted .dg-cell' +
+        ' { text-decoration: line-through; opacity: 0.55; }';
+      document.head.appendChild(style);
+
+      var status = document.getElementById('remoteCrudStatus');
+      var nextNewId = -1;   // 로컬 신규 행은 음수 id — 저장 시 서버가 실제 id를 발급하는 패턴
+
+      var grid = new DataGrid(document.getElementById('gridRemoteCrud'), {
+        /* 서버에서 12행만 잘라 온다 (기본 스펙 { rows, total } 응답) */
+        dataSource: { url: '/api/employees', params: { page: 0, pageSize: 12 } },
+        getRowId: function (row) { return row.id; },
+        rowSelection: 'multiple',
+        getRowClass: function (row) {
+          return row._rowStatus === '삭제' ? 'row-staged-deleted' : '';
+        },
+        columnDefs: [
+          { colId: 'sel', headerName: '', width: 44, minWidth: 44,
+            checkboxSelection: true, headerCheckboxSelection: true,
+            sortable: false, resizable: false },
+          { field: '_rowStatus', headerName: '상태', width: 90, align: 'center',
+            cellRenderer: DataGrid.renderers.tag({ '신규': 'green', '수정': 'yellow', '삭제': 'red' }) },
+          { field: 'id', headerName: 'ID', width: 70 },
+          { field: 'name', headerName: 'Name', flex: 1, editable: true },
+          { field: 'department', headerName: 'Department', width: 140 },
+          { field: 'salary', headerName: 'Salary', dataType: 'number', format: '$#,##0',
+            width: 120, editable: true, editor: 'number' },
+        ],
+      });
+
+      function summary() {
+        var n = { '신규': 0, '수정': 0, '삭제': 0 };
+        grid.getRowData().forEach(function (r) {
+          if (r._rowStatus in n) n[r._rowStatus]++;
+        });
+        status.textContent = '스테이징 — 신규 ' + n['신규'] + ' · 수정 ' + n['수정'] +
+          ' · 삭제 ' + n['삭제'] + ' (전체 ' + grid.getRowData().length + '행)' +
+          ' — 저장 시 이 상태별로 모아 서버 API에 보내면 됩니다.';
+      }
+
+      /* 신규 — 서버에 없는 로컬 행 추가 */
+      document.getElementById('crudStageAddBtn').addEventListener('click', function () {
+        grid.addRow({
+          id: nextNewId--, name: '새 직원', department: 'Engineering',
+          salary: 50000, _rowStatus: '신규',
+        });
+        summary();
+      });
+
+      /* 수정 — 선택 행 급여 +5%. 신규 행은 신규 유지(어차피 통째로 INSERT), 삭제 행은 제외 */
+      document.getElementById('crudStageEditBtn').addEventListener('click', function () {
+        var sel = grid.getSelectedRows().filter(function (r) { return r._rowStatus !== '삭제'; });
+        if (sel.length === 0) { status.textContent = '수정할 행을 먼저 선택하세요 (삭제 표시 행 제외).'; return; }
+        sel.forEach(function (row) {
+          grid.updateRow(row, {
+            salary: Math.round(row.salary * 1.05),
+            _rowStatus: row._rowStatus === '신규' ? '신규' : '수정',
+          });
+        });
+        summary();
+      });
+
+      /* 삭제 — 신규(로컬) 행은 로우 자체 제거, 서버 행은 '삭제' 표시만 */
+      document.getElementById('crudStageDelBtn').addEventListener('click', function () {
+        var sel = grid.getSelectedRows();
+        if (sel.length === 0) { status.textContent = '삭제할 행을 먼저 선택하세요.'; return; }
+        var localNew = sel.filter(function (r) { return r._rowStatus === '신규'; });
+        var serverRows = sel.filter(function (r) { return r._rowStatus !== '신규'; });
+        if (localNew.length) grid.removeRows(localNew);
+        serverRows.forEach(function (row) { grid.updateRow(row, { _rowStatus: '삭제' }); });
+        summary();
+      });
+
+      /* 다시 불러오기 — 서버 원본으로 리셋 (스테이징 전부 폐기) */
+      document.getElementById('crudStageReloadBtn').addEventListener('click', function () {
+        grid.reloadData();
+      });
+
+      /* 인라인 편집(더블클릭)도 '수정'으로 표시 — 신규 행은 신규 유지 */
+      grid.on('rowValueChanged', function (e) {
+        if (e.data._rowStatus === '신규' || e.data._rowStatus === '수정') return summary();
+        e.data._rowStatus = '수정';
+        grid.refreshRow(e.data);
+        summary();
+      });
+
+      /* 삭제 표시된 행은 편집 차단 */
+      grid.on('beforeCellSave', function (e) {
+        if (e.data._rowStatus === '삭제') e.cancel = true;
+      });
+
+      grid.on('dataChanged', function () { summary(); });
+      grid.on('dataLoadError', function (e) {
+        status.textContent = '로드 실패: ' + e.error.message + ' — 데모 서버로 열었는지 확인하세요.';
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

@@ -564,7 +564,9 @@ window.ApiDocs = {
         '<p>서버 스펙이 다르면 세 훅으로 맞춥니다: <code>request(state)</code>(요청 파라미터 커스텀), ' +
         '<code>parse(json)</code>(응답 변환), <code>headers</code>(인증 등 요청 헤더). ' +
         '아래 단계별 레시피와 <a href="../examples/features.html#remote-data-server-spec" target="_blank" rel="noopener">' +
-        '서버 스펙 맞춤 데모</a>, <a href="../examples/features.html#remote-data" target="_blank" rel="noopener">기본 스펙 데모</a>를 참고하세요.</p>',
+        '서버 스펙 맞춤 데모</a>, <a href="../examples/features.html#remote-data" target="_blank" rel="noopener">기본 스펙 데모</a>, ' +
+        '<a href="../examples/features.html#remote-crud-staging" target="_blank" rel="noopener">CRUD 스테이징 데모</a>' +
+        '(서버 데이터에 신규/수정/삭제 상태를 쌓았다가 저장하는 실무 패턴)를 참고하세요.</p>',
       entries: [
         {
           name: 'Step 1. 기본 스펙 그대로 연동',
