@@ -573,7 +573,10 @@ window.ApiDocs = {
           description:
             '서버가 기본 요청/응답 스펙을 따르면 <code>url</code>만으로 붙습니다. server로 돌릴 축만 ' +
             '<code>\'server\'</code>로 지정하세요 — 세 축은 독립이라 "정렬·필터는 클라이언트, 페이징만 서버" ' +
-            '같은 조합도 됩니다. POST 서버면 <code>method: \'POST\'</code> — 파라미터가 JSON body로 갑니다.',
+            '같은 조합도 됩니다. POST 서버면 <code>method: \'POST\'</code> — 파라미터가 JSON body로 갑니다. ' +
+            '이때 기본 매핑의 <code>sort</code>·<code>filter</code> 값은 GET과 동일한 <strong>JSON 문자열</strong>로 ' +
+            'body에 들어갑니다(<code>{"sort":"[{\\"field\\":...}]"}</code> — 이중 인코딩). ' +
+            '서버가 중첩 객체/배열을 기대하면 Step 3의 <code>request</code>로 직접 만드세요.',
           example:
             'var grid = new DataGrid(el, {\n' +
             "  dataSource: { url: '/api/employees' },   // GET, { rows, total } 응답\n" +
@@ -612,8 +615,16 @@ window.ApiDocs = {
             '<code>{ page, pageSize, sortModel, filterModel, quickFilter, sortMode, filterMode, pageMode }</code> ' +
             '읽기 전용 스냅샷이고, 반환한 객체가 요청 파라미터가 됩니다(<code>params</code> 고정 파라미터 위에 병합). ' +
             '값이 <code>undefined</code>인 키는 생략되므로 조건부 파라미터를 깔끔하게 표현할 수 있습니다. ' +
-            '예외가 나면 <code>console.error</code> 후 기본 매핑으로 폴백합니다.',
+            '예외가 나면 <code>console.error</code> 후 기본 매핑으로 폴백합니다. ' +
+            '<strong>병합 우선순위:</strong> <code>params</code>와 같은 키를 반환하면 <code>request</code>가 ' +
+            '이깁니다(나중에 병합). 단 <code>undefined</code> 반환은 "생략"이지 "삭제"가 아니므로 ' +
+            '<code>params</code>가 준 키를 지우지는 못합니다 — 조건부 제거는 <code>params</code> 쪽에서 하세요. ' +
+            '<strong>직렬화:</strong> GET은 모든 값이 쿼리스트링 문자열이 되므로 배열·객체는 직접 문자열로 ' +
+            '만들어야 합니다(객체를 그대로 반환하면 <code>[object Object]</code>). POST는 body 전체가 ' +
+            '<code>JSON.stringify</code>되므로 <code>sort: state.sortModel</code>처럼 중첩 배열/객체를 ' +
+            '그대로 반환해도 온전히 나갑니다.',
           example:
+            '// GET — 값은 전부 문자열/숫자로 (쿼리스트링에 들어간다)\n' +
             'dataSource: {\n' +
             "  url: '/api/employees-v2',\n" +
             '  request: function (state) {\n' +
@@ -623,6 +634,19 @@ window.ApiDocs = {
             '      orderBy: state.sortModel.length\n' +
             "        ? state.sortModel[0].field + ':' + state.sortModel[0].dir\n" +
             '        : undefined,               // 정렬 없으면 파라미터 자체를 생략\n' +
+            '      q: state.quickFilter || undefined,\n' +
+            '    };\n' +
+            '  },\n' +
+            '}\n' +
+            '\n' +
+            '// POST — body가 JSON.stringify되므로 중첩 구조를 그대로 반환해도 된다\n' +
+            'dataSource: {\n' +
+            "  url: '/api/employees/search',\n" +
+            "  method: 'POST',\n" +
+            '  request: function (state) {\n' +
+            '    return {\n' +
+            '      paging: { offset: state.page * state.pageSize, limit: state.pageSize },\n' +
+            '      sort: state.sortModel,       // [{ field, dir }] 배열 그대로\n' +
             '      q: state.quickFilter || undefined,\n' +
             '    };\n' +
             '  },\n' +
@@ -653,7 +677,9 @@ window.ApiDocs = {
             '정렬·필터·페이지 외의 조회 조건(검색 폼, 기간, 카테고리 등)은 <code>params</code>를 ' +
             '<strong>함수</strong>로 두세요 — 요청마다 다시 평가되므로, 조건 값을 바꾸고 ' +
             '<code>reloadData()</code>만 호출하면 됩니다. <code>request</code> 훅을 쓸 때도 ' +
-            '<code>params</code>는 그대로 병합되므로 두 방식을 함께 쓸 수 있습니다.',
+            '<code>params</code>는 그대로 병합되므로 두 방식을 함께 쓸 수 있습니다 — 역할 분담은 ' +
+            '"<code>request</code> = 그리드 상태 → 서버 스펙 변환, <code>params</code> = 그리드 상태와 무관한 ' +
+            '조회 조건"이 기본입니다. 같은 키가 겹치면 <code>request</code>가 이깁니다(Step 3 참고).',
           example:
             "var cond = { dept: '', from: null };\n" +
             'var grid = new DataGrid(el, {\n' +
