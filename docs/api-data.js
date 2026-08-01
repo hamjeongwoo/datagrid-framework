@@ -22,7 +22,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.13.0',
+  version: '2.14.0',
   updated: '2026-08-01',
 
   sections: [
@@ -660,7 +660,8 @@ window.ApiDocs = {
         '<p><strong>동작 원리:</strong> <code>dataSource</code>가 있으면 그리드는 생성 직후 <code>fetch</code>로 ' +
         '데이터를 불러옵니다. <code>sortMode</code> / <code>filterMode</code> / <code>pageMode</code>가 ' +
         '<code>\'server\'</code>인 축은 클라이언트 처리를 건너뛰고, 그 축의 상태가 바뀔 때마다(정렬 클릭, ' +
-        '필터 변경, 페이지 이동) 자동으로 다시 요청합니다. 그 외에는 <code>reloadData()</code>(수동 재조회)와 ' +
+        '필터 변경, 페이지 이동) 자동으로 다시 요청합니다. 그 외에는 <code>reloadData()</code>(수동 재조회 — ' +
+        '2.14.0부터 1페이지로 되돌린 뒤 요청, 유지하려면 <code>{ keepPage: true }</code>)와 ' +
         '<code>setDataSource()</code>(소스 교체) 시점에 요청합니다. 응답 대기 중에는 로딩 오버레이가 표시되고, ' +
         '요청이 겹치면 마지막 요청만 반영됩니다.</p>' +
         '<p><strong>세 축의 기본값 (2.13.0부터):</strong> <code>sortMode</code>·<code>filterMode</code>를 ' +
@@ -1471,13 +1472,23 @@ window.ApiDocs = {
           name: 'reloadData',
           demo: 'remote-data',
           group: 'Data',
-          signature: 'reloadData(): void',
+          signature: 'reloadData(options?: { keepPage?: boolean }): void',
           since: '1.2.0',
           description:
-            '<code>dataSource</code>에서 데이터를 다시 불러옵니다. server 모드인 축의 현재 상태' +
-            '(페이지·정렬·필터)가 요청 파라미터로 전달되고, 응답이 오면 행을 교체하고 ' +
-            '<code>dataChanged</code>를 발생시킵니다. 여러 요청이 겹치면 마지막 요청만 반영됩니다. ' +
+            '<code>dataSource</code>에서 데이터를 다시 불러옵니다. <strong>1페이지로 되돌린 뒤</strong> ' +
+            '요청하며(2.14.0부터), server 모드인 축의 현재 상태(정렬·필터)가 요청 파라미터로 전달되고, ' +
+            '응답이 오면 행을 교체하고 <code>dataChanged</code>를 발생시킵니다. ' +
+            '여러 요청이 겹치면 마지막 요청만 반영됩니다.<br><br>' +
+            '<strong>페이지 리셋 이유</strong> — 이 메서드는 조회 조건이 바뀌어 호출하는 경우가 대부분입니다. ' +
+            '12페이지를 보던 중 조건이 좁혀져 결과가 3페이지로 줄면, 페이지를 유지한 채로는 범위 밖 페이지 ' +
+            '(빈 화면)에 머물게 됩니다. <code>setDataSource()</code>가 1페이지로 리셋하는 것과도 일관됩니다.<br><br>' +
+            '저장 후 <strong>보던 페이지 그대로</strong> 새로고침하려면 ' +
+            '<code>reloadData({ keepPage: true })</code>. 정렬 클릭·필터 변경·페이지 이동에 따른 자동 재조회는 ' +
+            '이 메서드를 거치지 않으므로 영향받지 않습니다(페이지 이동은 이동한 페이지를, 필터는 1페이지를 요청). ' +
             '조회 조건 변경 패턴은 <a href="#remote-data-guide">가이드 Step 5</a> 참고.',
+          example:
+            'grid.reloadData();                    // 조건 변경 후 — 1페이지부터\n' +
+            'grid.reloadData({ keepPage: true });  // 저장 후 새로고침 — 보던 페이지 유지',
         },
         {
           name: 'setDataSource',

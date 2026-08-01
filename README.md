@@ -155,7 +155,7 @@ cellRenderer: DataGrid.renderers.checkbox()   // 값을 체크박스 모양으�
 `getCsv()` / `exportCsv(filename)` / `exportExcel(filename, sheetName)` / `getJson()` ·
 `showLoadingOverlay()` / `hideLoadingOverlay()` ·
 `setTheme('light'|'dark')` · `refresh()` · `refreshCell(row, field)` / `refreshRow(row)` / `refreshColumn(colId)` ·
-`setOptions(patch)` · `expandRow(row)` / `collapseRow(row)` / `toggleRowDetail(row)` · `reloadData()` / `setDataSource(ds)` ·
+`setOptions(patch)` · `expandRow(row)` / `collapseRow(row)` / `toggleRowDetail(row)` · `reloadData({ keepPage? })`(1페이지로 리셋 후 재조회 — 보던 페이지를 지키려면 `{ keepPage: true }`) / `setDataSource(ds)` ·
 `toggleNode(row, expanded?)` / `expandNode(row)` / `collapseNode(row)` / `isNodeExpanded(row)` / `expandAllNodes(level?)` / `collapseAllNodes()` ·
 `setPinnedTopRows(rows)` · `setEnabled(bool)` / `isEnabled()` · `once(event, fn)` · `destroy()`
 

@@ -294,6 +294,22 @@
   }
 
   /**
+   * reloadData(opts)가 1페이지로 되돌릴지.
+   *
+   * 명시적 재조회는 "조회 조건이 바뀌었으니 다시 받아라"인 경우가 대부분이라
+   * 리셋이 기본이다 — 12페이지를 보던 중 조건이 좁혀져 결과가 3페이지로 줄면
+   * 페이지를 유지한 채로는 빈 화면이 나온다(서버는 범위 밖 페이지에 빈 배열을 준다).
+   * setDataSource()가 이미 1페이지로 되돌리는 것과도 일관된다.
+   *
+   * 저장 후 보던 페이지 그대로 새로고침하는 경우는 { keepPage: true }.
+   * 정렬/필터/페이지 이동에 따른 내부 재조회는 각자 페이지를 관리하므로
+   * 이 경로(공개 reloadData)를 타지 않고 _fetchData()를 직접 호출한다.
+   */
+  function shouldResetPageOnReload(opts) {
+    return !(opts && opts.keepPage);
+  }
+
+  /**
    * editableIndicator: 이 컬럼 헤더에 편집 아이콘을 표시할지.
    * "지금 실제로 편집할 수 있는가"를 기준으로 한다 — 그리드가 잠겨 있으면
    * (editable: false / setEditable(false)) 컬럼 설정과 무관하게 표시하지 않는다.
@@ -3377,7 +3393,7 @@
       this._sortModel = evt.sortModel.slice();
       this.refresh();
       this._emitter.emit('sortChanged', { sortModel: this._sortModel.slice() });
-      if (this._sortMode === 'server') this.reloadData();
+      if (this._sortMode === 'server') this._fetchData(); /* 정렬은 페이지를 유지 */
     }
 
     _toggleSort(col, additive) {
@@ -3536,7 +3552,7 @@
       this._currentPage = 0;
       this.refresh();
       this._emitter.emit('filterChanged', { filterModel: this.getFilterModel() });
-      if (this._filterMode === 'server') this.reloadData();
+      if (this._filterMode === 'server') this._fetchData(); /* 페이지는 위에서 이미 0 */
     }
 
     getFilterModel() {
@@ -3551,7 +3567,7 @@
       this._currentPage = 0;
       this.refresh();
       this._emitter.emit('filterChanged', { filterModel: {} });
-      if (this._filterMode === 'server') this.reloadData();
+      if (this._filterMode === 'server') this._fetchData(); /* 페이지는 위에서 이미 0 */
     }
 
     setQuickFilter(text) {
@@ -3559,7 +3575,7 @@
       this._currentPage = 0;
       this.refresh();
       this._emitter.emit('filterChanged', { filterModel: this.getFilterModel(), quickFilter: this._quickFilter });
-      if (this._filterMode === 'server') this.reloadData();
+      if (this._filterMode === 'server') this._fetchData(); /* 페이지는 위에서 이미 0 */
     }
 
     /* ---- row grouping ---- */
@@ -5336,7 +5352,7 @@
       this.refresh();
       this._bodyEl.scrollTop = 0;
       this._emitter.emit('paginationChanged', { page: this._currentPage, pageSize: this._pageSize });
-      if (this._pageMode === 'server') this.reloadData();
+      if (this._pageMode === 'server') this._fetchData(); /* 방금 이동한 페이지를 요청해야 한다 */
     }
 
     setPageSize(size) {
@@ -5346,7 +5362,7 @@
       this._currentPage = Math.floor(firstVisible / size);
       this.refresh();
       this._emitter.emit('paginationChanged', { page: this._currentPage, pageSize: this._pageSize });
-      if (this._pageMode === 'server') this.reloadData();
+      if (this._pageMode === 'server') this._fetchData(); /* 위에서 계산한 페이지를 유지 */
     }
 
     /* ---- overlays ---- */
@@ -5375,11 +5391,28 @@
     /* ---- remote data source ---- */
 
     /**
-     * dataSource에서 데이터를 (다시) 불러온다. server 모드인 축의 현재 상태
-     * (페이지·정렬·필터)가 요청 파라미터로 전달되고, 응답이 도착하면
+     * dataSource에서 데이터를 다시 불러온다. **1페이지로 되돌린 뒤** 요청한다 —
+     * 조회 조건이 바뀌어 호출하는 경우가 대부분이라, 페이지를 유지하면 결과가
+     * 줄었을 때 범위 밖 페이지(빈 화면)에 머문다. 보던 페이지를 지켜야 하면
+     * reloadData({ keepPage: true }).
+     *
+     * 정렬/필터/페이지 이동에 따른 내부 재조회는 각자 페이지를 관리하므로
+     * 이 메서드가 아니라 _fetchData()를 직접 호출한다.
+     */
+    reloadData(opts) {
+      const ds = this.options.dataSource;
+      if (!ds || !ds.url || typeof fetch === 'undefined') return;
+      /* 리셋은 요청 조립(_fetchData) 전에 — 그래야 page 파라미터도 0으로 나간다 */
+      if (shouldResetPageOnReload(opts)) this._currentPage = 0;
+      this._fetchData();
+    }
+
+    /**
+     * 현재 상태 그대로 dataSource를 호출한다(페이지 리셋 없음). server 모드인 축의
+     * 현재 상태(페이지·정렬·필터)가 요청 파라미터로 전달되고, 응답이 도착하면
      * 행을 교체하고 refresh한다. 경합은 마지막 요청만 반영한다.
      */
-    reloadData() {
+    _fetchData() {
       const ds = this.options.dataSource;
       if (!ds || !ds.url || typeof fetch === 'undefined') return;
       const req = buildDataSourceRequest(ds, {
@@ -5451,8 +5484,7 @@
      */
     setDataSource(dataSource) {
       this.options.dataSource = dataSource;
-      this._currentPage = 0;
-      this.reloadData();
+      this.reloadData(); /* reloadData가 1페이지로 되돌린다 */
     }
 
     /* ---- data API ---- */
@@ -6084,7 +6116,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.13.0';
+  DataGrid.version = '2.14.0';
 
   /* Internals exposed for headless unit tests (not part of the public API). */
   DataGrid._test = {
@@ -6098,6 +6130,7 @@
     shouldShowEditableIcon,
     resolveDomLayout,
     resolveDataModes,
+    shouldResetPageOnReload,
     formatNumber,
     formatDate,
     formatValue,

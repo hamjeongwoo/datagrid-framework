@@ -1426,6 +1426,19 @@ suite('resolveDataModes — pageMode 상속', function () {
   assertEq(T.resolveDataModes({ pageMode: 'server', sortMode: 'oops' }).sortMode, 'client', '잘못된 값 → client');
 });
 
+suite('shouldResetPageOnReload', function () {
+  /* 명시적 재조회는 조회 조건이 바뀐 경우가 대부분 — 리셋이 기본 */
+  assert(T.shouldResetPageOnReload(undefined), '인자 없음 → 1페이지로 리셋');
+  assert(T.shouldResetPageOnReload({}), '빈 객체 → 리셋');
+  assert(T.shouldResetPageOnReload(null), 'null → 리셋');
+  assert(T.shouldResetPageOnReload({ keepPage: false }), 'keepPage: false → 리셋');
+  /* 저장 후 보던 페이지 그대로 새로고침하는 탈출구 */
+  assert(!T.shouldResetPageOnReload({ keepPage: true }), 'keepPage: true → 페이지 유지');
+  /* 다른 키가 섞여도 keepPage만 본다 */
+  assert(T.shouldResetPageOnReload({ silent: true }), '모르는 키만 있으면 리셋');
+  assert(!T.shouldResetPageOnReload({ keepPage: true, silent: true }), '다른 키가 섞여도 유지');
+});
+
 suite('shouldShowEditableIcon', function () {
   var editable = { editable: true };
   var readonly = { editable: false };

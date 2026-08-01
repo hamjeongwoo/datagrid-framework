@@ -177,6 +177,14 @@
 ### v2.1 — "TreeGrid" (§6 T1~T4)
 - treeData 코어(계층 표시·펼침/접힘·계층 정렬/필터), 체크박스 캐스케이드, 부모 요약, 지연 로딩
 
+### v2.14 — reloadData()가 1페이지로 리셋 (사용자 제보)
+- 증상: `reloadData()`를 호출해도 현재 페이지가 그대로라, 조회 조건이 좁혀져 결과가 줄면 범위 밖 페이지(빈 화면)에 머문다. 서버는 범위 밖 페이지에 빈 배열을 주므로 에러도 안 난다.
+- 원인: 공개 `reloadData()`가 내부 자동 재조회(정렬·필터·페이지 이동)와 **같은 메서드를 공유**하고 있었다. 페이지 이동(`setPage`)이 이 메서드를 쓰므로 안에서 리셋할 수 없었고, 그래서 아무도 리셋하지 않는 상태가 기본이 됐다.
+- 수정: 경로를 둘로 나눈다. `_fetchData()`(내부, 현재 상태 그대로 요청) + `reloadData(opts)`(공개, 1페이지로 되돌린 뒤 `_fetchData()`). 내부 호출자는 전부 `_fetchData()`로 — `setPage`/`setPageSize`는 방금 계산한 페이지를 유지, `applyColumnFilter`/`clearFilters`/`setQuickFilter`는 이미 `_currentPage = 0`을 세운 뒤 호출, 정렬은 종전대로 페이지 유지.
+- 리셋은 요청 조립 **전에** 해야 `page` 파라미터도 0으로 나간다. `dataSource`가 없으면 종전대로 완전한 no-op(페이지도 안 건드림).
+- 탈출구: `reloadData({ keepPage: true })` — 저장 후 보던 페이지 그대로 새로고침하는 경우. 순수 함수 `shouldResetPageOnReload(opts)`로 분리해 `_test` 노출.
+- `setDataSource()`는 자체 리셋을 지우고 `reloadData()`에 위임(동작 동일).
+
 ### v2.13 — sortMode/filterMode가 pageMode를 상속 (사용자 제안)
 - 문제 제기: "pageMode가 server면 sortMode/filterMode도 따라와야 하는 것 아닌가?" — 맞을 뿐 아니라, 기존 기본값(세 축 독립 `'client'`)은 **조용히 틀린 결과를 내는 기본값**이었다.
 - 계측 근거: 서버 페이징이면 `_rows`는 현재 한 페이지뿐이라 ① 클라 정렬은 그 페이지 안에서만 정렬되면서 헤더는 전체 정렬처럼 표시되고(사용자가 틀린 걸 알 수 없다), ② 클라 필터는 페이지를 걸러내는데 `pageInfo.total`은 `_serverTotal`이라 "1–20 / 10,000"이라 써놓고 7행만 나온다.
