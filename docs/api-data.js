@@ -581,27 +581,6 @@ window.ApiDocs = {
             '필터 모델 구조는 <a href="#filter-model">Filter Model</a> 섹션 참고.',
         },
         {
-          name: 'editor',
-          type: "'text' | 'number' | 'select' | { init, getValue, destroy? }",
-          since: '1.2.0',
-          description:
-            '인라인 에디터. 문자열이면 내장 에디터(<code>\'select\'</code>는 <code>editorOptions</code> 배열 필요), ' +
-            '객체면 커스텀 에디터: <code>init(cellEl, value, row, col)</code>로 UI를 셀에 렌더링하고, ' +
-            '커밋 시 <code>getValue()</code>가 새 값을 반환하며, 닫힐 때 <code>destroy()</code>(선택)가 호출됩니다. ' +
-            '커스텀 에디터에서도 <kbd>Enter</kbd> 커밋 / <kbd>Esc</kbd> 취소 / 포커스 이탈 커밋과 ' +
-            '<code>validator</code>·<code>beforeCellSave</code> 검증이 동일하게 동작합니다. ' +
-            '생략 시 <code>dataType</code>/<code>filter</code>가 number면 숫자, 아니면 텍스트 에디터.',
-          example:
-            "editor: {\n" +
-            "  init: function (cell, value) {\n" +
-            "    this._input = document.createElement('input');\n" +
-            "    this._input.type = 'range'; this._input.value = value;\n" +
-            '    cell.appendChild(this._input); this._input.focus();\n' +
-            '  },\n' +
-            '  getValue: function () { return Number(this._input.value); },\n' +
-            '}',
-        },
-        {
           name: 'headerAlign',
           type: "'left' | 'center' | 'right'",
           since: '2.0.0',
@@ -706,8 +685,9 @@ window.ApiDocs = {
         },
         {
           name: 'editor',
-          type: "'text' | 'number' | 'select' | 'multiselect' | 'radio' | 'checkbox'",
+          type: "'text' | 'number' | 'select' | 'multiselect' | 'radio' | 'checkbox' | { init, getValue, destroy? }",
           default: "'text'",
+          since: '1.2.0',
           description:
             '인라인 에디터 종류. <code>\'number\'</code>는 커밋 시 숫자로 변환하고 숫자가 아니면 이전 값으로 되돌립니다. ' +
             '<code>\'select\'</code>·<code>\'radio\'</code>는 <code>editorOptions</code>에서 단일 선택 ' +
@@ -721,11 +701,27 @@ window.ApiDocs = {
             "그 값('Y'/'N', 1/0 등)으로 읽고 커밋합니다. 매핑 없이도 'y'/'yes'/'true'/'1' 계열 문자열은 " +
             '체크로 인식합니다 (커밋은 불리언). ' +
             '모두 <kbd>Enter</kbd>/바깥 클릭으로 커밋, <kbd>Esc</kbd>로 취소하며, ' +
-            'editor를 선언하면 <code>editable: true</code>는 생략할 수 있습니다 (v2.2.0).',
+            'editor를 선언하면 <code>editable: true</code>는 생략할 수 있습니다 (v2.2.0). ' +
+            '문자열 대신 객체를 주면 <strong>커스텀 에디터</strong>입니다: ' +
+            '<code>init(cellEl, value, row, col)</code>로 UI를 셀에 렌더링하고, 커밋 시 ' +
+            '<code>getValue()</code>가 새 값을 반환하며, 닫힐 때 <code>destroy()</code>(선택)가 호출됩니다. ' +
+            '커스텀 에디터에서도 <kbd>Enter</kbd>/<kbd>Esc</kbd>/포커스 이탈과 ' +
+            '<code>validator</code>·<code>beforeCellSave</code> 검증이 동일하게 동작합니다. ' +
+            '생략 시 <code>dataType</code>/<code>filter</code>가 number면 숫자, 아니면 텍스트 에디터입니다.',
           example:
             "{ field: 'skills', editor: 'multiselect',   // 값은 ['js', 'css'] 같은 배열\n" +
             "  editorOptions: [{ label: 'JavaScript', value: 'js' }, { label: 'CSS', value: 'css' }],\n" +
-            '  cellRenderer: DataGrid.renderers.multiselect() }',
+            '  cellRenderer: DataGrid.renderers.multiselect() }\n' +
+            '\n' +
+            '// 커스텀 에디터 — { init, getValue, destroy? } 객체\n' +
+            "{ field: 'progress', editor: {\n" +
+            "  init: function (cell, value) {\n" +
+            "    this._input = document.createElement('input');\n" +
+            "    this._input.type = 'range'; this._input.value = value;\n" +
+            '    cell.appendChild(this._input); this._input.focus();\n' +
+            '  },\n' +
+            '  getValue: function () { return Number(this._input.value); },\n' +
+            '} }',
         },
         {
           name: 'editorOptions',
