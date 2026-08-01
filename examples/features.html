@@ -2333,6 +2333,68 @@
     </script>
   </div>
 
+  <!-- ======================================================== 커스텀 헤더 (headerRenderer) -->
+  <h2 class="section" id="custom-header">Custom Header (headerRenderer / headerClass / headerTooltip)</h2>
+  <p class="section-desc">
+    <code class="inline">column.headerRenderer(params)</code>는 헤더 라벨을 커스텀 콘텐츠(HTML 문자열 또는 Element)로
+    교체합니다 — <code class="inline">cellRenderer</code>의 헤더판. 정렬·필터 메뉴·리사이즈·리오더는 그대로 동작하고,
+    커스텀 헤더 안의 버튼·입력 등 인터랙티브 요소 클릭은 정렬을 발동하지 않습니다.
+    <code class="inline">headerClass</code>·<code class="inline">headerTooltip</code>으로 클래스와 툴팁도 지정할 수 있습니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div id="gridCustomHeader" class="grid-wrap-sm"></div>
+      <div class="status-line" id="customHeaderStatus">Salary 헤더의 Σ 버튼을 클릭해 보세요 — 정렬 없이 합계만 계산됩니다. 라벨 영역 클릭은 정렬.</div>
+    </div>
+    <script type="text/x-example">
+      /* headerClass 데모용 스타일 — 자체 완결을 위해 카드 스크립트에서 주입 */
+      var style = document.createElement('style');
+      style.textContent = '#gridCustomHeader .accent-header .dg-header-cell-label' +
+        ' { color: var(--dg-accent-color); font-style: italic; }';
+      document.head.appendChild(style);
+
+      var status = document.getElementById('customHeaderStatus');
+
+      /* Element 반환 headerRenderer — 라벨 옆 Σ 버튼 (버튼 클릭은 정렬을 발동하지 않음) */
+      function salaryHeader(params) {
+        var wrap = document.createElement('span');
+        wrap.appendChild(document.createTextNode(params.headerName));
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = 'Σ';
+        btn.title = '표시 중인 행의 급여 합계 계산';
+        btn.style.cssText = 'margin-left: 6px; padding: 0 6px; cursor: pointer;';
+        btn.addEventListener('click', function () {
+          var sum = grid.getDisplayedRows().reduce(function (a, r) { return a + (r.salary || 0); }, 0);
+          status.textContent = 'Σ 클릭 — 표시 행 급여 합계: ' + sum.toLocaleString() + ' (정렬은 발동하지 않았습니다)';
+        });
+        wrap.appendChild(btn);
+        return wrap;
+      }
+
+      var grid = new DataGrid(document.getElementById('gridCustomHeader'), {
+        rowData: DemoData.makeEmployees(40, 21),
+        columnDefs: [
+          { field: 'name', headerName: 'Name', flex: 1, sortable: true,
+            /* HTML 문자열 반환 — 이스케이프되지 않으므로 신뢰된 마크업만 사용 */
+            headerRenderer: function () {
+              return '<span style="color: var(--dg-accent-color)">◆</span> <b>Name</b>';
+            } },
+          { field: 'dept', headerName: 'Dept', width: 150, sortable: true,
+            headerClass: 'accent-header',
+            headerTooltip: '부서 — headerClass로 스타일, headerTooltip으로 이 툴팁을 표시' },
+          { field: 'salary', headerName: 'Salary', width: 170, sortable: true, align: 'right',
+            valueFormatter: function (v) { return v.toLocaleString(); },
+            headerRenderer: salaryHeader },
+        ],
+      });
+
+      grid.on('sortChanged', function (e) {
+        status.textContent = 'sortChanged: ' + JSON.stringify(e.sortModel);
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

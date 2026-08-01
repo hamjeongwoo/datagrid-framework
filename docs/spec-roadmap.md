@@ -174,6 +174,13 @@
 ### v2.1 — "TreeGrid" (§6 T1~T4)
 - treeData 코어(계층 표시·펼침/접힘·계층 정렬/필터), 체크박스 캐스케이드, 부모 요약, 지연 로딩
 
+### v2.4 — 커스텀 헤더 (사용자 요청)
+- `column.headerRenderer(params) => string | HTMLElement` — 헤더 셀 라벨을 커스텀 콘텐츠로 교체 (`cellRenderer`의 헤더판). params: `{ colDef, headerName }`. 문자열 반환은 HTML로 삽입(이스케이프 안 함 — cellRenderer와 동일 경고), Element 반환은 append. 정렬 아이콘·필터 메뉴 버튼·리사이저·리오더·헤더 체크박스 등 기본 동작은 그대로 유지된다. 콜백 예외는 잡아서 `console.error` + 기본 텍스트 라벨 폴백.
+- `column.headerClass: string | (colDef) => string` — 헤더 셀에 추가 클래스 (`cellClass`의 헤더판, 공백 구분 다중 클래스 지원).
+- `column.headerTooltip: string` — 헤더 셀 `title` 속성.
+- 인터랙티브 요소 가드 — 커스텀 헤더 안의 `button·input·select·textarea·a·label` 클릭/드래그는 정렬 토글·`headerClicked`·컬럼 리오더를 발동하지 않는다 (요소 본연의 동작만 수행).
+- 참고: `autoSizeColumn`의 헤더 폭 측정은 `headerName` 텍스트 기준 유지 (커스텀 콘텐츠 폭은 미반영 — 문서에 명시).
+
 ### v2.3 — 검색형 select 에디터 (사용자 요청)
 - `column.editorSearch` — `editor: 'select'`를 검색 입력이 있는 셀 앵커 옵션 패널로 전환 (옵셔널). `true`면 정적 `editorOptions`를 로컬 필터(label/문자열화 value 부분 일치, 대소문자 무관), `{ fetch(query, row, col) => Promise<options>, debounce: 250, minLength: 0, placeholder }`면 질의마다 비동기 로드(lazy 검색 — 디바운스, 최신 질의만 반영, 실패 시 console.error + "Load failed" 표시).
 - 키보드: ↑/↓ 옵션 이동, Enter 선택+커밋, 옵션 클릭 즉시 커밋(전파 차단 — editOnSingleClick 재진입 방지), Esc 취소. 옵션을 고르지 않으면 미커밋.

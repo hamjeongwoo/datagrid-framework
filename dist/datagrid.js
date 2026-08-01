@@ -1363,6 +1363,23 @@
   }
 
   /**
+   * column.headerClass('foo bar' 문자열 또는 (colDef) => string 함수)를
+   * 클래스명 배열로 변환한다. 콜백 예외는 잡아서 빈 배열 폴백 (그리드가 죽으면 안 된다).
+   */
+  function resolveHeaderClass(headerClass, col) {
+    var cls = headerClass;
+    if (typeof cls === 'function') {
+      try { cls = cls(col); }
+      catch (e) {
+        console.error('[DataGrid] headerClass failed for "' + (col && col.colId) + '":', e);
+        return [];
+      }
+    }
+    if (cls === null || cls === undefined || cls === '') return [];
+    return String(cls).trim().split(/\s+/).filter(function (s) { return s !== ''; });
+  }
+
+  /**
    * 컬럼 폭 계산: 사용자 리사이즈(overrides) > flex(남은 공간 비율) > width.
    * 모든 결과는 minWidth 이상, maxWidth(있으면) 이하로 클램프된다.
    */
@@ -2246,6 +2263,10 @@
 
   /* ---- header ---- */
 
+  /* 커스텀 헤더(headerRenderer) 안의 인터랙티브 요소 — 클릭/드래그가
+   * 정렬 토글·headerClicked·컬럼 리오더를 발동하지 않고 본연의 동작만 수행한다. */
+  var HEADER_INTERACTIVE_SELECTOR = 'button, input, select, textarea, a, label';
+
   DataGrid.prototype._renderHeader = function () {
     var self = this;
     this._renderGroupHeader();
@@ -2261,6 +2282,9 @@
       if (headerAlign === 'center') cell.classList.add('dg-align-center');
       if (col.pinned === 'left') cell.classList.add('dg-pinned-left');
       if (col.pinned === 'right') cell.classList.add('dg-pinned-right');
+      var headerCls = resolveHeaderClass(col.headerClass, col);
+      if (headerCls.length) cell.classList.add.apply(cell.classList, headerCls);
+      if (col.headerTooltip) cell.title = col.headerTooltip;
 
       if (col.headerCheckboxSelection && self.options.rowSelection === 'multiple') {
         cell.classList.add('dg-checkbox-header');
@@ -2282,10 +2306,10 @@
       }
 
       var label = el('span', 'dg-header-cell-label', cell);
-      label.textContent = col.headerName;
+      self._renderHeaderLabel(label, col);
 
       cell.addEventListener('click', function (e) {
-        if (e.target.closest('.dg-header-resizer') || e.target.closest('.dg-header-menu-btn') || e.target.closest('.dg-checkbox')) return;
+        if (e.target.closest('.dg-header-resizer') || e.target.closest('.dg-header-menu-btn') || e.target.closest(HEADER_INTERACTIVE_SELECTOR)) return;
         self._emitter.emit('headerClicked', { colDef: col });
       });
 
@@ -2300,7 +2324,7 @@
           if (self._sortModel.length > 1) orderEl.textContent = String(sortIdx + 1);
         }
         cell.addEventListener('click', function (e) {
-          if (e.target.closest('.dg-header-resizer') || e.target.closest('.dg-header-menu-btn')) return;
+          if (e.target.closest('.dg-header-resizer') || e.target.closest('.dg-header-menu-btn') || e.target.closest(HEADER_INTERACTIVE_SELECTOR)) return;
           self._toggleSort(col, e.shiftKey);
         });
       }
@@ -2336,6 +2360,23 @@
     });
 
     this._renderFloatingFilters();
+  };
+
+  /**
+   * 헤더 라벨 콘텐츠 — headerRenderer가 있으면 커스텀 콘텐츠(HTML 문자열 또는 Element),
+   * 없거나 실패하면 headerName 텍스트. cellRenderer와 동일하게 문자열은 이스케이프하지 않는다.
+   */
+  DataGrid.prototype._renderHeaderLabel = function (label, col) {
+    if (col.headerRenderer) {
+      try {
+        var out = col.headerRenderer({ colDef: col, headerName: col.headerName });
+        if (out instanceof (global.Node || Object)) { label.appendChild(out); return; }
+        if (out !== undefined && out !== null) { label.innerHTML = out; return; }
+      } catch (e) {
+        console.error('[DataGrid] headerRenderer failed for "' + col.colId + '":', e);
+      }
+    }
+    label.textContent = col.headerName;
   };
 
   /* ---- column group header (columnGroups — 2단 헤더) ---- */
@@ -4795,7 +4836,7 @@
     var self = this;
     cell.addEventListener('mousedown', function (e) {
       if (e.button !== 0) return;
-      if (e.target.closest('.dg-header-resizer') || e.target.closest('.dg-header-menu-btn') || e.target.closest('.dg-checkbox')) return;
+      if (e.target.closest('.dg-header-resizer') || e.target.closest('.dg-header-menu-btn') || e.target.closest(HEADER_INTERACTIVE_SELECTOR)) return;
 
       var startX = e.clientX;
       var dragging = false;
@@ -5570,7 +5611,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.3.0';
+  DataGrid.version = '2.4.0';
 
   /* Internals exposed for headless unit tests (not part of the public API). */
   DataGrid._test = {
@@ -5628,6 +5669,7 @@
     buildWorksheetXml: buildWorksheetXml,
     buildXlsxParts: buildXlsxParts,
     normalizeColumns: normalizeColumns,
+    resolveHeaderClass: resolveHeaderClass,
     applyColumnState: applyColumnState,
     computeColumnWidths: computeColumnWidths,
     computeColumnWindow: computeColumnWindow,

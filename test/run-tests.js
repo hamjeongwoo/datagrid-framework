@@ -1267,6 +1267,38 @@ suite('applyColumnState', function () {
   assertEq(r.columns[0].colId, 'b', 'malformed entries skipped');
 });
 
+/* ---------------- resolveHeaderClass ---------------- */
+suite('resolveHeaderClass', function () {
+  assertEq(T.resolveHeaderClass('hl', { colId: 'a' }), ['hl'], 'string class');
+  assertEq(T.resolveHeaderClass('  hl  accent ', {}), ['hl', 'accent'], 'multi class trimmed/split');
+  assertEq(T.resolveHeaderClass(null, {}), [], 'null → []');
+  assertEq(T.resolveHeaderClass(undefined, {}), [], 'undefined → []');
+  assertEq(T.resolveHeaderClass('', {}), [], 'empty string → []');
+  assertEq(T.resolveHeaderClass('   ', {}), [], 'blank string → []');
+  assertEq(
+    T.resolveHeaderClass(function (c) { return c.colId === 'salary' ? 'money' : 'plain'; }, { colId: 'salary' }),
+    ['money'],
+    'function receives colDef'
+  );
+  assertEq(
+    T.resolveHeaderClass(function () { return null; }, { colId: 'a' }),
+    [],
+    'function returning null → []'
+  );
+  /* 콜백 예외는 잡아서 빈 배열 폴백 — console.error는 시끄러우니 잠시 막는다 */
+  var origErr = console.error;
+  console.error = function () {};
+  try {
+    assertEq(
+      T.resolveHeaderClass(function () { throw new Error('boom'); }, { colId: 'a' }),
+      [],
+      'throwing function → [] (caught)'
+    );
+  } finally {
+    console.error = origErr;
+  }
+});
+
 /* ---------------- escapeHtml ---------------- */
 suite('escapeHtml', function () {
   assertEq(

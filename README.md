@@ -114,6 +114,9 @@ python demo/server.py
 | `valueFormatter(value, row)` | 표시 문자열 (기본 HTML 이스케이프) |
 | `cellRenderer(params)` | HTML/Node 반환 커스텀 렌더러 |
 | `cellClass` | string 또는 `fn(value, row)` |
+| `headerRenderer(params)` | 헤더 라벨 커스텀 콘텐츠(HTML/Element) — 정렬·필터·리사이즈는 유지, 내부 버튼 등 인터랙티브 요소는 정렬 미발동 |
+| `headerClass` | string 또는 `fn(colDef)` — 헤더 셀 추가 클래스 |
+| `headerTooltip` | 헤더 셀 툴팁 (`title` 속성) |
 | `align` / `headerAlign` | `'left'` \| `'center'` \| `'right'` (헤더만 다른 정렬 가능) |
 | `pinned` | `'left'` \| `'right'` 고정 컬럼 |
 | `checkboxSelection` / `headerCheckboxSelection` | 선택 체크박스 / 헤더 전체 선택 |

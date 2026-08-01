@@ -22,7 +22,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.3.0',
+  version: '2.4.0',
   updated: '2026-07-31',
 
   sections: [
@@ -628,6 +628,43 @@ window.ApiDocs = {
           description:
             '헤더 라벨만 셀과 다른 정렬을 지정합니다. 생략 시 <code>align</code>을 따릅니다.',
           example: "{ field: 'salary', align: 'right', headerAlign: 'center' }",
+        },
+        {
+          name: 'headerRenderer',
+          demo: 'custom-header',
+          type: '(params) => string | HTMLElement',
+          since: '2.4.0',
+          description:
+            '헤더 라벨을 커스텀 콘텐츠로 교체합니다 — <code>cellRenderer</code>의 헤더판. ' +
+            'params는 <code>{ colDef, headerName }</code>. HTML 문자열을 반환하면 그대로 삽입되고' +
+            '(<strong>이스케이프되지 않으므로</strong> 신뢰된 마크업만), Element를 반환하면 append됩니다. ' +
+            '정렬 아이콘·필터 메뉴·리사이저·리오더 등 기본 헤더 동작은 그대로 유지되며, ' +
+            '커스텀 콘텐츠 안의 인터랙티브 요소(<code>button·input·select·textarea·a·label</code>) ' +
+            '클릭/드래그는 정렬 토글·<code>headerClicked</code>·컬럼 리오더를 발동하지 않습니다. ' +
+            '예외가 발생하면 <code>headerName</code> 텍스트로 폴백됩니다. ' +
+            '참고: <code>autoSizeColumn</code>의 헤더 폭 측정은 <code>headerName</code> 텍스트 기준입니다.',
+          example:
+            'headerRenderer: function (params) {\n' +
+            "  return '<b>' + params.headerName + '</b> <small>(원)</small>';\n" +
+            '}',
+        },
+        {
+          name: 'headerClass',
+          demo: 'custom-header',
+          type: 'string | (colDef) => string',
+          since: '2.4.0',
+          description:
+            '헤더 셀에 추가할 CSS 클래스(공백 구분 다중 가능) — <code>cellClass</code>의 헤더판. ' +
+            '함수형은 <code>colDef</code>를 받으며, 예외가 발생하면 클래스 없이 렌더링됩니다.',
+          example: "headerClass: 'accent-header'",
+        },
+        {
+          name: 'headerTooltip',
+          demo: 'custom-header',
+          type: 'string',
+          since: '2.4.0',
+          description: '헤더 셀에 마우스를 올렸을 때 표시할 툴팁(<code>title</code> 속성).',
+          example: "headerTooltip: '세전 연봉 (원화)'",
         },
         {
           name: 'wrapText',
