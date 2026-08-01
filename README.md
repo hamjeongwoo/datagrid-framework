@@ -64,6 +64,7 @@ python demo/server.py
 | `getRowId` | function | 행 식별자 (기본: 자동) |
 | `columnReorder` | boolean | 헤더 드래그 순서 변경 (기본 true) |
 | `floatingFilter` | boolean | 헤더 아래 인라인 필터 행 (필터 메뉴와 모델 공유) |
+| `editableIndicator` | boolean | 편집 가능한 컬럼 헤더에 연필 아이콘 표시 (그리드를 잠그면 함께 사라짐) |
 | `groupBy` | array | 행 그룹핑 필드 목록 (`['dept', 'city']` 다단계 지원) |
 | `groupDefaultExpanded` | boolean | 그룹 초기 펼침 상태 (기본 true) |
 | `grandTotal` | boolean | 하단 전체 요약 행 (`aggFunc` 컬럼 집계) |

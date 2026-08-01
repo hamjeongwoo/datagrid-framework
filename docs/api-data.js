@@ -22,7 +22,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.8.0',
+  version: '2.9.0',
   updated: '2026-08-01',
 
   sections: [
@@ -198,6 +198,24 @@ window.ApiDocs = {
             '<code>set</code>은 단일 값 드롭다운이 생깁니다. 필터 메뉴와 같은 필터 모델을 공유하며, ' +
             '단일 입력으로 표현할 수 없는 <code>inRange</code>는 <code>equals</code>로 대체됩니다.',
           example: 'floatingFilter: true',
+        },
+        {
+          name: 'editableIndicator',
+          demo: 'editable-indicator',
+          type: 'boolean',
+          default: 'false',
+          since: '2.9.0',
+          description:
+            '편집 가능한 컬럼의 헤더에 연필 아이콘을 표시합니다 — 어떤 컬럼을 더블클릭할 수 있는지 ' +
+            '한눈에 알 수 있습니다. 표시 기준은 <strong>지금 실제로 편집할 수 있는가</strong>입니다: ' +
+            '<a href="#column-defs-editable"><code>editable</code></a>이 <code>true</code>인 컬럼' +
+            '(<a href="#column-defs-editor"><code>editor</code></a>를 선언하면 자동으로 true)이면서 ' +
+            '그리드가 잠기지 않은 경우에만 나타나고, ' +
+            '<a href="#api-methods-setEditable"><code>setEditable(false)</code></a>로 잠그면 ' +
+            '아이콘도 함께 사라집니다(편집할 수 없는데 아이콘이 남아 거짓 정보가 되는 것을 막습니다). ' +
+            '체크박스 선택 컬럼·행 번호 컬럼 같은 내장 컬럼은 편집 대상이 아니므로 제외됩니다. ' +
+            '아이콘 색·크기는 <code>.dg-editable-icon</code>으로 재정의할 수 있습니다.',
+          example: 'editableIndicator: true',
         },
         {
           name: 'groupBy',

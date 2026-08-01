@@ -2829,6 +2829,65 @@
     </script>
   </div>
 
+  <!-- ======================================================== 편집 가능 컬럼 표시 -->
+  <h2 class="section" id="editable-indicator">Editable Column Indicator (editableIndicator)</h2>
+  <p class="section-desc">
+    <code class="inline">editableIndicator: true</code>를 주면 편집 가능한 컬럼 헤더에 연필 아이콘이 붙습니다 —
+    어떤 컬럼을 더블클릭할 수 있는지 한눈에 보입니다. 표시 기준은 <strong>지금 실제로 편집할 수 있는가</strong>라서,
+    <code class="inline">setEditable(false)</code>로 그리드를 잠그면 아이콘도 함께 사라집니다(거짓 표시 방지).
+    아래 버튼으로 확인해 보세요.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn" id="eiToggleBtn" type="button">표시 끄기 — setOptions({ editableIndicator })</button>
+        <button class="tb-btn" id="eiLockBtn" type="button">그리드 잠그기 — setEditable(false)</button>
+      </div>
+      <div id="gridEditableIndicator" class="grid-wrap-sm"></div>
+      <div class="status-line" id="eiStatus">Name · Department · Salary 헤더의 연필 아이콘이 편집 가능 표시입니다. (ID·City는 읽기 전용)</div>
+    </div>
+    <script type="text/x-example">
+      var status = document.getElementById('eiStatus');
+      var indicatorOn = true;
+      var locked = false;
+
+      var grid = new DataGrid(document.getElementById('gridEditableIndicator'), {
+        rowData: DemoData.makeEmployees(40, 11),
+        editableIndicator: true,
+        columnDefs: [
+          { field: 'id', headerName: 'ID', width: 70, align: 'right' },   // 읽기 전용
+          { field: 'name', headerName: 'Name', flex: 1, editable: true },
+          { field: 'department', headerName: 'Department', width: 150,
+            editor: 'select',                                             // editor 선언 = 편집 의도
+            editorOptions: ['Engineering', 'Design', 'Marketing', 'Sales'] },
+          { field: 'city', headerName: 'City', width: 130 },              // 읽기 전용
+          { field: 'salary', headerName: 'Salary', width: 120, align: 'right',
+            editor: 'number' },
+        ],
+      });
+
+      function report() {
+        var icons = document.querySelectorAll('#gridEditableIndicator .dg-editable-icon').length;
+        status.textContent = '연필 아이콘 ' + icons + '개 — editableIndicator: ' + indicatorOn +
+          ', 그리드 편집 ' + (locked ? '잠김(setEditable(false))' : '가능');
+      }
+
+      document.getElementById('eiToggleBtn').addEventListener('click', function () {
+        indicatorOn = !indicatorOn;
+        grid.setOptions({ editableIndicator: indicatorOn });
+        this.textContent = (indicatorOn ? '표시 끄기' : '표시 켜기') + ' — setOptions({ editableIndicator })';
+        report();
+      });
+
+      document.getElementById('eiLockBtn').addEventListener('click', function () {
+        locked = !locked;
+        grid.setEditable(!locked);   // 잠그면 아이콘도 사라진다
+        this.textContent = (locked ? '그리드 풀기 — setEditable(true)' : '그리드 잠그기 — setEditable(false)');
+        report();
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

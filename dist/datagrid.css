@@ -229,6 +229,17 @@
 }
 .dg-filter-active .dg-filter-icon { display: block; }
 
+/* 편집 가능 컬럼 표시 (editableIndicator 옵션) — 컬럼 정체성이므로 라벨 바로 옆.
+   정렬·필터 아이콘(상태 표시)보다 약하게 보여 라벨을 가리지 않게 한다. */
+.dg-editable-icon {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  color: var(--dg-secondary-foreground-color);
+  opacity: 0.55;
+}
+.dg-header-cell:hover .dg-editable-icon { opacity: 1; }
+
 .dg-header-menu-btn {
   flex: none;
   margin-left: auto;

@@ -25,8 +25,12 @@
   <h1>Employee Directory</h1>
   <p class="subtitle">
     10,000행 실데이터 템플릿 — 가상 스크롤, 정렬(Shift 멀티), 컬럼 필터 메뉴, 헤더 필터 행,
-    퀵 필터, 행 그룹핑·집계, 체크박스 선택, 페이지네이션, 인라인 편집,
+    퀵 필터, 행 그룹핑·집계, 체크박스 선택, 페이지네이션,
     클립보드 복사/붙여넣기(<kbd>Ctrl+C</kbd>/<kbd>Ctrl+V</kbd>), CSV 내보내기를 한 화면에서 사용합니다.
+    인라인 편집은 <strong>모든 에디터 종류</strong>를 한 번에 보여줍니다 —
+    text · number · select · searchselect(검색형) · radio · multiselect · checkbox ·
+    date · datetime · 커스텀(range 슬라이더). 헤더에 <strong>연필 아이콘</strong>이 있는 컬럼이
+    편집 가능한 컬럼입니다(<code class="inline">editableIndicator</code>).
     <strong>View Source</strong> 탭에서 전체 코드를 확인하세요.
   </p>
 
@@ -54,14 +58,54 @@
         return v === null || v === undefined ? '' : '$' + Number(v).toLocaleString();
       };
 
+      /* 편집기 선택지 — { label, value } 형식은 화면에 label, 데이터에 value를 저장합니다 */
+      var SKILL_OPTIONS = [
+        { label: 'JavaScript', value: 'js' },
+        { label: 'TypeScript', value: 'ts' },
+        { label: 'Python', value: 'py' },
+        { label: 'SQL', value: 'sql' },
+        { label: 'Figma', value: 'figma' },
+        { label: 'Kubernetes', value: 'k8s' },
+      ];
+      /* searchselect 데모용 — 데이터에 없는 도시까지 포함해 검색이 의미 있게 */
+      var CITY_OPTIONS = ['Seoul', 'Tokyo', 'New York', 'London', 'Berlin', 'Singapore', 'Sydney',
+        'Toronto', 'Amsterdam', 'Barcelona', 'Chicago', 'Dubai', 'Helsinki', 'Osaka', 'Paris',
+        'Prague', 'San Francisco', 'Stockholm', 'Taipei', 'Vancouver'];
+
+      /* 커스텀 에디터 — { init, getValue, destroy? } 객체 (내장 에디터로 안 되는 UI) */
+      var sliderEditor = {
+        init: function (cell, value) {
+          this._input = document.createElement('input');
+          this._input.type = 'range';
+          this._input.min = 0;
+          this._input.max = 100;
+          this._input.value = value === null || value === undefined ? 0 : value;
+          this._input.className = 'dg-cell-editor';
+          cell.appendChild(this._input);
+          this._input.focus();
+        },
+        getValue: function () { return Number(this._input.value); },
+      };
+
+      /* 데모 데이터에 없는 두 필드(skills·lastReview)를 결정적으로 파생시킵니다
+         — demo/data.js는 다른 예제와 공유하므로 건드리지 않습니다 (Math.random 금지) */
+      var rows = DemoData.makeEmployees(10000).map(function (r, i) {
+        var p = r.hireDate.split('-');
+        r.skills = [SKILL_OPTIONS[i % 6].value, SKILL_OPTIONS[(i * 5 + 2) % 6].value]
+          .filter(function (v, k, arr) { return arr.indexOf(v) === k; });
+        r.lastReview = new Date(+p[0] + 1, +p[1] - 1, +p[2], 9 + (i % 8), (i % 4) * 15);
+        return r;
+      });
+
       var grid = new DataGrid(document.getElementById('grid'), {
-        rowData: DemoData.makeEmployees(10000),
+        rowData: rows,
         rowSelection: 'multiple',
         pagination: true,
         paginationPageSize: 50,
         zebra: true,
         grandTotal: true,
         floatingFilter: true,
+        editableIndicator: true,   // 편집 가능한 컬럼 헤더에 연필 아이콘 표시
         defaultColDef: { sortable: true, resizable: true },
         columnDefs: [
           { colId: 'sel', headerName: '', width: 48, minWidth: 48, pinned: 'left',
@@ -72,24 +116,47 @@
             validator: function (v) {
               return String(v).trim().length >= 2 || '이름은 2자 이상이어야 합니다';
             } },
-          { field: 'email', headerName: 'Email', width: 230, filter: 'text' },
+          // text 에디터 — editor 생략 시 기본값
+          { field: 'email', headerName: 'Email', width: 210, filter: 'text', editable: true,
+            validator: function (v) {
+              return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(v)) || '올바른 이메일 형식이 아닙니다';
+            } },
+          // select — 드롭다운 단일 선택
           { field: 'department', headerName: 'Department', width: 140, filter: 'set',
-            editable: true, editor: 'select',
+            editor: 'select',
             editorOptions: ['Engineering', 'Design', 'Marketing', 'Sales', 'Finance', 'Support'] },
-          { field: 'city', headerName: 'City', width: 130, filter: 'set' },
+          // searchselect — 검색 입력이 있는 옵션 패널 (목록이 길 때)
+          { field: 'city', headerName: 'City', width: 130, filter: 'set',
+            editor: 'select', editorSearch: true, editorOptions: CITY_OPTIONS },
+          // radio — 셀 앵커 라디오 패널
           { field: 'status', headerName: 'Status', width: 130, filter: 'set',
+            editor: 'radio', editorOptions: ['Active', 'On Leave', 'Contract', 'Inactive'],
             cellRenderer: DataGrid.renderers.tag({
               'Active': 'green', 'On Leave': 'yellow', 'Contract': 'blue', 'Inactive': 'gray',
             }) },
+          // multiselect — 배열 값을 체크리스트 패널에서 (label 표시 / value 저장)
+          { field: 'skills', headerName: 'Skills', width: 190, sortable: false,
+            editor: 'multiselect', editorOptions: SKILL_OPTIONS,
+            cellRenderer: DataGrid.renderers.multiselect() },
+          // number — 커밋 시 숫자로 변환
           { field: 'salary', headerName: 'Salary', width: 120, align: 'right',
-            filter: 'number', editable: true, editor: 'number',
+            filter: 'number', editor: 'number',
             aggFunc: 'sum', valueFormatter: money,
             validator: function (v) { return v >= 0 || '급여는 0 이상이어야 합니다'; } },
+          // 커스텀 에디터 — range 슬라이더
           { field: 'progress', headerName: 'Onboarding', width: 150,
+            editor: sliderEditor,
             cellRenderer: DataGrid.renderers.progress() },
+          // checkbox — 불리언 인라인 체크박스
           { field: 'remote', headerName: 'Remote', width: 90, align: 'center',
-            cellRenderer: DataGrid.renderers.check() },
-          { field: 'hireDate', headerName: 'Hire Date', width: 120, filter: 'text' },
+            editor: 'checkbox',
+            cellRenderer: DataGrid.renderers.checkbox() },
+          // date — dataType: 'date'면 editor 생략해도 날짜 피커가 기본
+          { field: 'hireDate', headerName: 'Hire Date', width: 125,
+            dataType: 'date', filter: 'text', format: 'yyyy-MM-dd', editable: true },
+          // datetime — 값이 Date 인스턴스면 커밋도 Date
+          { field: 'lastReview', headerName: 'Last Review', width: 160, sortable: true,
+            dataType: 'date', editor: 'datetime', format: 'yyyy-MM-dd HH:mm' },
         ],
       });
 
@@ -122,9 +189,9 @@
         grid.addRow({
           id: nextId++, name: 'New Employee', email: 'new@example.com',
           department: 'Engineering', city: 'Seoul', status: 'Active',
-          salary: 50000, rating: 3.0, progress: 0, remote: false,
-          hireDate: '2026-07-31',
-        });
+          skills: ['js'], salary: 50000, rating: 3.0, progress: 0, remote: false,
+          hireDate: '2026-08-01', lastReview: new Date(2026, 7, 1, 10, 0),
+        }, 0);   // 0 = 맨 앞에 삽입 — 추가된 행을 찾으러 스크롤할 필요 없음
         statusLine.textContent = '새 직원이 추가되었습니다. (총 ' +
           grid.getRowData().length.toLocaleString() + '행)';
       });
@@ -147,10 +214,18 @@
         }
       });
 
+      /* 에디터마다 커밋 값의 타입이 다릅니다 (Date·배열·불리언·숫자·문자열) */
+      function showValue(v) {
+        if (v === null || v === undefined || v === '') return '(비어 있음)';
+        if (v instanceof Date) return DataGrid.format(v, 'yyyy-MM-dd HH:mm');
+        if (Array.isArray(v)) return v.length ? v.join(', ') : '(없음)';
+        return String(v);
+      }
+
       grid.on('cellValueChanged', function (e) {
         statusLine.textContent =
           '"' + e.data.name + '" 행의 ' + e.colDef.headerName + ' 값이 ' +
-          e.oldValue + ' → ' + e.newValue + ' (으)로 변경되었습니다.';
+          showValue(e.oldValue) + ' → ' + showValue(e.newValue) + ' (으)로 변경되었습니다.';
       });
     </script>
   </div>

@@ -94,6 +94,7 @@
 | [x] | `numberCell` (행 번호 컬럼) | `rowNumbers: true` 옵션 (좌측 고정, 표시 순서 기준) — v1.1.0 | **P1** (쉬움) |
 | [x] | `column > maxWidth` | `maxWidth` — 리사이즈·flex·autoSize 상한 — v1.1.0 | **P1** (쉬움) |
 | [x] | `editable` (그리드 레벨 on/off) | `editable: false` 옵션 — 컬럼 설정 무시하고 잠금 + `setEditable(bool)` / `isEditable()` — v1.1.0 | **P1** (쉬움) |
+| [x] | (없음 — 자체 개선) 편집 가능 컬럼의 시각적 구분 | `editableIndicator: true` — 편집 가능 컬럼 헤더에 연필 아이콘, 그리드 잠금 시 함께 사라짐 — v2.9.0 | **P2** (사용자 요청) |
 | [x] | `column > nodrag/nodrop` | `column.suppressMove` — 드래그 이동 제외 — v1.2.0 | **P2** |
 | [x] | `rowInit` (행별 클래스/속성) | `getRowClass(row, index) => string` 옵션 — v1.2.0 | **P2** |
 | [x] | `column > halign` (헤더만 다른 정렬) | `column.headerAlign: 'left'\|'center'\|'right'` — v2.0.0 | P3 |
@@ -174,6 +175,14 @@
 
 ### v2.1 — "TreeGrid" (§6 T1~T4)
 - treeData 코어(계층 표시·펼침/접힘·계층 정렬/필터), 체크박스 캐스케이드, 부모 요약, 지연 로딩
+
+### v2.9 — 편집 가능 컬럼 표시 + 템플릿 데모 에디터 전수 (사용자 요청)
+- `editableIndicator: true` — 편집 가능한 컬럼 헤더에 연필 아이콘. **opt-in**으로 둔 이유: 기존 그리드(데모 54개 포함)의 외형을 바꾸지 않고, `rowNumbers`·`floatingFilter`·`zebra`처럼 시각 요소는 옵션으로 켜는 이 프로젝트의 관례를 따르기 위함.
+- 표시 기준은 "지금 실제로 편집 가능한가" — `col.editable && grid._editable`. `setEditable(false)`로 잠그면 아이콘도 사라진다(편집 불가인데 아이콘이 남으면 거짓 정보). `setOptions({ editableIndicator })`로 런타임 토글 가능(둘 다 `refresh()`가 헤더를 재생성하므로 별도 처리 불필요).
+- 아이콘 위치는 라벨 바로 옆 — 정렬·필터 아이콘은 *상태* 표시(활성일 때만 보임)인 반면 편집 가능 여부는 *컬럼 정체성*이라 라벨과 함께 읽히는 편이 맞다. `opacity: .55`(헤더 hover 시 1)로 라벨을 가리지 않게 한다.
+- 순수 함수 `shouldShowEditableIcon(col, gridEditable, indicatorOn)` — `_test` 노출.
+- index.html 템플릿 데모를 **모든 에디터 종류**로 확장: text(name/email) · number(salary) · select(department) · searchselect(city, 20개 도시) · radio(status) · multiselect(skills) · checkbox(remote) · date(hireDate) · datetime(lastReview) · 커스텀 range 슬라이더(progress). `skills`·`lastReview`는 index.html 안에서 결정적으로 파생시킨다 — `demo/data.js`는 원격 API·다른 예제와 공유하므로 필드를 늘리면 그쪽 퀵필터/응답이 함께 바뀐다.
+- 데모: features.html `#editable-indicator`(표시 토글 + 그리드 잠금 버튼).
 
 ### v2.8 — date / datetime 에디터 (사용자 요청)
 - `editor: 'date' | 'datetime'` — 네이티브 `<input type="date">` / `<input type="datetime-local">`로 편집(의존성 0 원칙에 따라 자체 달력 UI 대신 브라우저 기본 피커). 값 표시는 로컬 시각 기준 `'yyyy-MM-dd(THH:mm)'`.

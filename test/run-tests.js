@@ -1297,6 +1297,20 @@ suite('defaultEditorType', function () {
   assertEq(T.defaultEditorType({ dataType: 'string' }), 'text', "dataType: 'string' → text");
 });
 
+suite('shouldShowEditableIcon', function () {
+  var editable = { editable: true };
+  var readonly = { editable: false };
+  assert(T.shouldShowEditableIcon(editable, true, true), '편집 가능 + 그리드 활성 + 옵션 on → 표시');
+  assert(!T.shouldShowEditableIcon(editable, true, false), '옵션 off → 미표시');
+  assert(!T.shouldShowEditableIcon(readonly, true, true), '읽기 전용 컬럼 → 미표시');
+  /* 그리드가 잠기면(editable: false / setEditable(false)) 컬럼 설정과 무관하게 감춘다 —
+   * 편집할 수 없는데 편집 아이콘이 남아 있으면 거짓 정보가 된다 */
+  assert(!T.shouldShowEditableIcon(editable, false, true), '그리드 잠금 → 미표시');
+  assert(!T.shouldShowEditableIcon(null, true, true), 'null 컬럼 → 미표시 (크래시 없음)');
+  assert(!T.shouldShowEditableIcon({}, true, true), 'editable 미지정 → 미표시');
+  assert(T.shouldShowEditableIcon(editable, true, true) === true, '불리언 반환 (truthy 값 누출 없음)');
+});
+
 /* ---------------- formatNumber / formatDate / formatValue ---------------- */
 suite('format', function () {
   assertEq(T.formatNumber(1234567.891, '#,##0.00'), '1,234,567.89', 'grouping + 2 decimals');

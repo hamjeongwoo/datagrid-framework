@@ -45,6 +45,10 @@
   const MENU_ICON_SVG =
     '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true">' +
     '<path d="M2 4.5h12v1.4H2zM2 7.3h12v1.4H2zM2 10.1h12v1.4H2z"/></svg>';
+  const EDIT_ICON_SVG =
+    '<svg class="dg-editable-icon" viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true">' +
+    '<path d="M11.9 1.3a1.1 1.1 0 0 1 1.6 0l1.2 1.2a1.1 1.1 0 0 1 0 1.6l-1.1 1.1-2.8-2.8 1.1-1.1z"/>' +
+    '<path d="M10.1 3.1l2.8 2.8-7.2 7.2-3.5.7.7-3.5 7.2-7.2z"/></svg>';
   const CHEVRON_SVG =
     '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" aria-hidden="true">' +
     '<path d="M6 3.5L10.5 8L6 12.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -247,6 +251,16 @@
   function dateEditorOptions(col) {
     const o = col.editorOptions;
     return o && typeof o === 'object' && !Array.isArray(o) ? o : null;
+  }
+
+  /**
+   * editableIndicator: 이 컬럼 헤더에 편집 아이콘을 표시할지.
+   * "지금 실제로 편집할 수 있는가"를 기준으로 한다 — 그리드가 잠겨 있으면
+   * (editable: false / setEditable(false)) 컬럼 설정과 무관하게 표시하지 않는다.
+   * 체크박스 선택 컬럼·상태 컬럼 같은 내장 컬럼은 editable이 false라 자연히 제외된다.
+   */
+  function shouldShowEditableIcon(col, gridEditable, indicatorOn) {
+    return !!(indicatorOn && gridEditable && col && col.editable);
   }
 
   /** column.format / DataGrid.format() 진입점 — '#'나 '0'이 있으면 숫자, 아니면 날짜 패턴. */
@@ -2515,6 +2529,12 @@
 
         const label = el('span', 'dg-header-cell-label', cell);
         this._renderHeaderLabel(label, col);
+
+        if (shouldShowEditableIcon(col, this._editable, this.options.editableIndicator)) {
+          cell.classList.add('dg-editable-col');
+          cell.insertAdjacentHTML('beforeend', EDIT_ICON_SVG);
+          cell.lastChild.setAttribute('title', 'Editable column');
+        }
 
         cell.addEventListener('click', e => {
           if (e.target.closest('.dg-header-resizer') || e.target.closest('.dg-header-menu-btn') || e.target.closest(HEADER_INTERACTIVE_SELECTOR)) return;
@@ -5917,7 +5937,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.8.0';
+  DataGrid.version = '2.9.0';
 
   /* Internals exposed for headless unit tests (not part of the public API). */
   DataGrid._test = {
@@ -5928,6 +5948,7 @@
     parseDateInputValue,
     editValueEquals,
     defaultEditorType,
+    shouldShowEditableIcon,
     formatNumber,
     formatDate,
     formatValue,
