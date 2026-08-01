@@ -174,6 +174,13 @@
 ### v2.1 — "TreeGrid" (§6 T1~T4)
 - treeData 코어(계층 표시·펼침/접힘·계층 정렬/필터), 체크박스 캐스케이드, 부모 요약, 지연 로딩
 
+### v2.5 — Remote Data Source 서버 스펙 맞춤 (사용자 요청)
+- `dataSource.request(state) => params` — 기본 파라미터 매핑(`page·pageSize·sort·filter·quickFilter`)을 **대체**하는 커스텀 요청 빌더. state는 `{ page, pageSize, sortModel, filterModel, quickFilter, sortMode, filterMode, pageMode }` 읽기 전용 스냅샷. 반환 객체가 `params`(고정 파라미터) 위에 merge되며, 값이 `undefined`인 키는 생략된다(조건부 파라미터). 예외 시 `console.error` + 기본 매핑 폴백. `offset/limit`, `orderBy=field:dir` 등 어떤 서버 스펙에도 대응.
+- `dataSource.headers: object | () => object` — 요청 헤더(인증 토큰 등). 함수는 요청마다 평가(토큰 갱신 대응), 예외 시 헤더 없이 진행. POST의 `Content-Type: application/json` 기본값은 유지하되 같은 키를 주면 덮어쓴다.
+- `setDataSource(dataSource)` — 런타임 교체(1페이지 리셋 + `reloadData()`). 조회 조건만 바뀌는 경우는 기존대로 `params`를 함수로 두고 `reloadData()`.
+- 데모 서버에 다른 스펙의 엔드포인트 `/api/employees-v2`(offset/limit/orderBy=field:dir/q/dept, 응답 `{ result: { items, totalCount, receivedToken } }`, `X-Demo-Token` 에코)를 server.js·server.py 양쪽에 추가하고, features.html에 request/parse/headers/params 조합 카드로 시연.
+- api.html에 Remote Data Source 전용 가이드 섹션(kind: guide) 추가 — 기본 스펙/3축 모드/응답·요청 커스텀/헤더/런타임 변경/에러 처리 전체 흐름.
+
 ### v2.4 — 커스텀 헤더 (사용자 요청)
 - `column.headerRenderer(params) => string | HTMLElement` — 헤더 셀 라벨을 커스텀 콘텐츠로 교체 (`cellRenderer`의 헤더판). params: `{ colDef, headerName }`. 문자열 반환은 HTML로 삽입(이스케이프 안 함 — cellRenderer와 동일 경고), Element 반환은 append. 정렬 아이콘·필터 메뉴 버튼·리사이저·리오더·헤더 체크박스 등 기본 동작은 그대로 유지된다. 콜백 예외는 잡아서 `console.error` + 기본 텍스트 라벨 폴백.
 - `column.headerClass: string | (colDef) => string` — 헤더 셀에 추가 클래스 (`cellClass`의 헤더판, 공백 구분 다중 클래스 지원).

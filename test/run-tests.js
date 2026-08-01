@@ -621,6 +621,64 @@ suite('dataSource request/response', function () {
   });
   assertEq(emptySort.url, '/x', 'empty sort/filter omitted from params');
 
+  /* ---- request 훅 (v2.5 — 서버 스펙 맞춤 커스텀 파라미터 빌더) ---- */
+  var seen = null;
+  var req5 = T.buildDataSourceRequest({
+    url: '/api/v2',
+    params: { fixed: 'yes' },
+    request: function (s) {
+      seen = s;
+      return {
+        offset: s.page * s.pageSize,
+        limit: s.pageSize,
+        orderBy: s.sortModel.length ? s.sortModel[0].field + ':' + s.sortModel[0].dir : undefined,
+        q: s.quickFilter || undefined,
+      };
+    },
+  }, state);
+  assert(req5.url.indexOf('offset=50') !== -1 && req5.url.indexOf('limit=25') !== -1, 'request hook custom paging params');
+  assert(req5.url.indexOf('orderBy=name%3Aasc') !== -1, 'request hook custom sort format');
+  assert(req5.url.indexOf('fixed=yes') !== -1, 'params base still merged under request hook');
+  assert(req5.url.indexOf('page=') === -1 && req5.url.indexOf('sort=') === -1, 'default mapping replaced by request hook');
+  assertEq(seen.page, 2, 'request state: page');
+  assertEq(seen.quickFilter, 'kim', 'request state: quickFilter');
+  assertEq(seen.sortMode, 'server', 'request state: modes');
+
+  var req6 = T.buildDataSourceRequest({
+    url: '/api/v2',
+    request: function () { return { q: undefined, keep: 'k' }; },
+  }, state);
+  assert(req6.url.indexOf('q=') === -1 && req6.url.indexOf('keep=k') !== -1, 'undefined values omitted (conditional params)');
+
+  var origErr = console.error;
+  console.error = function () {};
+  try {
+    var req7 = T.buildDataSourceRequest({
+      url: '/api/v2',
+      request: function () { throw new Error('boom'); },
+    }, state);
+    assert(req7.url.indexOf('page=2') !== -1, 'request hook exception → default mapping fallback');
+    var req8 = T.buildDataSourceRequest({
+      url: '/x',
+      params: function () { throw new Error('boom'); },
+      headers: function () { throw new Error('boom'); },
+    }, state);
+    assert(req8.url.indexOf('page=2') !== -1, 'params exception → state params still applied');
+    assertEq(req8.headers, null, 'headers exception → no headers');
+  } finally {
+    console.error = origErr;
+  }
+
+  /* ---- headers (v2.5 — 인증 토큰 등) ---- */
+  var req9 = T.buildDataSourceRequest({ url: '/x', headers: { Authorization: 'Bearer t1' } }, state);
+  assertEq(req9.headers, { Authorization: 'Bearer t1' }, 'static headers object');
+  var req10 = T.buildDataSourceRequest(
+    { url: '/x', headers: function () { return { 'X-Token': 'live' }; } },
+    state
+  );
+  assertEq(req10.headers, { 'X-Token': 'live' }, 'headers function evaluated per request');
+  assertEq(T.buildDataSourceRequest({ url: '/x' }, state).headers, null, 'no headers option → null');
+
   assertEq(T.parseDataSourceResponse([{ a: 1 }]), { rows: [{ a: 1 }], total: 1 }, 'bare array response');
   assertEq(
     T.parseDataSourceResponse({ rows: [{ a: 1 }], total: 99 }),

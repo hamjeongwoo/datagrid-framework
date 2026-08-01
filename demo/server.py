@@ -99,6 +99,9 @@ class DemoHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/employees":
             self._serve_employees(parse_qs(parsed.query))
             return
+        if parsed.path == "/api/employees-v2":
+            self._serve_employees_v2(parse_qs(parsed.query))
+            return
         super().do_GET()
 
     def _serve_employees(self, query):
@@ -130,6 +133,47 @@ class DemoHandler(SimpleHTTPRequestHandler):
 
         time.sleep(0.12)  # 로딩 오버레이 확인용 지연 (server.js와 동일)
         body = json.dumps({"rows": rows, "total": total}).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _serve_employees_v2(self, query):
+        """v2: 우리 기본 스펙과 다른 서버 흉내 (server.js와 동일) —
+        offset/limit, orderBy=field:dir, q, dept 필터, envelope 응답, 헤더 에코."""
+        rows = list(_EMPLOYEES)
+
+        dept = (query.get("dept") or [None])[0]
+        if dept:
+            rows = [r for r in rows if r["department"] == dept]
+
+        q = (query.get("q") or [None])[0]
+        if q:
+            needle = q.lower()
+            rows = [r for r in rows if any(needle in str(v).lower() for v in r.values())]
+
+        order_by = (query.get("orderBy") or [None])[0]  # "field:asc" | "field:desc"
+        if order_by:
+            field, _, direction = order_by.partition(":")
+            rows.sort(key=lambda r: (r.get(field) is None, r.get(field)),
+                      reverse=direction == "desc")
+
+        total_count = len(rows)
+        try:
+            offset = int((query.get("offset") or [None])[0])
+            limit = int((query.get("limit") or [None])[0])
+            if limit > 0:
+                rows = rows[offset:offset + limit]
+        except (TypeError, ValueError):
+            pass
+
+        time.sleep(0.12)
+        body = json.dumps({"result": {
+            "items": rows,
+            "totalCount": total_count,
+            "receivedToken": self.headers.get("X-Demo-Token"),
+        }}).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))

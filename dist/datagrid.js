@@ -683,21 +683,68 @@
    */
   function buildDataSourceRequest(dataSource, state) {
     var params = {};
-    var base = typeof dataSource.params === 'function' ? dataSource.params() : dataSource.params;
-    for (var k in base || {}) params[k] = base[k];
-    if (state.pageMode === 'server' && state.pagination) {
-      params.page = state.page;
-      params.pageSize = state.pageSize;
+    var k;
+    var base = null;
+    try {
+      base = typeof dataSource.params === 'function' ? dataSource.params() : dataSource.params;
+    } catch (e) {
+      console.error('[DataGrid] dataSource.params failed:', e);
     }
-    if (state.sortMode === 'server' && state.sortModel && state.sortModel.length > 0) {
-      params.sort = JSON.stringify(state.sortModel);
+    for (k in base || {}) params[k] = base[k];
+
+    /* request 훅이 있으면 기본 파라미터 매핑을 대체한다 — 서버 스펙(offset/limit,
+     * orderBy=field:dir 등)에 맞춘 커스텀 빌더. undefined 값 키는 생략(조건부 파라미터). */
+    var custom = null;
+    if (typeof dataSource.request === 'function') {
+      try {
+        custom = dataSource.request({
+          page: state.page,
+          pageSize: state.pageSize,
+          sortModel: (state.sortModel || []).slice(),
+          filterModel: state.filterModel || {},
+          quickFilter: state.quickFilter || '',
+          sortMode: state.sortMode,
+          filterMode: state.filterMode,
+          pageMode: state.pageMode,
+        });
+      } catch (e) {
+        console.error('[DataGrid] dataSource.request failed:', e);
+        custom = null;
+      }
     }
-    if (state.filterMode === 'server') {
-      var hasFilter = false;
-      for (var f in state.filterModel || {}) { hasFilter = true; break; }
-      if (hasFilter) params.filter = JSON.stringify(state.filterModel);
-      if (state.quickFilter) params.quickFilter = state.quickFilter;
+    if (custom) {
+      for (k in custom) {
+        if (custom[k] !== undefined) params[k] = custom[k];
+      }
+    } else {
+      if (state.pageMode === 'server' && state.pagination) {
+        params.page = state.page;
+        params.pageSize = state.pageSize;
+      }
+      if (state.sortMode === 'server' && state.sortModel && state.sortModel.length > 0) {
+        params.sort = JSON.stringify(state.sortModel);
+      }
+      if (state.filterMode === 'server') {
+        var hasFilter = false;
+        for (var f in state.filterModel || {}) { hasFilter = true; break; }
+        if (hasFilter) params.filter = JSON.stringify(state.filterModel);
+        if (state.quickFilter) params.quickFilter = state.quickFilter;
+      }
     }
+
+    /* headers — 인증 토큰 등. 함수는 요청마다 평가(토큰 갱신 대응), 예외 시 헤더 없이 진행 */
+    var headers = null;
+    var h = null;
+    try {
+      h = typeof dataSource.headers === 'function' ? dataSource.headers() : dataSource.headers;
+    } catch (e) {
+      console.error('[DataGrid] dataSource.headers failed:', e);
+    }
+    if (h) {
+      headers = {};
+      for (k in h) headers[k] = h[k];
+    }
+
     var method = (dataSource.method || 'GET').toUpperCase();
     var url = dataSource.url;
     var body = null;
@@ -709,7 +756,7 @@
     } else {
       body = JSON.stringify(params);
     }
-    return { url: url, method: method, body: body };
+    return { url: url, method: method, body: body, headers: headers };
   }
 
   /**
@@ -5014,10 +5061,17 @@
       pageMode: this._pageMode,
     });
     var opts = { method: req.method };
+    var headers = {};
+    var hasHeaders = false;
     if (req.body !== null) {
-      opts.headers = { 'Content-Type': 'application/json' };
+      headers['Content-Type'] = 'application/json'; /* 기본값 — dataSource.headers가 같은 키를 주면 덮어씀 */
+      hasHeaders = true;
       opts.body = req.body;
     }
+    if (req.headers) {
+      for (var hk in req.headers) { headers[hk] = req.headers[hk]; hasHeaders = true; }
+    }
+    if (hasHeaders) opts.headers = headers;
     this.showLoadingOverlay();
     var seq = ++this._loadSeq;
     fetch(req.url, opts)
@@ -5055,6 +5109,17 @@
         self.hideLoadingOverlay();
         self._emitter.emit('dataLoadError', { error: err });
       });
+  };
+
+  /**
+   * 원격 데이터 소스를 런타임에 교체하고 1페이지부터 다시 불러온다.
+   * 조회 조건(파라미터)만 바뀌는 경우라면 dataSource.params를 함수로 두고
+   * reloadData()를 호출하는 쪽이 가볍다.
+   */
+  DataGrid.prototype.setDataSource = function (dataSource) {
+    this.options.dataSource = dataSource;
+    this._currentPage = 0;
+    this.reloadData();
   };
 
   /* ---- data API ---- */
@@ -5611,7 +5676,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.4.0';
+  DataGrid.version = '2.5.0';
 
   /* Internals exposed for headless unit tests (not part of the public API). */
   DataGrid._test = {

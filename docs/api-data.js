@@ -22,8 +22,8 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.4.0',
-  updated: '2026-07-31',
+  version: '2.5.0',
+  updated: '2026-08-01',
 
   sections: [
 
@@ -305,16 +305,19 @@ window.ApiDocs = {
         {
           name: 'dataSource',
           demo: 'remote-data',
-          type: '{ url, method?, params?, parse? }',
+          type: '{ url, method?, params?, request?, parse?, headers? }',
           since: '1.2.0',
           description:
             '원격 데이터 소스. <code>fetch</code>로 <code>url</code>을 호출해 행을 불러옵니다. ' +
             '<code>method</code> 기본은 GET(파라미터를 쿼리스트링으로, POST면 JSON body로), ' +
             '<code>params</code>는 항상 포함할 고정 파라미터(객체 또는 함수), ' +
-            '<code>parse(json)</code>은 응답을 <code>{ rows, total }</code>로 바꾸는 훅입니다' +
-            '(기본: 배열 또는 <code>{ rows, total }</code> 그대로). ' +
+            '<code>request(state)</code>는 기본 파라미터 매핑을 서버 스펙으로 대체하는 훅(since 2.5.0), ' +
+            '<code>parse(json)</code>은 응답을 <code>{ rows, total }</code>로 바꾸는 훅' +
+            '(기본: 배열 또는 <code>{ rows, total }</code> 그대로), ' +
+            '<code>headers</code>는 인증 토큰 등 요청 헤더(객체 또는 함수, since 2.5.0)입니다. ' +
             '로딩 중 오버레이가 표시되고 실패 시 <code>dataLoadError</code> 이벤트가 발생합니다. ' +
-            '<code>reloadData()</code>로 다시 불러옵니다.',
+            '<code>reloadData()</code>로 다시 불러오고 <code>setDataSource()</code>로 교체합니다. ' +
+            '<strong>단계별 레시피는 <a href="#remote-data-guide">Remote Data Source 가이드</a> 참고.</strong>',
           example:
             "dataSource: {\n" +
             "  url: '/api/employees',\n" +
@@ -527,6 +530,175 @@ window.ApiDocs = {
             '그리드 전체 편집 스위치. <code>false</code>면 컬럼의 <code>editable</code> 설정을 무시하고 ' +
             '더블클릭·<kbd>Enter</kbd>·<code>startEdit()</code>·붙여넣기를 모두 잠급니다. ' +
             '런타임에는 <a href="#api-methods-setEditable"><code>setEditable()</code></a>로 전환합니다.',
+        },
+      ],
+    },
+
+    /* =========================================================================
+     * Remote Data Source 가이드
+     * ======================================================================= */
+    {
+      id: 'remote-data-guide',
+      title: 'Remote Data Source 가이드',
+      kind: 'guide',
+      intro:
+        '<p><code>dataSource</code>는 실무에서 가장 많이 쓰는 축입니다. 이 섹션은 서버 연동의 전체 흐름을 ' +
+        '단계별로 안내합니다 — 기본 스펙 그대로 붙는 경우부터, <strong>파라미터·응답·인증이 우리 스펙과 다른 ' +
+        '서버에 맞추는 방법</strong>까지.</p>' +
+        '<p><strong>동작 원리:</strong> <code>dataSource</code>가 있으면 그리드는 생성 직후 <code>fetch</code>로 ' +
+        '데이터를 불러옵니다. <code>sortMode</code> / <code>filterMode</code> / <code>pageMode</code>가 ' +
+        '<code>\'server\'</code>인 축은 클라이언트 처리를 건너뛰고, 그 축의 상태가 바뀔 때마다(정렬 클릭, ' +
+        '필터 변경, 페이지 이동) 자동으로 다시 요청합니다. 그 외에는 <code>reloadData()</code>(수동 재조회)와 ' +
+        '<code>setDataSource()</code>(소스 교체) 시점에 요청합니다. 응답 대기 중에는 로딩 오버레이가 표시되고, ' +
+        '요청이 겹치면 마지막 요청만 반영됩니다.</p>' +
+        '<p><strong>기본 요청 스펙</strong> — server 모드인 축의 상태가 다음 파라미터로 나갑니다 ' +
+        '(GET이면 쿼리스트링, POST면 JSON body):</p>' +
+        '<ul>' +
+        '<li><code>page</code> · <code>pageSize</code> — <code>pageMode: \'server\'</code> + <code>pagination</code>일 때 (0부터 시작)</li>' +
+        '<li><code>sort</code> — <code>sortMode: \'server\'</code>일 때, <code>[{ "field": "name", "dir": "asc" }]</code> JSON 문자열</li>' +
+        '<li><code>filter</code> — <code>filterMode: \'server\'</code>일 때, 필터 모델 JSON 문자열 (구조는 Filter Model 섹션)</li>' +
+        '<li><code>quickFilter</code> — <code>filterMode: \'server\'</code> + <code>setQuickFilter()</code> 텍스트</li>' +
+        '</ul>' +
+        '<p><strong>기본 응답 스펙</strong> — 배열(<code>[...]</code>) 또는 <code>{ rows: [...], total: n }</code>. ' +
+        '<code>total</code>은 서버 페이징의 전체 행 수(페이지네이션 계산에 사용)입니다.</p>' +
+        '<p>서버 스펙이 다르면 세 훅으로 맞춥니다: <code>request(state)</code>(요청 파라미터 커스텀), ' +
+        '<code>parse(json)</code>(응답 변환), <code>headers</code>(인증 등 요청 헤더). ' +
+        '아래 단계별 레시피와 <a href="../examples/features.html#remote-data-server-spec" target="_blank" rel="noopener">' +
+        '서버 스펙 맞춤 데모</a>, <a href="../examples/features.html#remote-data" target="_blank" rel="noopener">기본 스펙 데모</a>를 참고하세요.</p>',
+      entries: [
+        {
+          name: 'Step 1. 기본 스펙 그대로 연동',
+          demo: 'remote-data',
+          since: '1.2.0',
+          description:
+            '서버가 기본 요청/응답 스펙을 따르면 <code>url</code>만으로 붙습니다. server로 돌릴 축만 ' +
+            '<code>\'server\'</code>로 지정하세요 — 세 축은 독립이라 "정렬·필터는 클라이언트, 페이징만 서버" ' +
+            '같은 조합도 됩니다. POST 서버면 <code>method: \'POST\'</code> — 파라미터가 JSON body로 갑니다.',
+          example:
+            'var grid = new DataGrid(el, {\n' +
+            "  dataSource: { url: '/api/employees' },   // GET, { rows, total } 응답\n" +
+            "  sortMode: 'server',    // 정렬 클릭 → sort 파라미터로 재조회\n" +
+            "  filterMode: 'server',  // 필터/quickFilter → filter·quickFilter 파라미터\n" +
+            "  pageMode: 'server',    // 페이지 이동 → page·pageSize 파라미터\n" +
+            '  pagination: true,\n' +
+            '  columnDefs: [ /* ... */ ],\n' +
+            '});',
+        },
+        {
+          name: 'Step 2. 응답 레이아웃이 다를 때 — parse',
+          demo: 'remote-data-server-spec',
+          since: '1.2.0',
+          description:
+            '응답이 envelope에 싸여 있거나 필드명이 다르면 <code>parse(json)</code>으로 ' +
+            '<code>{ rows, total }</code>을 만들어 반환하세요. 원본 JSON 전체가 인자로 오므로 ' +
+            '필요한 메타데이터(토큰, 서버 시각 등)를 여기서 빼둘 수도 있습니다. ' +
+            'parse에서 예외가 나면 <code>console.error</code> 후 기본 해석으로 폴백합니다.',
+          example:
+            '// 서버 응답: { result: { items: [...], totalCount: 500 } }\n' +
+            'dataSource: {\n' +
+            "  url: '/api/employees-v2',\n" +
+            '  parse: function (json) {\n' +
+            '    return { rows: json.result.items, total: json.result.totalCount };\n' +
+            '  },\n' +
+            '}',
+        },
+        {
+          name: 'Step 3. 요청 파라미터 스펙이 다를 때 — request',
+          demo: 'remote-data-server-spec',
+          since: '2.5.0',
+          description:
+            '서버가 <code>offset/limit</code>, <code>orderBy=field:dir</code> 같은 다른 파라미터를 쓰면 ' +
+            '<code>request(state)</code>로 기본 매핑을 <strong>대체</strong>합니다. <code>state</code>는 ' +
+            '<code>{ page, pageSize, sortModel, filterModel, quickFilter, sortMode, filterMode, pageMode }</code> ' +
+            '읽기 전용 스냅샷이고, 반환한 객체가 요청 파라미터가 됩니다(<code>params</code> 고정 파라미터 위에 병합). ' +
+            '값이 <code>undefined</code>인 키는 생략되므로 조건부 파라미터를 깔끔하게 표현할 수 있습니다. ' +
+            '예외가 나면 <code>console.error</code> 후 기본 매핑으로 폴백합니다.',
+          example:
+            'dataSource: {\n' +
+            "  url: '/api/employees-v2',\n" +
+            '  request: function (state) {\n' +
+            '    return {\n' +
+            '      offset: state.page * state.pageSize,\n' +
+            '      limit: state.pageSize,\n' +
+            '      orderBy: state.sortModel.length\n' +
+            "        ? state.sortModel[0].field + ':' + state.sortModel[0].dir\n" +
+            '        : undefined,               // 정렬 없으면 파라미터 자체를 생략\n' +
+            '      q: state.quickFilter || undefined,\n' +
+            '    };\n' +
+            '  },\n' +
+            '}',
+        },
+        {
+          name: 'Step 4. 인증 헤더 — headers',
+          demo: 'remote-data-server-spec',
+          since: '2.5.0',
+          description:
+            '토큰 등 요청 헤더는 <code>headers</code>에 객체 또는 함수로 지정합니다. ' +
+            '<strong>함수는 요청마다 평가</strong>되므로 갱신되는 토큰도 항상 최신 값이 나갑니다. ' +
+            'POST의 기본 <code>Content-Type: application/json</code>은 유지되며, 같은 키를 주면 덮어씁니다. ' +
+            '예외가 나면 헤더 없이 요청합니다.',
+          example:
+            'dataSource: {\n' +
+            "  url: '/api/employees',\n" +
+            '  headers: function () {\n' +
+            "    return { Authorization: 'Bearer ' + auth.currentToken() };\n" +
+            '  },\n' +
+            '}',
+        },
+        {
+          name: 'Step 5. 조회 조건 변경 — params + reloadData',
+          demo: 'remote-data-server-spec',
+          since: '1.2.0',
+          description:
+            '정렬·필터·페이지 외의 조회 조건(검색 폼, 기간, 카테고리 등)은 <code>params</code>를 ' +
+            '<strong>함수</strong>로 두세요 — 요청마다 다시 평가되므로, 조건 값을 바꾸고 ' +
+            '<code>reloadData()</code>만 호출하면 됩니다. <code>request</code> 훅을 쓸 때도 ' +
+            '<code>params</code>는 그대로 병합되므로 두 방식을 함께 쓸 수 있습니다.',
+          example:
+            "var cond = { dept: '', from: null };\n" +
+            'var grid = new DataGrid(el, {\n' +
+            '  dataSource: {\n' +
+            "    url: '/api/employees',\n" +
+            '    params: function () {\n' +
+            '      return {\n' +
+            '        dept: cond.dept || undefined,\n' +
+            '        from: cond.from || undefined,\n' +
+            '      };\n' +
+            '    },\n' +
+            '  },\n' +
+            '});\n' +
+            '\n' +
+            "searchForm.addEventListener('submit', function () {\n" +
+            '  cond.dept = deptSelect.value;\n' +
+            '  grid.reloadData();          // params 함수가 새 조건으로 다시 평가된다\n' +
+            '});',
+        },
+        {
+          name: 'Step 6. 데이터 소스 교체 — setDataSource',
+          demo: 'remote-data-server-spec',
+          since: '2.5.0',
+          description:
+            'URL이나 훅 구성 자체가 바뀌는 경우(다른 엔드포인트, 다른 서버 스펙)는 ' +
+            '<code>setDataSource(dataSource)</code>로 교체합니다. 1페이지로 리셋하고 즉시 다시 불러옵니다. ' +
+            '조건 값만 바뀌는 경우는 Step 5(<code>params</code> 함수)가 더 가볍습니다.',
+          example:
+            "grid.setDataSource({ url: '/api/archived-employees' });",
+        },
+        {
+          name: 'Step 7. 에러 처리와 로딩 표시',
+          demo: 'remote-data',
+          since: '1.2.0',
+          description:
+            '로드 중에는 로딩 오버레이가 자동 표시됩니다. 네트워크 오류·HTTP 에러 상태(4xx/5xx)·JSON 파싱 실패는 ' +
+            '<code>dataLoadError</code> 이벤트로 옵니다 — 기존 행은 유지되므로 사용자에게 재시도 UI를 보여주고 ' +
+            '<code>reloadData()</code>를 다시 호출하면 됩니다. 인증 만료(401) 처리도 이 이벤트에서 하세요.',
+          example:
+            "grid.on('dataLoadError', function (e) {\n" +
+            "  toast('데이터를 불러오지 못했습니다: ' + e.error.message);\n" +
+            "  if (String(e.error.message).indexOf('401') !== -1) auth.refresh().then(function () {\n" +
+            '    grid.reloadData();\n' +
+            '  });\n' +
+            '});',
         },
       ],
     },
@@ -1066,7 +1238,20 @@ window.ApiDocs = {
           description:
             '<code>dataSource</code>에서 데이터를 다시 불러옵니다. server 모드인 축의 현재 상태' +
             '(페이지·정렬·필터)가 요청 파라미터로 전달되고, 응답이 오면 행을 교체하고 ' +
-            '<code>dataChanged</code>를 발생시킵니다. 여러 요청이 겹치면 마지막 요청만 반영됩니다.',
+            '<code>dataChanged</code>를 발생시킵니다. 여러 요청이 겹치면 마지막 요청만 반영됩니다. ' +
+            '조회 조건 변경 패턴은 <a href="#remote-data-guide">가이드 Step 5</a> 참고.',
+        },
+        {
+          name: 'setDataSource',
+          demo: 'remote-data-server-spec',
+          group: 'Data',
+          signature: 'setDataSource(dataSource: object): void',
+          since: '2.5.0',
+          description:
+            '원격 데이터 소스를 런타임에 교체하고 <strong>1페이지로 리셋한 뒤</strong> 즉시 다시 불러옵니다. ' +
+            'URL·훅 구성이 통째로 바뀔 때 사용하고, 조회 조건 값만 바뀌면 <code>params</code> 함수 + ' +
+            '<code>reloadData()</code>가 더 가볍습니다(<a href="#remote-data-guide">가이드</a> 참고).',
+          example: "grid.setDataSource({ url: '/api/archived-employees' });",
         },
         {
           name: 'addRow',

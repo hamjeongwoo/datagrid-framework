@@ -2395,6 +2395,119 @@
     </script>
   </div>
 
+  <!-- ======================================================== 원격 데이터 — 서버 스펙 맞춤 -->
+  <h2 class="section" id="remote-data-server-spec">Remote Data Source — 서버 스펙 맞춤 (request / parse / headers)</h2>
+  <p class="section-desc">
+    서버의 파라미터·응답 스펙이 그리드 기본값과 다를 때:
+    <code class="inline">dataSource.request(state)</code>로 요청 파라미터를 서버 스펙(예:
+    <code class="inline">offset/limit/orderBy</code>)으로 바꾸고, <code class="inline">parse(json)</code>으로
+    envelope 응답을 <code class="inline">{ rows, total }</code>로 변환하며,
+    <code class="inline">headers</code>로 인증 토큰을 보냅니다. 조회 조건은 <code class="inline">params</code>
+    함수 + <code class="inline">reloadData()</code>로, 서버 교체는 <code class="inline">setDataSource()</code>로.
+    이 데모는 데모 서버의 <code class="inline">/api/employees-v2</code>(다른 스펙의 서버 흉내)를 사용합니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <select class="tb-select" id="remoteV2Dept">
+          <option value="">부서 전체</option>
+          <option>Engineering</option><option>Design</option><option>Marketing</option>
+          <option>Sales</option><option>Finance</option><option>Support</option>
+        </select>
+        <input class="tb-input" id="remoteV2Quick" type="text" placeholder="서버측 검색(q)… (예: Seoul)">
+        <button class="tb-btn" id="remoteV2SwapBtn" type="button">기본 스펙 서버로 교체 (setDataSource)</button>
+      </div>
+      <div id="gridRemoteV2" class="grid-wrap-sm"></div>
+      <div class="status-line" id="remoteV2Status">
+        헤더 정렬·페이지 이동이 offset/limit/orderBy 파라미터로 나가는 것을 네트워크 탭에서 확인해 보세요.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var status = document.getElementById('remoteV2Status');
+      var current = { dept: '' };   // 조회 조건 — 바꾸고 reloadData()하면 params 함수가 다시 평가된다
+      var lastToken = null;
+
+      /* 서버 A: 우리 기본 스펙과 전혀 다른 서버 — request/parse/headers로 맞춘다 */
+      var customSpecServer = {
+        url: '/api/employees-v2',
+        /* 고정·조회 조건 파라미터 — 함수라서 요청마다 평가 (런타임 변경 지점) */
+        params: function () {
+          return current.dept ? { dept: current.dept } : {};
+        },
+        /* 인증 헤더 — 함수라서 토큰 갱신에도 대응. 서버가 에코해 주는 값으로 확인한다 */
+        headers: function () { return { 'X-Demo-Token': 'demo-token-123' }; },
+        /* 기본 매핑(page/pageSize/sort/filter/quickFilter)을 서버 스펙으로 대체.
+         * undefined 값 키는 요청에서 생략된다(조건부 파라미터). */
+        request: function (state) {
+          return {
+            offset: state.page * state.pageSize,
+            limit: state.pageSize,
+            orderBy: state.sortModel.length
+              ? state.sortModel[0].field + ':' + state.sortModel[0].dir
+              : undefined,
+            q: state.quickFilter || undefined,
+          };
+        },
+        /* envelope 응답 { result: { items, totalCount } } → { rows, total } */
+        parse: function (json) {
+          lastToken = json.result.receivedToken;
+          return { rows: json.result.items, total: json.result.totalCount };
+        },
+      };
+
+      /* 서버 B: 우리 기본 스펙 그대로인 서버 — request/parse가 필요 없다 */
+      var defaultSpecServer = { url: '/api/employees' };
+      var usingCustom = true;
+
+      var grid = new DataGrid(document.getElementById('gridRemoteV2'), {
+        dataSource: customSpecServer,
+        sortMode: 'server',
+        filterMode: 'server',
+        pageMode: 'server',
+        pagination: true,
+        paginationPageSize: 20,
+        columnDefs: [
+          { field: 'id', headerName: 'ID', width: 70 },
+          { field: 'name', headerName: 'Name', width: 160 },
+          { field: 'department', headerName: 'Department', width: 150 },
+          { field: 'city', headerName: 'City', width: 130 },
+          { field: 'salary', headerName: 'Salary', dataType: 'number', format: '$#,##0', width: 130 },
+        ],
+      });
+
+      grid.on('dataChanged', function (e) {
+        status.textContent = usingCustom
+          ? '/api/employees-v2 (커스텀 스펙) — ' + e.rowCount + '행 수신, 서버가 받은 토큰: ' + lastToken +
+            (current.dept ? ', dept=' + current.dept : '')
+          : '/api/employees (기본 스펙) — ' + e.rowCount + '행 수신 (request/parse 없이 동작)';
+      });
+      grid.on('dataLoadError', function (e) {
+        status.textContent = '로드 실패: ' + e.error.message + ' — 데모 서버를 재시작했는지 확인하세요.';
+      });
+
+      /* 조회 조건 변경 — params 함수가 읽는 값을 바꾸고 다시 불러온다 */
+      document.getElementById('remoteV2Dept').addEventListener('change', function (e) {
+        current.dept = e.target.value;
+        grid.reloadData();
+      });
+
+      var timer = null;
+      document.getElementById('remoteV2Quick').addEventListener('input', function (e) {
+        clearTimeout(timer);
+        timer = setTimeout(function () { grid.setQuickFilter(e.target.value); }, 300);
+      });
+
+      /* 런타임 데이터 소스 교체 — 1페이지로 리셋하고 다시 불러온다 */
+      document.getElementById('remoteV2SwapBtn').addEventListener('click', function () {
+        usingCustom = !usingCustom;
+        this.textContent = usingCustom
+          ? '기본 스펙 서버로 교체 (setDataSource)'
+          : '커스텀 스펙 서버로 교체 (setDataSource)';
+        grid.setDataSource(usingCustom ? customSpecServer : defaultSpecServer);
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

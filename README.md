@@ -82,7 +82,7 @@ python demo/server.py
 | `domLayout` | `'normal'` \| `'autoHeight'` | 내용 높이에 맞춘 그리드 (세로 가상화 없음) |
 | `showHeader` | boolean | `false`면 헤더 영역 숨김 |
 | `columnGroups` | array | 2단 컬럼 그룹 헤더 `[{ headerName, children }]` |
-| `dataSource` | object | 원격 데이터 `{ url, method, params, parse }` (`reloadData()`로 재요청) |
+| `dataSource` | object | 원격 데이터 `{ url, method, params, request, parse, headers }` — `request(state)`로 요청 파라미터를 서버 스펙에 맞춤, `parse(json)`으로 응답 변환, `headers`로 인증 (`reloadData()` 재요청, `setDataSource()` 교체) |
 | `rowDetail` | object | 마스터-디테일 `{ renderer(row), height }` (`expandRow`/`collapseRow`/`toggleRowDetail`) |
 | `treeData` | object | 계층 데이터 트리 표시 `{ treeField, indent, defaultExpandLevel, childrenField \| parentIdField+idField, cascade, checkboxDisabled(row), summary, fetchChildren(row), hasChildren(row) }` — `checkboxSelection` 컬럼과 함께 쓰면 3상태 캐스케이드 선택. `pagination`/`groupBy`와 배타 |
 | `title` / `toolbar` | string / element | 그리드 타이틀 바 / 소비자 DOM 툴바 슬롯 |
@@ -152,7 +152,7 @@ cellRenderer: DataGrid.renderers.checkbox()   // 값을 체크박스 모양으�
 `getCsv()` / `exportCsv(filename)` / `exportExcel(filename, sheetName)` / `getJson()` ·
 `showLoadingOverlay()` / `hideLoadingOverlay()` ·
 `setTheme('light'|'dark')` · `refresh()` · `refreshCell(row, field)` / `refreshRow(row)` / `refreshColumn(colId)` ·
-`setOptions(patch)` · `expandRow(row)` / `collapseRow(row)` / `toggleRowDetail(row)` · `reloadData()` ·
+`setOptions(patch)` · `expandRow(row)` / `collapseRow(row)` / `toggleRowDetail(row)` · `reloadData()` / `setDataSource(ds)` ·
 `toggleNode(row, expanded?)` / `expandNode(row)` / `collapseNode(row)` / `isNodeExpanded(row)` / `expandAllNodes(level?)` / `collapseAllNodes()` ·
 `setPinnedTopRows(rows)` · `setEnabled(bool)` / `isEnabled()` · `once(event, fn)` · `destroy()`
 
