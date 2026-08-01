@@ -89,7 +89,7 @@ python demo/server.py
 | `rowDetail` | object | 마스터-디테일 `{ renderer(row), height }` (`expandRow`/`collapseRow`/`toggleRowDetail`) |
 | `treeData` | object | 계층 데이터 트리 표시 `{ treeField, indent, defaultExpandLevel, childrenField \| parentIdField+idField, cascade, checkboxDisabled(row), summary, fetchChildren(row), hasChildren(row) }` — `checkboxSelection` 컬럼과 함께 쓰면 3상태 캐스케이드 선택. `pagination`/`groupBy`와 배타 |
 | `title` / `toolbar` | string / element | 그리드 타이틀 바 / 소비자 DOM 툴바 슬롯 |
-| `sortMode` / `filterMode` / `pageMode` | `'client'` \| `'server'` | 각 축의 처리 주체 — server면 상태를 요청 파라미터로 전달 |
+| `sortMode` / `filterMode` / `pageMode` | `'client'` \| `'server'` | 각 축의 처리 주체 — server면 상태를 요청 파라미터로 전달. `sortMode`/`filterMode`를 생략하면 **`pageMode`를 따름**(기본 `'client'`) — 서버 페이징이면 클라이언트는 현재 한 페이지만 들고 있어 클라 정렬/필터가 그 페이지 안에서만 동작하기 때문. 상속은 `pageMode` → 나머지 단방향이라 `sortMode: 'server'` + 클라 페이징 조합은 그대로 가능 |
 
 ## 컬럼 정의
 

@@ -55,7 +55,7 @@
 | [x] | `groupModel > showSummary · grandSummary`, `column > summary`, `summaryData`, util `aggregate` | `column.aggFunc: 'sum'\|'avg'\|'min'\|'max'\|'count'` (그룹 헤더 행 집계) + `grandTotal: true` 전체 요약 행 — v1.1.0 | **P1** (그룹핑과 함께) |
 | [x] | `collapse() / expand() / toggle()` (그룹 전체) | `expandAllGroups()` / `collapseAllGroups()` — v1.1.0 | **P1** (그룹핑과 함께) |
 | [x] | `group` / `beforeGroupExpand` / `toggle` 이벤트 | `groupChanged` / `groupToggled` — v1.1.0 | **P1** (그룹핑과 함께) |
-| [x] | **`dataModel`** (원격 데이터: `url · method · postData · getData · location:'remote'`, remote 정렬/필터/페이징) | `dataSource: { url, method, params, parse }` + `sortMode/filterMode/pageMode: 'client'\|'server'` + `reloadData()` + `dataLoadError` — 데모 서버 `/api/employees` 포함 — v1.2.0 | **P2** |
+| [x] | **`dataModel`** (원격 데이터: `url · method · postData · getData · location:'remote'`, remote 정렬/필터/페이징) | `dataSource: { url, method, params, parse }` + `sortMode/filterMode/pageMode: 'client'\|'server'`(v2.13.0부터 sort/filter는 미지정 시 `pageMode` 상속) + `reloadData()` + `dataLoadError` — 데모 서버 `/api/employees` 포함 — v1.2.0 | **P2** |
 | [x] | `detailModel` + `rowExpand/rowCollapse` (마스터-디테일 행) | `rowDetail: { renderer, height }` + `expandRow()/collapseRow()/toggleRowDetail()/isRowExpanded()` + `rowExpanded`/`rowCollapsed` — 가변 높이 가상화(computeRowTops) — v1.2.0 | **P2** |
 | [x] | `column > formula` (계산 컬럼) | `valueGetter(row)` — 파생 값을 row[field]에 기록(정렬·필터·내보내기 공유) — v1.2.0 | **P2** |
 | [x] | `mergeCells` | `mergeCells: ['field'...]` — 표시 순서 기준 연속 동일 값 세로 병합 (그룹/디테일에서 단절) — v2.0.0 | P3 |
@@ -176,6 +176,14 @@
 
 ### v2.1 — "TreeGrid" (§6 T1~T4)
 - treeData 코어(계층 표시·펼침/접힘·계층 정렬/필터), 체크박스 캐스케이드, 부모 요약, 지연 로딩
+
+### v2.13 — sortMode/filterMode가 pageMode를 상속 (사용자 제안)
+- 문제 제기: "pageMode가 server면 sortMode/filterMode도 따라와야 하는 것 아닌가?" — 맞을 뿐 아니라, 기존 기본값(세 축 독립 `'client'`)은 **조용히 틀린 결과를 내는 기본값**이었다.
+- 계측 근거: 서버 페이징이면 `_rows`는 현재 한 페이지뿐이라 ① 클라 정렬은 그 페이지 안에서만 정렬되면서 헤더는 전체 정렬처럼 표시되고(사용자가 틀린 걸 알 수 없다), ② 클라 필터는 페이지를 걸러내는데 `pageInfo.total`은 `_serverTotal`이라 "1–20 / 10,000"이라 써놓고 7행만 나온다.
+- `resolveDataModes(options)` 순수 함수 — `sortMode`/`filterMode`가 `null`/`undefined`면 `pageMode`를 따른다. `_test` 노출.
+- **상속은 `pageMode` → `sortMode`/`filterMode` 단방향.** 반대 조합(`sortMode: 'server'` + `pageMode: 'client'` — 서버가 정렬된 전체를 주고 클라가 페이징)은 정상이므로 `pageMode`를 끌어올리지 않는다. "서버 페이징만이 클라이언트가 전체 데이터를 못 본다는 제약을 만든다"가 방향의 근거.
+- 명시적으로 어긋나게 지정한 경우(`pageMode: 'server'` + `sortMode: 'client'`)는 "현재 페이지 안에서만 정렬"이 의도일 수 있으므로 **존중하되 `console.warn`**. 순수 함수는 `warnings` 배열만 반환하고 출력은 호출자가 한다(테스트에서 콘솔 오염 없음).
+- 호환성: `dataSource` 없이 쓰던 코드는 `pageMode`가 `'client'`라 상속해도 결과 동일. 실제로 달라지는 건 `pageMode: 'server'`를 쓰면서 sort/filter를 안 적은 경우뿐이고, 그건 위의 깨진 동작이 고쳐지는 방향.
 
 ### v2.12 — domLayout: 'fill' (부모 높이 채우기, 사용자 제보)
 - 증상: 부모 컨테이너가 `flex: 1`인데 **데이터가 없으면 그리드가 부모보다 작고, 많으면 부모를 넘어 커진다.**

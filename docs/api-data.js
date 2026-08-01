@@ -22,7 +22,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.12.0',
+  version: '2.13.0',
   updated: '2026-08-01',
 
   sections: [
@@ -351,14 +351,32 @@ window.ApiDocs = {
           name: 'sortMode',
           demo: 'remote-data',
           type: "'client' | 'server'",
-          default: "'client'",
+          default: "pageMode를 따름 (pageMode 기본값은 'client')",
           since: '1.2.0',
           description:
             '정렬 수행 주체. <code>\'server\'</code>면 클라이언트 정렬을 건너뛰고 정렬이 바뀔 때마다 ' +
             '<code>dataSource</code>를 다시 호출하며 <code>sort</code> 파라미터(sortModel JSON)를 보냅니다. ' +
             '<code>filterMode</code>(<code>filter</code>/<code>quickFilter</code> 파라미터)와 ' +
             '<code>pageMode</code>(<code>page</code>/<code>pageSize</code> 파라미터, 응답 <code>total</code>로 ' +
-            '페이지네이션 계산)도 같은 방식입니다. 세 축을 독립적으로 설정할 수 있습니다.',
+            '페이지네이션 계산)도 같은 방식입니다.<br><br>' +
+            '<strong>기본값 상속 (2.13.0부터)</strong> — <code>sortMode</code>와 <code>filterMode</code>를 ' +
+            '적지 않으면 <code>pageMode</code>를 따릅니다(<code>pageMode</code>의 기본값은 ' +
+            '<code>\'client\'</code>이므로 원격 데이터를 안 쓰면 종전과 동일). 서버 페이징에서는 ' +
+            '클라이언트가 <strong>현재 한 페이지만</strong> 들고 있어서, 클라이언트 정렬은 그 페이지 안에서만 ' +
+            '정렬되면서 헤더에는 전체 정렬처럼 표시되고, 클라이언트 필터는 페이지를 걸러내는데 총 건수는 ' +
+            '서버 값이라 "1–20 / 10,000"이라 써놓고 7행만 나오는 식으로 어긋나기 때문입니다.<br><br>' +
+            '상속은 <strong><code>pageMode</code> → <code>sortMode</code>/<code>filterMode</code> 단방향</strong>입니다. ' +
+            '반대 조합(<code>sortMode: \'server\'</code> + <code>pageMode: \'client\'</code> — 서버가 정렬된 전체를 ' +
+            '주고 클라이언트가 페이징)은 정상이므로 <code>pageMode</code>를 끌어올리지 않습니다. ' +
+            '<code>pageMode: \'server\'</code>에 <code>sortMode: \'client\'</code>를 명시하면 ' +
+            '("현재 페이지 안에서만 정렬"이 의도일 수 있으므로) 그대로 존중하되 ' +
+            '<code>console.warn</code>으로 알립니다.',
+          example:
+            "pageMode: 'server',   // sortMode·filterMode도 자동으로 'server'\n" +
+            'pagination: true,\n' +
+            '\n' +
+            '// 서버가 정렬된 전체를 주고 페이징은 클라이언트가 하는 구성\n' +
+            "sortMode: 'server',   // pageMode는 기본값 'client' 그대로",
         },
         {
           name: 'columnGroups',
@@ -645,6 +663,12 @@ window.ApiDocs = {
         '필터 변경, 페이지 이동) 자동으로 다시 요청합니다. 그 외에는 <code>reloadData()</code>(수동 재조회)와 ' +
         '<code>setDataSource()</code>(소스 교체) 시점에 요청합니다. 응답 대기 중에는 로딩 오버레이가 표시되고, ' +
         '요청이 겹치면 마지막 요청만 반영됩니다.</p>' +
+        '<p><strong>세 축의 기본값 (2.13.0부터):</strong> <code>sortMode</code>·<code>filterMode</code>를 ' +
+        '적지 않으면 <code>pageMode</code>를 따릅니다. 즉 <code>pageMode: \'server\'</code>만 켜도 정렬·필터가 ' +
+        '함께 서버로 갑니다 — 서버 페이징에서는 클라이언트가 현재 한 페이지만 들고 있어 클라이언트 정렬/필터가 ' +
+        '그 페이지 안에서만 동작하면서도 전체를 처리한 것처럼 보이기 때문입니다. 상속은 ' +
+        '<code>pageMode</code> → 나머지 <strong>단방향</strong>이라, <code>sortMode: \'server\'</code>만 켜서 ' +
+        '"서버가 정렬한 전체를 받아 클라이언트가 페이징"하는 구성은 그대로 됩니다.</p>' +
         '<p><strong>기본 요청 스펙</strong> — server 모드인 축의 상태가 다음 파라미터로 나갑니다 ' +
         '(GET이면 쿼리스트링, POST면 JSON body):</p>' +
         '<ul>' +

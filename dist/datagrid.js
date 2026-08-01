@@ -262,6 +262,38 @@
   }
 
   /**
+   * 데이터 모드 정규화 — sortMode/filterMode는 명시하지 않으면 pageMode를 따른다.
+   *
+   * 서버 페이징이면 클라이언트가 들고 있는 _rows는 "현재 한 페이지"뿐이다.
+   * 그 상태에서 클라이언트 정렬은 페이지 안에서만 정렬하면서 헤더에는 전체 정렬처럼
+   * 표시되고, 클라이언트 필터는 페이지를 걸러내는데 총 건수는 서버 값(_serverTotal)이라
+   * "1–20 / 10,000"이라 써놓고 7행만 나오는 식으로 어긋난다. 그래서 pageMode: 'server'는
+   * 나머지 두 축을 함께 끌어올리는 것을 기본으로 한다.
+   *
+   * 상속은 pageMode → sort/filter 단방향뿐이다. 반대 조합(sortMode: 'server' +
+   * pageMode: 'client')은 서버가 정렬된 전체를 주고 클라가 페이징하는 정상 구성이라
+   * pageMode를 끌어올리면 안 된다.
+   *
+   * 명시적으로 어긋나게 지정한 경우(pageMode: 'server' + sortMode: 'client')는
+   * "현재 페이지 안에서만 정렬"이 의도일 수 있으므로 존중하되 warnings로 알린다.
+   * 순수 함수 — 경고 출력은 호출자가 한다.
+   */
+  function resolveDataModes(options) {
+    const opts = options || {};
+    const norm = value => (value === 'server' ? 'server' : 'client');
+    const pageMode = norm(opts.pageMode);
+    const warnings = [];
+    const inherit = key => {
+      const raw = opts[key];
+      if (raw === undefined || raw === null) return pageMode;
+      const mode = norm(raw);
+      if (pageMode === 'server' && mode === 'client') warnings.push(key);
+      return mode;
+    };
+    return { pageMode, sortMode: inherit('sortMode'), filterMode: inherit('filterMode'), warnings };
+  }
+
+  /**
    * editableIndicator: 이 컬럼 헤더에 편집 아이콘을 표시할지.
    * "지금 실제로 편집할 수 있는가"를 기준으로 한다 — 그리드가 잠겨 있으면
    * (editable: false / setEditable(false)) 컬럼 설정과 무관하게 표시하지 않는다.
@@ -1885,9 +1917,16 @@
       this._historyMuted = false;
 
       /* remote data source */
-      this._sortMode = options.sortMode === 'server' ? 'server' : 'client';
-      this._filterMode = options.filterMode === 'server' ? 'server' : 'client';
-      this._pageMode = options.pageMode === 'server' ? 'server' : 'client';
+      const dataModes = resolveDataModes(options);
+      this._sortMode = dataModes.sortMode;
+      this._filterMode = dataModes.filterMode;
+      this._pageMode = dataModes.pageMode;
+      dataModes.warnings.forEach(key => {
+        console.warn(
+          `[DataGrid] pageMode: 'server'인데 ${key}: 'client'입니다 — 클라이언트는 현재 페이지만 ` +
+            `들고 있어 그 페이지 안에서만 처리됩니다. 의도한 것이 아니면 ${key}를 생략하거나(=pageMode를 따름) 'server'로 지정하세요.`
+        );
+      });
       this._serverTotal = 0;
       this._loadSeq = 0;
 
@@ -6045,7 +6084,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.12.0';
+  DataGrid.version = '2.13.0';
 
   /* Internals exposed for headless unit tests (not part of the public API). */
   DataGrid._test = {
@@ -6058,6 +6097,7 @@
     defaultEditorType,
     shouldShowEditableIcon,
     resolveDomLayout,
+    resolveDataModes,
     formatNumber,
     formatDate,
     formatValue,

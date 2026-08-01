@@ -1378,6 +1378,54 @@ suite('resolveDomLayout', function () {
   assertEq(T.resolveDomLayout(true), 'normal', '불리언 → normal');
 });
 
+suite('resolveDataModes — pageMode 상속', function () {
+  /* 아무것도 안 주면 셋 다 client (기존 기본값과 동일) */
+  var none = T.resolveDataModes({});
+  assertEq(none.pageMode, 'client', '생략 → pageMode client');
+  assertEq(none.sortMode, 'client', '생략 → sortMode client');
+  assertEq(none.filterMode, 'client', '생략 → filterMode client');
+  assertEq(none.warnings.length, 0, '경고 없음');
+  assertEq(T.resolveDataModes(undefined).pageMode, 'client', 'options 자체가 없어도 크래시 없음');
+
+  /* 핵심 규칙: pageMode: 'server'면 명시하지 않은 축이 따라온다.
+   * 서버 페이징에서 클라 정렬은 현재 페이지만 정렬하므로 조용히 틀린 결과가 된다. */
+  var server = T.resolveDataModes({ pageMode: 'server' });
+  assertEq(server.sortMode, 'server', "pageMode: 'server' → sortMode 상속");
+  assertEq(server.filterMode, 'server', "pageMode: 'server' → filterMode 상속");
+  assertEq(server.warnings.length, 0, '상속은 경고 대상이 아님');
+
+  /* 상속은 단방향 — sort/filter가 server라고 pageMode를 끌어올리지 않는다.
+   * (서버가 정렬된 전체를 주고 클라가 페이징하는 정상 조합) */
+  var sortOnly = T.resolveDataModes({ sortMode: 'server' });
+  assertEq(sortOnly.pageMode, 'client', "sortMode: 'server'가 pageMode를 바꾸지 않음");
+  assertEq(sortOnly.filterMode, 'client', 'filterMode도 pageMode(client)를 따름');
+  assertEq(T.resolveDataModes({ filterMode: 'server' }).pageMode, 'client', 'filterMode도 단방향');
+
+  /* 명시 지정은 상속을 이긴다 */
+  var mixed = T.resolveDataModes({ pageMode: 'server', sortMode: 'client' });
+  assertEq(mixed.sortMode, 'client', '명시한 client가 상속을 이긴다');
+  assertEq(mixed.filterMode, 'server', '명시 안 한 축은 여전히 상속');
+  assertEq(mixed.warnings.length, 1, '어긋난 조합은 경고 1건');
+  assertEq(mixed.warnings[0], 'sortMode', '경고 대상 키');
+
+  var both = T.resolveDataModes({ pageMode: 'server', sortMode: 'client', filterMode: 'client' });
+  assertEq(both.warnings.length, 2, '두 축 모두 어긋나면 경고 2건');
+
+  /* pageMode가 client면 client 명시는 지극히 정상 — 경고하지 않는다 */
+  assertEq(T.resolveDataModes({ pageMode: 'client', sortMode: 'client' }).warnings.length, 0,
+    'client + client 조합은 경고 없음');
+  assertEq(T.resolveDataModes({ pageMode: 'client', sortMode: 'server' }).warnings.length, 0,
+    'client 페이징 + server 정렬은 정상 조합');
+
+  /* 모르는 값은 client로 (resolveDomLayout과 같은 엄격 매칭 규칙) */
+  assertEq(T.resolveDataModes({ pageMode: 'Server' }).pageMode, 'client', '대소문자 다르면 client');
+  assertEq(T.resolveDataModes({ pageMode: 'remote' }).pageMode, 'client', '모르는 값 → client');
+  /* null/undefined는 "미지정"이라 상속, 그 외 잘못된 값은 client 명시로 취급 */
+  assertEq(T.resolveDataModes({ pageMode: 'server', sortMode: null }).sortMode, 'server', 'null → 미지정으로 상속');
+  assertEq(T.resolveDataModes({ pageMode: 'server', sortMode: undefined }).sortMode, 'server', 'undefined → 상속');
+  assertEq(T.resolveDataModes({ pageMode: 'server', sortMode: 'oops' }).sortMode, 'client', '잘못된 값 → client');
+});
+
 suite('shouldShowEditableIcon', function () {
   var editable = { editable: true };
   var readonly = { editable: false };
