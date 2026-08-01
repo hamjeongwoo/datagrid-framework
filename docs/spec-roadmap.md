@@ -174,6 +174,12 @@
 ### v2.1 — "TreeGrid" (§6 T1~T4)
 - treeData 코어(계층 표시·펼침/접힘·계층 정렬/필터), 체크박스 캐스케이드, 부모 요약, 지연 로딩
 
+### v2.3 — 검색형 select 에디터 (사용자 요청)
+- `column.editorSearch` — `editor: 'select'`를 검색 입력이 있는 셀 앵커 옵션 패널로 전환 (옵셔널). `true`면 정적 `editorOptions`를 로컬 필터(label/문자열화 value 부분 일치, 대소문자 무관), `{ fetch(query, row, col) => Promise<options>, debounce: 250, minLength: 0, placeholder }`면 질의마다 비동기 로드(lazy 검색 — 디바운스, 최신 질의만 반영, 실패 시 console.error + "Load failed" 표시).
+- 키보드: ↑/↓ 옵션 이동, Enter 선택+커밋, 옵션 클릭 즉시 커밋(전파 차단 — editOnSingleClick 재진입 방지), Esc 취소. 옵션을 고르지 않으면 미커밋.
+- `DataGrid.renderers.searchselect(options?)` — 짝꿍 렌더러. select 렌더러와 동일 + lazy로 고른 값은 그리드가 유지하는 컬럼별 value→label 캐시로 표시 (cellRenderer params에 `optionLabels` 추가).
+- 데모: features.html 카드에 editOnSingleClick 토글 체크박스 포함 (클릭 한 번 편집과 조합 테스트).
+
 ### v2.2 — select 에디터 label/value (사용자 요청)
 - `editorOptions`가 문자열 배열 외에 `{ label, value }` 객체 배열 지원 — 드롭다운은 label 표시, 커밋은 value(원본 타입 보존). 셀에는 저장된 value가 표시된다.
 - `editor`를 선언한 컬럼은 `editable: true` 생략 가능 — editor 선언 자체가 편집 의도. 명시적 `editable: false`(컬럼 또는 defaultColDef)가 우선.

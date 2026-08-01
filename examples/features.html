@@ -2038,6 +2038,105 @@
     </script>
   </div>
 
+  <!-- ======================================================== 검색형 select 에디터 (editorSearch) -->
+  <h2 class="section">Searchable Select Editor (editorSearch)</h2>
+  <p class="section-desc">
+    <code class="inline">editor: 'select'</code>에 <code class="inline">editorSearch</code>를 주면 네이티브 셀렉트 대신
+    검색 입력이 있는 옵션 패널로 바뀝니다. <code class="inline">editorSearch: true</code>는 정적
+    <code class="inline">editorOptions</code>를 로컬에서 필터하고, <code class="inline">editorSearch: { fetch(query) }</code>는
+    질의마다 비동기로 목록을 불러옵니다 (lazy 검색 — <code class="inline">debounce</code>·<code class="inline">minLength</code>·
+    <code class="inline">placeholder</code> 옵션). 짝꿍 렌더러 <code class="inline">DataGrid.renderers.searchselect()</code>는
+    lazy 검색으로 고른(정적 목록에 없는) 값도 선택 당시의 label로 표시합니다.
+    툴바 체크박스로 <code class="inline">editOnSingleClick</code>을 켜서 클릭 한 번 편집과 함께 테스트해 보세요.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="ssSingleClick"> editOnSingleClick (클릭 한 번으로 편집)
+        </label>
+      </div>
+      <div id="gridSearchSel" class="grid-wrap-md"></div>
+      <div class="status-line" id="searchSelStatus">
+        Country는 정적 목록 검색(editorSearch: true), City는 lazy 검색(fetch + 250ms 지연 시뮬레이션)입니다.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var COUNTRIES = [
+        { label: 'South Korea', value: 'kr' }, { label: 'Japan', value: 'jp' },
+        { label: 'United States', value: 'us' }, { label: 'United Kingdom', value: 'gb' },
+        { label: 'Germany', value: 'de' }, { label: 'France', value: 'fr' },
+        { label: 'Singapore', value: 'sg' }, { label: 'Australia', value: 'au' },
+        { label: 'Canada', value: 'ca' }, { label: 'Brazil', value: 'br' },
+        { label: 'India', value: 'in' }, { label: 'Italy', value: 'it' },
+        { label: 'Spain', value: 'es' }, { label: 'Netherlands', value: 'nl' },
+        { label: 'Sweden', value: 'se' }, { label: 'Norway', value: 'no' },
+        { label: 'Mexico', value: 'mx' }, { label: 'Turkey', value: 'tr' },
+        { label: 'Poland', value: 'pl' }, { label: 'Vietnam', value: 'vn' },
+      ];
+      /* lazy 검색용 "서버" 데이터 — value는 도시명, label은 국가를 덧붙인 표기 */
+      var CITY_DB = [
+        'Seoul/South Korea', 'Busan/South Korea', 'Tokyo/Japan', 'Osaka/Japan',
+        'New York/United States', 'San Francisco/United States', 'Chicago/United States',
+        'London/United Kingdom', 'Manchester/United Kingdom', 'Berlin/Germany',
+        'Munich/Germany', 'Paris/France', 'Lyon/France', 'Singapore/Singapore',
+        'Sydney/Australia', 'Melbourne/Australia', 'Toronto/Canada', 'Vancouver/Canada',
+        'Sao Paulo/Brazil', 'Mumbai/India', 'Delhi/India', 'Rome/Italy', 'Milan/Italy',
+        'Madrid/Spain', 'Barcelona/Spain', 'Amsterdam/Netherlands', 'Stockholm/Sweden',
+        'Oslo/Norway', 'Mexico City/Mexico', 'Istanbul/Turkey', 'Warsaw/Poland', 'Hanoi/Vietnam',
+      ].map(function (s) {
+        var p = s.split('/');
+        return { label: p[0] + ' (' + p[1] + ')', value: p[0] };
+      });
+      var HOME_COUNTRY = { Seoul: 'kr', Tokyo: 'jp', 'New York': 'us', London: 'gb',
+        Berlin: 'de', Singapore: 'sg', Sydney: 'au', Toronto: 'ca' };
+
+      var rows = DemoData.makeEmployees(40, 21);
+      rows.forEach(function (r) { r.country = HOME_COUNTRY[r.city]; });
+
+      var grid = new DataGrid(document.getElementById('gridSearchSel'), {
+        rowData: rows,
+        columnDefs: [
+          { field: 'name', headerName: 'Name', width: 150 },
+          { field: 'country', headerName: 'Country (정적 검색)', width: 220,
+            editor: 'select', editorOptions: COUNTRIES,
+            editorSearch: true,                             // 검색 입력 + 로컬 필터
+            cellRenderer: DataGrid.renderers.searchselect() },
+          { field: 'city', headerName: 'City (lazy 검색)', flex: 1,
+            editor: 'select',
+            editorSearch: {
+              minLength: 1,            // 1자 이상 입력해야 검색
+              debounce: 300,           // 입력 멈춤 300ms 후 fetch
+              placeholder: '도시 이름 검색…',
+              fetch: function (query) {
+                /* 서버 검색 시뮬레이션 — 250ms 지연 후 부분 일치 목록 반환 */
+                return new Promise(function (resolve) {
+                  setTimeout(function () {
+                    var q = query.toLowerCase();
+                    resolve(CITY_DB.filter(function (c) {
+                      return c.label.toLowerCase().indexOf(q) !== -1;
+                    }));
+                  }, 250);
+                });
+              },
+            },
+            /* lazy로 고른 값은 선택 당시의 label("Paris (France)")로 표시된다 */
+            cellRenderer: DataGrid.renderers.searchselect() },
+        ],
+      });
+
+      grid.on('cellValueChanged', function (e) {
+        document.getElementById('searchSelStatus').textContent =
+          e.colDef.field + ': ' + JSON.stringify(e.oldValue) + ' → ' + JSON.stringify(e.newValue);
+      });
+      document.getElementById('ssSingleClick').addEventListener('change', function (e) {
+        grid.setOptions({ editOnSingleClick: e.target.checked });
+        document.getElementById('searchSelStatus').textContent = 'editOnSingleClick: ' +
+          e.target.checked + (e.target.checked ? ' — 셀을 한 번만 클릭해도 편집이 시작됩니다.' : '');
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

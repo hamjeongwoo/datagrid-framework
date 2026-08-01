@@ -211,6 +211,33 @@ suite('normalizeEditorOptions', function () {
   ], 'falsy primitives (0, empty string) are kept');
 });
 
+suite('filterEditorOptions', function () {
+  var f = T.filterEditorOptions;
+  var opts = [
+    { label: '한국', value: 'kr' }, { label: '일본', value: 'jp' },
+    { label: 'United States', value: 'us' }, { label: 'United Kingdom', value: 'uk' },
+  ];
+  assertEq(f(opts, ''), T.normalizeEditorOptions(opts), 'empty query → all');
+  assertEq(f(opts, '   '), T.normalizeEditorOptions(opts), 'blank query → all');
+  assertEq(f(opts, null), T.normalizeEditorOptions(opts), 'null query → all');
+  assertEq(f(opts, undefined), T.normalizeEditorOptions(opts), 'undefined query → all');
+  assertEq(f(opts, 'united'), [
+    { label: 'United States', value: 'us' }, { label: 'United Kingdom', value: 'uk' },
+  ], 'label contains, case-insensitive');
+  assertEq(f(opts, 'KING'), [{ label: 'United Kingdom', value: 'uk' }], 'uppercase query matches');
+  assertEq(f(opts, '한국'), [{ label: '한국', value: 'kr' }], 'korean label matches');
+  assertEq(f(opts, 'kr'), [{ label: '한국', value: 'kr' }], 'value string also matches');
+  assertEq(f(opts, 'zzz'), [], 'no match → empty');
+  assertEq(f(['Seoul', 'Tokyo'], 'seo'), [{ label: 'Seoul', value: 'Seoul' }], 'string options filtered');
+  assertEq(f([{ label: '열', value: 10 }, { label: '백', value: 100 }], '10'), [
+    { label: '열', value: 10 }, { label: '백', value: 100 },
+  ], 'numeric value stringified for matching');
+  assertEq(f(undefined, 'a'), [], 'no options → empty');
+  assertEq(f(opts, ' united '), [
+    { label: 'United States', value: 'us' }, { label: 'United Kingdom', value: 'uk' },
+  ], 'query is trimmed');
+});
+
 suite('lookupOptionLabel', function () {
   var l = T.lookupOptionLabel;
   var opts = [{ label: '한국', value: 'kr' }, { label: '일본', value: 'jp' }];

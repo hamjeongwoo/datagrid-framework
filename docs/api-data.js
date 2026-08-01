@@ -20,7 +20,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.2.0',
+  version: '2.3.0',
   updated: '2026-07-31',
 
   sections: [
@@ -712,6 +712,8 @@ window.ApiDocs = {
             '인라인 에디터 종류. <code>\'number\'</code>는 커밋 시 숫자로 변환하고 숫자가 아니면 이전 값으로 되돌립니다. ' +
             '<code>\'select\'</code>·<code>\'radio\'</code>는 <code>editorOptions</code>에서 단일 선택 ' +
             '(select는 드롭다운, radio는 multiselect와 같은 셀 앵커 라디오 패널). ' +
+            "select는 <a href='#column-defs-editorSearch'><code>editorSearch</code></a>를 주면 " +
+            '검색 입력이 있는 옵션 패널로 바뀝니다 (v2.3.0). ' +
             '<code>\'multiselect\'</code>(v2.2.0)는 셀 아래에 체크리스트 패널을 펼치고 <strong>배열</strong>을 ' +
             '<code>editorOptions</code> 순서로 커밋합니다 — 내용이 같으면 커밋하지 않습니다. ' +
             '<code>\'checkbox\'</code>(v2.2.0)는 체크박스입니다 — 기본은 불리언 커밋이고, ' +
@@ -744,6 +746,31 @@ window.ApiDocs = {
             "    { label: '한국', value: 'kr' },\n" +
             "    { label: '일본', value: 'jp' },\n" +
             '  ] }',
+        },
+        {
+          name: 'editorSearch',
+          type: 'true | { fetch?, debounce?, minLength?, placeholder? }',
+          default: 'undefined',
+          since: '2.3.0',
+          description:
+            "<code>editor: 'select'</code>를 네이티브 셀렉트 대신 <strong>검색 입력이 있는 옵션 패널</strong>로 " +
+            '바꿉니다. <code>true</code>면 정적 <code>editorOptions</code>를 로컬에서 필터하고(label 또는 ' +
+            '문자열화한 value 부분 일치, 대소문자 무관), <code>fetch(query, row, col) =&gt; Promise&lt;options&gt;</code>를 ' +
+            '주면 질의마다 비동기로 목록을 불러옵니다 (lazy 검색 — 반환 형식은 <code>editorOptions</code>와 동일). ' +
+            '<code>debounce</code>(기본 250ms)는 입력 멈춤 후 fetch까지의 지연, <code>minLength</code>(기본 0)는 ' +
+            'fetch를 시작할 최소 글자 수, <code>placeholder</code>(기본 "Search…")는 검색 입력의 플레이스홀더입니다. ' +
+            '<kbd>↑</kbd>/<kbd>↓</kbd>로 옵션 이동, <kbd>Enter</kbd>로 선택·커밋, 옵션 클릭은 즉시 커밋, ' +
+            '<kbd>Esc</kbd>는 취소합니다. 옵션을 고르지 않고 닫으면 값이 바뀌지 않으며, fetch 실패 시 ' +
+            '<code>console.error</code> 후 "Load failed"가 표시됩니다(이전 응답이 늦게 도착해도 최신 질의만 반영). ' +
+            "lazy로 고른 값의 label 표시는 짝꿍 렌더러 <a href='#renderers-searchselect'>" +
+            '<code>renderers.searchselect()</code></a>가 담당합니다.',
+          example:
+            "{ field: 'city', editor: 'select',\n" +
+            '  editorSearch: {\n' +
+            '    minLength: 1, debounce: 300,\n' +
+            "    fetch: function (query) { return fetch('/api/cities?q=' + query).then(r => r.json()); },\n" +
+            '  },\n' +
+            '  cellRenderer: DataGrid.renderers.searchselect() }',
         },
         {
           name: 'suppressCopy',
@@ -780,7 +807,8 @@ window.ApiDocs = {
           name: 'cellRenderer',
           type: '(params) => string | Node',
           description:
-            '셀 내용을 직접 렌더링합니다. <code>params</code>는 <code>{ value, formatted, data, colDef }</code>. ' +
+            '셀 내용을 직접 렌더링합니다. <code>params</code>는 <code>{ value, formatted, data, colDef, optionLabels }</code> ' +
+            '(<code>optionLabels</code>는 lazy 검색 select에서 고른 value→label 맵, 없으면 null — v2.3.0). ' +
             'HTML 문자열 또는 DOM Node를 반환하며, <strong>반환한 HTML은 이스케이프되지 않으므로</strong> ' +
             '사용자 입력을 넣을 때는 직접 이스케이프해야 합니다. 렌더러에서 예외가 발생하면 해당 셀은 포맷된 원본 값으로 대체됩니다. ' +
             '내장 렌더러는 <a href="#renderers">Built-in Renderers</a> 참고.',
@@ -1791,6 +1819,19 @@ window.ApiDocs = {
           example: "{ field: 'level', editor: 'radio',\n" +
             "  editorOptions: [{ label: 'Junior', value: 1 }, { label: 'Senior', value: 3 }],\n" +
             '  cellRenderer: DataGrid.renderers.radio() }',
+        },
+        {
+          name: 'searchselect',
+          signature: 'DataGrid.renderers.searchselect(options?: Array<string | { label, value }>)',
+          since: '2.3.0',
+          description:
+            "검색형 select(<a href='#column-defs-editorSearch'><code>editorSearch</code></a>)의 짝꿍 렌더러 — " +
+            "동작은 <a href='#renderers-select'><code>select</code></a>와 동일하게 저장된 value를 label로 " +
+            '표시하되, lazy 검색(<code>fetch</code>)으로 고른 <strong>정적 editorOptions에 없는 값</strong>도 ' +
+            '선택 당시의 label로 표시합니다 (그리드가 컬럼별 value→label 캐시를 유지). ' +
+            '캐시에도 없는 값(초기 데이터 등)은 원래 표시로 폴백합니다.',
+          example: "{ field: 'city', editor: 'select', editorSearch: { fetch: searchCities },\n" +
+            '  cellRenderer: DataGrid.renderers.searchselect() }',
         },
         {
           name: 'multiselect',

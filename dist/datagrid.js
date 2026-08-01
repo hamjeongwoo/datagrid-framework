@@ -437,6 +437,21 @@
   }
 
   /**
+   * 검색형 select(editorSearch)의 정적 목록 필터.
+   * label 또는 문자열화한 value에 질의가 포함되면 매치 (대소문자 무관).
+   * null/빈/공백 질의는 전체를 반환한다.
+   */
+  function filterEditorOptions(options, query) {
+    var list = normalizeEditorOptions(options);
+    var q = query === null || query === undefined ? '' : String(query).trim().toLowerCase();
+    if (q === '') return list;
+    return list.filter(function (o) {
+      return o.label.toLowerCase().indexOf(q) !== -1 ||
+        String(o.value).toLowerCase().indexOf(q) !== -1;
+    });
+  }
+
+  /**
    * 헤더 필터 행(floatingFilter)의 입력값 → 컬럼 필터 모델.
    * - raw가 null/undefined이거나 (set 제외) 공백뿐이면 null(필터 해제).
    * - 이미 적용된 모델의 연산자는 유지하되, 단일 입력으로 표현할 수 없는
@@ -2924,7 +2939,11 @@
 
     if (col.cellRenderer) {
       try {
-        var out = col.cellRenderer({ value: value, formatted: formatted, data: row, colDef: col });
+        var out = col.cellRenderer({
+          value: value, formatted: formatted, data: row, colDef: col,
+          /* lazy 검색(editorSearch.fetch)에서 고른 value→label 캐시 (없으면 null) */
+          optionLabels: (this._searchSelectLabels && this._searchSelectLabels[col.colId]) || null,
+        });
         if (out instanceof (global.Node || Object)) holder.appendChild(out);
         else if (out !== undefined && out !== null) holder.innerHTML = out;
         return;
@@ -4117,8 +4136,8 @@
     var getValue;
     var cleanup = null;
 
-    /* 셀 앵커 패널(multiselect/radio 공용) — 아래 공간이 부족하고 위가
-     * 더 넉넉하면 위로 펼침 */
+    /* 셀 앵커 패널(multiselect/radio/searchselect 공용) — 아래 공간이 부족하고
+     * 위가 더 넉넉하면 위로 펼침. 내용이 바뀌어 다시 불러도 안전하게 양방향 설정. */
     var flipPanelUp = function (panel) {
       var bodyRect = self._bodyEl.getBoundingClientRect();
       var cellRect = cellEl.getBoundingClientRect();
@@ -4126,6 +4145,9 @@
           cellRect.top - panel.offsetHeight - 4 > bodyRect.top) {
         panel.style.top = 'auto';
         panel.style.bottom = 'calc(100% + 2px)';
+      } else {
+        panel.style.top = 'calc(100% + 2px)';
+        panel.style.bottom = 'auto';
       }
     };
 
@@ -4234,6 +4256,136 @@
         });
         return out;
       };
+      invalidEl = cellEl;
+    } else if (editorType === 'select' && col.editorSearch) {
+      /* 검색형 select — 검색 입력 + 옵션 목록 패널에서 단일 선택.
+       * editorSearch: true      → 정적 editorOptions를 로컬 필터
+       * editorSearch: { fetch } → 질의마다 비동기 로드 (lazy 검색) */
+      var ssCfg = col.editorSearch === true ? {} : col.editorSearch;
+      var ssFetch = typeof ssCfg.fetch === 'function' ? ssCfg.fetch : null;
+      var ssDebounce = ssCfg.debounce !== undefined ? ssCfg.debounce : 250;
+      var ssMinLength = ssCfg.minLength || 0;
+      var ssPicked = value; /* 옵션을 고르기 전에는 원래 값 유지 → 무변경이면 미커밋 */
+      var ssShown = [];
+      var ssActive = -1;
+      var ssSeq = 0;
+      var ssTimer = null;
+      var ssPanel = el('div', 'dg-editor-searchselect', cellEl);
+      ssPanel.tabIndex = -1;
+      var ssInput = document.createElement('input');
+      ssInput.type = 'text';
+      ssInput.className = 'dg-searchselect-input';
+      ssInput.placeholder = ssCfg.placeholder !== undefined ? ssCfg.placeholder : 'Search…';
+      ssPanel.appendChild(ssInput);
+      var ssList = el('div', 'dg-searchselect-list', ssPanel);
+      /* 옵션 mousedown이 검색 입력의 포커스를 빼앗으면 focusout 커밋이
+       * 클릭보다 먼저 달린다 — 포커스 이동 자체를 막는다 */
+      ssList.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      /* lazy로 알게 된 value→label을 컬럼별로 기억 — 짝꿍 렌더러가
+       * 정적 editorOptions에 없는 값도 label로 표시할 수 있게 */
+      var ssCacheLabel = function (o) {
+        if (!ssFetch) return;
+        var all = self._searchSelectLabels || (self._searchSelectLabels = {});
+        var bucket = all[col.colId] || (all[col.colId] = {});
+        bucket[String(o.value)] = o.label;
+      };
+      var ssSetActive = function (i) {
+        if (!ssShown.length) return;
+        ssActive = clamp(i, 0, ssShown.length - 1);
+        var els = ssList.querySelectorAll('.dg-searchselect-option');
+        els.forEach(function (optEl, j) {
+          optEl.classList.toggle('dg-active', j === ssActive);
+        });
+        if (els[ssActive] && els[ssActive].scrollIntoView) {
+          els[ssActive].scrollIntoView({ block: 'nearest' });
+        }
+      };
+      var ssRenderMsg = function (text, cls) {
+        ssShown = [];
+        ssActive = -1;
+        ssList.innerHTML = '';
+        el('div', 'dg-searchselect-msg' + (cls ? ' ' + cls : ''), ssList).textContent = text;
+        flipPanelUp(ssPanel);
+      };
+      /* autoFirst: 검색 결과면 첫 항목을 활성으로 (빈 질의의 초기 목록은
+       * 현재 값 항목만 활성 — Enter가 엉뚱한 첫 옵션을 고르지 않게) */
+      var ssRenderList = function (opts, autoFirst) {
+        ssShown = opts;
+        ssActive = -1;
+        ssList.innerHTML = '';
+        if (!opts.length) { ssRenderMsg('No results'); return; }
+        opts.forEach(function (o, i) {
+          var optEl = el('div', 'dg-searchselect-option', ssList);
+          optEl.dataset.idx = i;
+          optEl.textContent = o.label;
+          var isCurrent = o.value === ssPicked ||
+            (ssPicked !== null && ssPicked !== undefined && String(o.value) === String(ssPicked));
+          if (isCurrent) ssActive = i;
+        });
+        if (ssActive === -1 && autoFirst) ssActive = 0;
+        if (ssActive !== -1) ssSetActive(ssActive);
+        flipPanelUp(ssPanel);
+      };
+      var ssRunQuery = function (q) {
+        if (!ssFetch) {
+          ssRenderList(filterEditorOptions(col.editorOptions, q), q.trim() !== '');
+          return;
+        }
+        if (q.length < ssMinLength) {
+          ssRenderMsg('Type ' + ssMinLength + '+ characters');
+          return;
+        }
+        var seq = ++ssSeq;
+        ssRenderMsg('Loading…', 'dg-loading');
+        var promised;
+        try { promised = ssFetch(q, row, col); }
+        catch (e) { promised = Promise.reject(e); }
+        Promise.resolve(promised).then(function (opts) {
+          if (finished || seq !== ssSeq) return; /* 닫혔거나 더 새 질의가 있음 */
+          ssRenderList(normalizeEditorOptions(opts), q.trim() !== '');
+        }).catch(function (err) {
+          if (finished || seq !== ssSeq) return;
+          console.error('[DataGrid] editorSearch.fetch failed for "' + col.field + '":', err);
+          ssRenderMsg('Load failed', 'dg-error');
+        });
+      };
+      ssList.addEventListener('click', function (e) {
+        /* 커밋으로 에디터가 닫힌 뒤 캔버스로 버블되면 editOnSingleClick이
+         * 편집을 재시작한다 (BUG-005 계열) — 여기서 전파를 끊는다 */
+        e.stopPropagation();
+        var optEl = e.target.closest('.dg-searchselect-option');
+        if (!optEl) return;
+        var o = ssShown[Number(optEl.dataset.idx)];
+        if (!o) return;
+        ssPicked = o.value;
+        ssCacheLabel(o);
+        finish(true);
+      });
+      ssInput.addEventListener('input', function () {
+        clearInvalid();
+        var q = ssInput.value;
+        if (ssTimer) clearTimeout(ssTimer);
+        if (!ssFetch) { ssRunQuery(q); return; }
+        ssTimer = setTimeout(function () { ssRunQuery(q); }, ssDebounce);
+      });
+      ssInput.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowDown') { e.preventDefault(); ssSetActive(ssActive + 1); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); ssSetActive(ssActive - 1); }
+        else if (e.key === 'Enter' && ssActive >= 0 && ssShown[ssActive]) {
+          /* 선택만 반영 — 커밋은 셀로 버블된 Enter를 공용 핸들러가 처리 */
+          ssPicked = ssShown[ssActive].value;
+          ssCacheLabel(ssShown[ssActive]);
+        }
+      });
+      cellEl.classList.add('dg-cell-editing');
+      ssRunQuery('');
+      flipPanelUp(ssPanel);
+      cleanup = function () {
+        if (ssTimer) clearTimeout(ssTimer);
+        cellEl.classList.remove('dg-cell-editing');
+      };
+      ssInput.focus();
+      getValue = function () { return ssPicked; };
       invalidEl = cellEl;
     } else {
       if (editorType === 'select') {
@@ -5314,11 +5466,18 @@
    * Built-in cell renderers
    * ------------------------------------------------------------------------- */
 
-  /* select/radio 렌더러 공용 팩토리 — 저장된 value를 editorOptions의 label로 */
+  /* select/radio/searchselect 렌더러 공용 팩토리 — 저장된 value를 editorOptions의
+   * label로. 정적 목록에 없으면 lazy 검색(editorSearch.fetch)에서 골랐던 label
+   * 캐시(params.optionLabels)를 본다. */
   function optionLabelRenderer(options) {
     return function (params) {
       var label = lookupOptionLabel(
         options || (params.colDef && params.colDef.editorOptions), params.value);
+      if (label === null && params.optionLabels &&
+          params.value !== null && params.value !== undefined &&
+          String(params.value) in params.optionLabels) {
+        label = params.optionLabels[String(params.value)];
+      }
       if (label !== null) return escapeHtml(label);
       var v = params.formatted;
       return v === null || v === undefined ? '' : escapeHtml(String(v));
@@ -5369,6 +5528,13 @@
     /** radio 에디터 짝꿍 — select와 동일하게 value → label. */
     radio: optionLabelRenderer,
     /**
+     * 검색형 select(editorSearch) 짝꿍 — select와 동일하게 value → label을
+     * 표시하되, lazy 검색으로 고른(정적 editorOptions에 없는) 값도 선택 당시의
+     * label로 표시한다. 컬럼 재구성(setColumns 등) 후에는 캐시가 비므로
+     * 그런 값은 원시 값으로 폴백된다.
+     */
+    searchselect: optionLabelRenderer,
+    /**
      * multiselect 에디터 짝꿍 — 값 배열을 label 칩 목록으로 표시.
      * 목록에 없는 값은 문자열 그대로 칩이 되고, 빈 배열/null은 빈 셀.
      */
@@ -5404,7 +5570,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.2.0';
+  DataGrid.version = '2.3.0';
 
   /* Internals exposed for headless unit tests (not part of the public API). */
   DataGrid._test = {
@@ -5420,6 +5586,7 @@
     buildFloatingFilterModel: buildFloatingFilterModel,
     validationMessage: validationMessage,
     normalizeEditorOptions: normalizeEditorOptions,
+    filterEditorOptions: filterEditorOptions,
     lookupOptionLabel: lookupOptionLabel,
     lookupOptionLabels: lookupOptionLabels,
     isCheckedValue: isCheckedValue,
