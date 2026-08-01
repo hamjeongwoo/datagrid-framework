@@ -2987,6 +2987,81 @@
     </script>
   </div>
 
+  <!-- ======================================================== 부모 높이 채우기 -->
+  <h2 class="section" id="fill-height">Fill Parent Height (domLayout: 'fill')</h2>
+  <p class="section-desc">
+    <code class="inline">domLayout: 'fill'</code>은 그리드를 <strong>부모 컨테이너 높이에 정확히 맞춥니다</strong> —
+    데이터가 없어도 줄지 않고, 많아도 부모를 넘지 않습니다(넘치는 행은 본문 스크롤).
+    <code class="inline">flex: 1</code>로 잡은 영역처럼 <strong>높이를 CSS로 계산해 주는 레이아웃</strong>에 쓰세요.
+    기본값 <code class="inline">'normal'</code>은 <code class="inline">height: 100%</code>라
+    부모가 flex 항목이면 자동 최소 크기(<code class="inline">min-height: auto</code>)에 밀려
+    행 수만큼 늘어날 수 있습니다.
+    아래 <strong>같은 400px 부모</strong>에 두 모드를 나란히 두었습니다 — 행 수를 바꿔 보세요.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn" id="fhEmptyBtn" type="button">데이터 0행</button>
+        <button class="tb-btn" id="fhFewBtn" type="button">5행</button>
+        <button class="tb-btn primary" id="fhManyBtn" type="button">300행</button>
+      </div>
+      <!-- 부모: 높이 400px 고정, 안쪽은 flex:1 두 칸 -->
+      <div id="fhStage" style="display:flex;gap:16px;height:400px">
+        <div style="flex:1;display:flex;flex-direction:column;min-width:0">
+          <div class="status-line" style="flex:none;margin:0 0 6px">domLayout: 'fill'</div>
+          <div id="fhFill" style="flex:1"></div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;min-width:0">
+          <div class="status-line" style="flex:none;margin:0 0 6px">기본값 ('normal')</div>
+          <div id="fhNormal" style="flex:1"></div>
+        </div>
+      </div>
+      <div class="status-line" id="fhStatus">버튼으로 행 수를 바꾸면 두 그리드의 실제 높이가 여기에 표시됩니다.</div>
+    </div>
+    <script type="text/x-example">
+      var status = document.getElementById('fhStatus');
+      var rows300 = DemoData.makeEmployees(300, 21);
+
+      var columnDefs = [
+        { field: 'name', headerName: 'Name', flex: 1 },
+        { field: 'department', headerName: 'Department', width: 130 },
+      ];
+
+      // 같은 flex:1 부모, 차이는 domLayout뿐
+      var fillGrid = new DataGrid(document.getElementById('fhFill'), {
+        rowData: rows300,
+        columnDefs: columnDefs,
+        domLayout: 'fill',   // 부모 높이에 정확히 맞춘다
+      });
+
+      var normalGrid = new DataGrid(document.getElementById('fhNormal'), {
+        rowData: rows300,
+        columnDefs: columnDefs,
+      });
+
+      function report() {
+        var parent = document.getElementById('fhFill').getBoundingClientRect().height;
+        var f = document.querySelector('#fhFill .dg-root').getBoundingClientRect().height;
+        var n = document.querySelector('#fhNormal .dg-root').getBoundingClientRect().height;
+        status.textContent =
+          '부모 높이 ' + Math.round(parent) + 'px  |  fill: ' + Math.round(f) + 'px' +
+          '  |  normal: ' + Math.round(n) + 'px' +
+          (Math.abs(n - parent) > 2 ? '  ← 부모를 벗어남' : '');
+      }
+
+      function setRows(rows) {
+        fillGrid.setRowData(rows);
+        normalGrid.setRowData(rows);
+        report();
+      }
+
+      document.getElementById('fhEmptyBtn').addEventListener('click', function () { setRows([]); });
+      document.getElementById('fhFewBtn').addEventListener('click', function () { setRows(rows300.slice(0, 5)); });
+      document.getElementById('fhManyBtn').addEventListener('click', function () { setRows(rows300); });
+      report();
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

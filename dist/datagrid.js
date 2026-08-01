@@ -254,6 +254,14 @@
   }
 
   /**
+   * domLayout 정규화 — 'normal'(기본) | 'autoHeight' | 'fill'.
+   * 모르는 값은 'normal'로 떨어뜨린다(오타가 레이아웃을 통째로 바꾸지 않게).
+   */
+  function resolveDomLayout(value) {
+    return value === 'autoHeight' || value === 'fill' ? value : 'normal';
+  }
+
+  /**
    * editableIndicator: 이 컬럼 헤더에 편집 아이콘을 표시할지.
    * "지금 실제로 편집할 수 있는가"를 기준으로 한다 — 그리드가 잠겨 있으면
    * (editable: false / setEditable(false)) 컬럼 설정과 무관하게 표시하지 않는다.
@@ -1864,6 +1872,8 @@
 
       this._rowHeight = options.rowHeight || 42;
       this._headerHeight = options.headerHeight || 48;
+      this._domLayout = resolveDomLayout(options.domLayout);
+      this._containerPositionSet = false; /* fill 모드에서 컨테이너 position을 우리가 바꿨는지 */
 
       /* change tracking + undo/redo — softDelete/statusColumn은 추적 상태가 필요하므로 자동 활성화 */
       this._trackChanges = !!(options.trackChanges || options.softDelete || options.statusColumn);
@@ -1950,7 +1960,7 @@
       root.setAttribute('role', 'grid');
       if (this.options.theme === 'dark') root.classList.add('dg-theme-dark');
       if (this.options.zebra) root.classList.add('dg-zebra');
-      if (this.options.domLayout === 'autoHeight') root.classList.add('dg-auto-height');
+      if (this._domLayout === 'autoHeight') root.classList.add('dg-auto-height');
       if (this.options.showHeader === false) root.classList.add('dg-no-header');
       root.style.setProperty('--dg-row-height', `${this._rowHeight}px`);
       root.style.setProperty('--dg-header-height', `${this._headerHeight}px`);
@@ -1989,6 +1999,34 @@
       this._rootEl = root;
       this._renderedRows = {}; /* pageIndex -> row element */
       this._lastRange = null;
+      this._applyFillLayout();
+    }
+
+    /**
+     * domLayout: 'fill' — 그리드를 흐름 밖(absolute + inset:0)으로 빼 컨테이너를
+     * 정확히 채운다. 흐름 밖이라 행 수가 컨테이너 높이에 전혀 영향을 주지 못하므로,
+     * 데이터가 없어도 줄지 않고 많아도 늘어나지 않는다.
+     *
+     * height:100%로는 이게 안 된다 — flex 항목의 자동 최소 크기(min-height: auto)가
+     * 내용에 밀려 커지면 100%도 같이 커지고, 높이가 불확정인 부모에서는 100% 자체가
+     * 풀리지 않아 내용 높이로 떨어진다.
+     *
+     * inset:0의 기준이 되도록 컨테이너가 static이면 relative로 올린다(우리가 바꾼
+     * 경우에만 destroy에서 되돌린다 — 소비자가 지정한 값은 건드리지 않는다).
+     */
+    _applyFillLayout() {
+      const fill = this._domLayout === 'fill';
+      this._rootEl.classList.toggle('dg-fill-height', fill);
+      if (fill) {
+        if (!this._containerPositionSet &&
+            getComputedStyle(this._container).position === 'static') {
+          this._container.style.position = 'relative';
+          this._containerPositionSet = true;
+        }
+      } else if (this._containerPositionSet) {
+        this._container.style.position = '';
+        this._containerPositionSet = false;
+      }
     }
 
     /** toolbar 옵션(Element 또는 grid를 받는 팩토리 함수)을 슬롯에 넣는다. */
@@ -2498,6 +2536,11 @@
       if ('rowHeight' in patch) {
         this._rowHeight = patch.rowHeight || 42;
         this._rootEl.style.setProperty('--dg-row-height', `${this._rowHeight}px`);
+      }
+      if ('domLayout' in patch) {
+        this._domLayout = resolveDomLayout(patch.domLayout);
+        this._rootEl.classList.toggle('dg-auto-height', this._domLayout === 'autoHeight');
+        this._applyFillLayout();
       }
       if ('headerHeight' in patch) {
         this._headerHeight = patch.headerHeight || 48;
@@ -5895,6 +5938,11 @@
       this._closeMenu();
       if (this._resizeObserver) this._resizeObserver.disconnect();
       this._docListeners.forEach(l => { document.removeEventListener(l[0], l[1]); });
+      /* fill 모드에서 우리가 올린 컨테이너 position은 되돌린다 */
+      if (this._containerPositionSet) {
+        this._container.style.position = '';
+        this._containerPositionSet = false;
+      }
       if (this._rootEl.parentNode) this._rootEl.parentNode.removeChild(this._rootEl);
     }
   }
@@ -5997,7 +6045,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.11.0';
+  DataGrid.version = '2.12.0';
 
   /* Internals exposed for headless unit tests (not part of the public API). */
   DataGrid._test = {
@@ -6009,6 +6057,7 @@
     editValueEquals,
     defaultEditorType,
     shouldShowEditableIcon,
+    resolveDomLayout,
     formatNumber,
     formatDate,
     formatValue,

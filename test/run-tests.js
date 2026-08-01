@@ -1366,6 +1366,18 @@ suite('defaultEditorType', function () {
   assertEq(T.defaultEditorType({ dataType: 'string' }), 'text', "dataType: 'string' → text");
 });
 
+suite('resolveDomLayout', function () {
+  assertEq(T.resolveDomLayout(undefined), 'normal', '생략 → normal');
+  assertEq(T.resolveDomLayout('normal'), 'normal', "'normal' 명시");
+  assertEq(T.resolveDomLayout('autoHeight'), 'autoHeight', "'autoHeight'");
+  assertEq(T.resolveDomLayout('fill'), 'fill', "'fill'");
+  /* 오타가 레이아웃을 통째로 바꾸면 원인 찾기가 어렵다 — 모르는 값은 normal로 */
+  assertEq(T.resolveDomLayout('Fill'), 'normal', '대소문자 다르면 normal (엄격 매칭)');
+  assertEq(T.resolveDomLayout('auto'), 'normal', '모르는 값 → normal');
+  assertEq(T.resolveDomLayout(null), 'normal', 'null → normal');
+  assertEq(T.resolveDomLayout(true), 'normal', '불리언 → normal');
+});
+
 suite('shouldShowEditableIcon', function () {
   var editable = { editable: true };
   var readonly = { editable: false };

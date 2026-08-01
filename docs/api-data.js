@@ -22,7 +22,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.11.0',
+  version: '2.12.0',
   updated: '2026-08-01',
 
   sections: [
@@ -423,14 +423,42 @@ window.ApiDocs = {
         },
         {
           name: 'domLayout',
-          demo: 'auto-height',
-          type: "'normal' | 'autoHeight'",
+          demo: 'fill-height',
+          type: "'normal' | 'autoHeight' | 'fill'",
           default: "'normal'",
           since: '2.0.0',
           description:
-            '<code>\'autoHeight\'</code>면 컨테이너 높이 대신 내용 높이만큼 그리드가 늘어납니다 — ' +
-            '컨테이너에 높이를 지정할 필요가 없어지는 대신 <strong>세로 가상화가 비활성</strong>화되므로 ' +
-            '소량 데이터(수십~수백 행) 전용입니다.',
+            '그리드 높이를 무엇이 결정할지 고릅니다.' +
+            '<table class="api-table"><thead><tr><th>값</th><th>높이</th><th>쓰는 곳</th></tr></thead><tbody>' +
+            "<tr><td><code>'normal'</code> (기본)</td><td><code>height: 100%</code> — 컨테이너 높이를 따름</td>" +
+            '<td>컨테이너 높이가 <strong>확정</strong>된 경우(px·vh 등)</td></tr>' +
+            "<tr><td><code>'fill'</code> (v2.12.0)</td><td>컨테이너를 <strong>정확히</strong> 채움 " +
+            '— 데이터 양과 무관하게 고정</td><td><code>flex: 1</code>·grid 등 <strong>CSS가 높이를 계산</strong>해 주는 레이아웃</td></tr>' +
+            "<tr><td><code>'autoHeight'</code></td><td>내용 높이만큼 늘어남</td>" +
+            '<td>컨테이너에 높이를 안 주고 싶을 때 (<strong>세로 가상화 비활성</strong> — 소량 데이터 전용)</td></tr>' +
+            '</tbody></table>' +
+            "<strong><code>'fill'</code>이 필요한 이유:</strong> <code>'normal'</code>의 " +
+            '<code>height: 100%</code>는 컨테이너 높이가 확정일 때만 동작합니다. 컨테이너가 ' +
+            '<code>flex: 1</code> 항목이면 자동 최소 크기(<code>min-height: auto</code>)가 내용에 밀려 ' +
+            '커지므로 <strong>행이 많을수록 그리드가 부모를 넘어 늘어나고</strong>, 높이가 불확정인 부모에서는 ' +
+            '<code>100%</code>가 아예 풀리지 않아 <strong>데이터가 없을 때 쪼그라듭니다</strong>. ' +
+            "<code>'fill'</code>은 그리드를 흐름 밖(<code>position: absolute; inset: 0</code>)으로 빼서 " +
+            '행 수가 컨테이너 높이에 영향을 주지 못하게 합니다 — 넘치는 행은 본문이 스크롤합니다. ' +
+            '<strong>전제:</strong> 컨테이너에 해결된 높이가 있어야 하며' +
+            '(높이가 <code>auto</code>인 컨테이너라면 <code>0</code>이 됩니다), ' +
+            '컨테이너가 <code>position: static</code>이면 그리드가 <code>relative</code>로 올립니다' +
+            '(<code>destroy()</code>에서 되돌립니다 — 직접 지정한 값은 건드리지 않습니다). ' +
+            '컨테이너 padding 안쪽이 아니라 <strong>테두리 안쪽 전체</strong>를 채웁니다.',
+          example:
+            '// 부모가 flex:1 로 높이를 잡아주는 레이아웃\n' +
+            '// <div style="display:flex; flex-direction:column; height:100vh">\n' +
+            '//   <header>…</header>\n' +
+            '//   <div id="grid" style="flex:1"></div>\n' +
+            '// </div>\n' +
+            "new DataGrid(document.getElementById('grid'), {\n" +
+            "  domLayout: 'fill',   // 데이터가 0행이든 10만행이든 높이는 부모 그대로\n" +
+            '  rowData: rows,\n' +
+            '});',
         },
         {
           name: 'virtualX',

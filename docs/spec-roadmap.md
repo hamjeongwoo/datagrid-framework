@@ -99,6 +99,7 @@
 | [x] | `rowInit` (행별 클래스/속성) | `getRowClass(row, index) => string` 옵션 — v1.2.0 | **P2** |
 | [x] | `column > halign` (헤더만 다른 정렬) | `column.headerAlign: 'left'\|'center'\|'right'` — v2.0.0 | P3 |
 | [x] | `hwrap/wrap` (셀 줄바꿈 + 행 높이 자동) | `column.wrapText` + `autoRowHeight: true` — 텍스트 폭 측정 기반 가변 높이 가상화 — v2.0.0 | P3 |
+| [x] | (없음 — 자체 개선) 부모 컨테이너 높이에 정확히 맞추기 | `domLayout: 'fill'` — 흐름 밖으로 빼 데이터 양과 무관하게 컨테이너 높이 고정 (`flex: 1` 영역용) — v2.12.0 | **P2** (사용자 제보) |
 | [x] | `freezeRows` (상단 행 고정) | `pinnedTopRows: [rows]` + `setPinnedTopRows()` — 표시 전용 고정 행 — v2.0.0 | P3 |
 | [x] | `virtualX` (컬럼 가상화) | `virtualX: true` — 가시 컬럼 + 버퍼만 렌더, 창 밖은 스페이서 (computeColumnWindow) — v2.0.0 | P3 |
 | [x] | `flexHeight/flexWidth` (콘텐츠 크기에 맞춘 그리드) | `domLayout: 'autoHeight'` — 내용 높이만큼 확장 (세로 가상화 비활성, 소량 데이터용) — v2.0.0 | P3 |
@@ -175,6 +176,16 @@
 
 ### v2.1 — "TreeGrid" (§6 T1~T4)
 - treeData 코어(계층 표시·펼침/접힘·계층 정렬/필터), 체크박스 캐스케이드, 부모 요약, 지연 로딩
+
+### v2.12 — domLayout: 'fill' (부모 높이 채우기, 사용자 제보)
+- 증상: 부모 컨테이너가 `flex: 1`인데 **데이터가 없으면 그리드가 부모보다 작고, 많으면 부모를 넘어 커진다.**
+- 계측(400px 부모, 300행): 그리드 12,650px + 부모까지 같이 12,650px로 부풀음. 빈 데이터 + 높이 불확정 부모에서는 120px(`min-height` 바닥)로 쪼그라듦.
+- 원인 하나: **그리드 높이가 부모가 아니라 자기 콘텐츠에서 나온다.** `.dg-root { height: 100% }`는 ① flex 항목의 자동 최소 크기(`min-height: auto`)가 내용에 밀려 커지면 같이 커지고, ② 높이가 불확정인 부모에서는 아예 풀리지 않아 내용 높이로 떨어진다. 소비자가 `min-height: 0`을 직접 넣어야 풀리는 문제라 옵션으로 흡수.
+- `domLayout: 'fill'` — 루트를 흐름 밖(`position: absolute; inset: 0`)으로 뺀다. 흐름 밖이라 **행 수가 컨테이너 높이에 영향을 줄 수 없어** 데이터 0행이든 300행이든 높이가 부모 그대로다. JS 측정/ResizeObserver 없이 CSS만으로 성립하므로 "높이 설정 → 부모 성장 → 재측정"의 되먹임 루프가 원천적으로 없다.
+- `inset: 0` 기준을 위해 컨테이너가 `static`이면 `relative`로 올리고 **우리가 올린 경우에만** `destroy()`에서 되돌린다(소비자가 지정한 `position`은 보존).
+- 전제: 컨테이너에 해결된 높이가 있어야 한다(높이가 `auto`면 0이 된다). 컨테이너 padding 안쪽이 아니라 테두리 안쪽 전체를 채운다 — 문서에 명시.
+- 순수 함수 `resolveDomLayout(value)` — 모르는 값은 `'normal'`로(오타가 레이아웃을 통째로 바꾸지 않게). `_test` 노출.
+- `setOptions({ domLayout })` 런타임 전환 지원. 데모: features.html `#fill-height` — 같은 400px `flex:1` 부모에 fill/normal을 나란히 두고 행 수(0·5·300)를 바꿔 실제 높이를 표시.
 
 ### v2.10 — 중첩 요청 파라미터 직렬화 (사용자 제보 버그 + 탈출구)
 - [BUG-009](bug-reports/2026-08-02-009-nested-params-querystring.md) — `dataSource.request`/`params`가 중첩 객체·배열을 반환하면 GET 쿼리스트링에서 `[object Object]`가 되던 문제. `encodeURIComponent(value)`가 값에 `String()`을 걸기 때문. v2.5에서 `request` 훅으로 반환 구조를 자유화하면서 직렬화는 평면 전제 그대로 둔 것이 원인.

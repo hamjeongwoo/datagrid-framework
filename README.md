@@ -82,7 +82,7 @@ python demo/server.py
 | `virtualX` | boolean | 컬럼 가상화 — 보이는 컬럼만 렌더링 (수백 컬럼용) |
 | `pinnedTopRows` | array | 헤더 아래 고정 행 (표시 전용, `setPinnedTopRows`) |
 | `autoRowHeight` | boolean | `wrapText` 컬럼 기준 행 높이 자동 계산 |
-| `domLayout` | `'normal'` \| `'autoHeight'` | 내용 높이에 맞춘 그리드 (세로 가상화 없음) |
+| `domLayout` | `'normal'` \| `'fill'` \| `'autoHeight'` | 높이 결정 방식. `'normal'`(기본) = `height: 100%`(컨테이너 높이가 확정일 때), `'fill'` = 컨테이너를 정확히 채움(데이터 양과 무관 — `flex: 1` 영역용), `'autoHeight'` = 내용 높이만큼 늘어남(세로 가상화 없음) |
 | `showHeader` | boolean | `false`면 헤더 영역 숨김 |
 | `columnGroups` | array | 2단 컬럼 그룹 헤더 `[{ headerName, children }]` |
 | `dataSource` | object | 원격 데이터 `{ url, method, params, request, parse, headers, paramsFormat, paramsSerializer }` — `request(state)`로 요청 파라미터를 서버 스펙에 맞춤, `parse(json)`으로 응답 변환, `headers`로 인증, `paramsFormat`으로 중첩 표기 선택(`'dot'` 기본 → `page.selectPage=1` Spring·ASP.NET / `'bracket'` → `page[selectPage]=1` qs·PHP·Rails), `paramsSerializer(params)`로 쿼리스트링 생성 자체를 대체 (`reloadData()` 재요청, `setDataSource()` 교체) |
