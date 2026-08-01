@@ -145,12 +145,27 @@
   }
 
   /**
+   * 날짜 값 → Date. 시간대 표기가 없는 ISO 문자열('2024-03-15', '2024-03-15T14:30')은
+   * 로컬 시간으로 해석한다 — new Date()는 날짜만 있는 ISO를 UTC 자정으로 읽기 때문에
+   * UTC 음수 오프셋 지역에서 하루가 밀린다('2024-03-15'가 뉴욕에서 3월 14일, BUG-008).
+   * Date·숫자(타임스탬프)·그 밖의 문자열(시간대가 붙은 ISO, '2024/03/15' 등)은
+   * 절대 시각이 명확하므로 new Date()에 그대로 위임한다.
+   */
+  function parseLocalDate(value) {
+    if (value instanceof Date) return value;
+    if (typeof value === 'number') return new Date(value);
+    const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?$/.exec(String(value));
+    if (!m) return new Date(value);
+    return new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
+  }
+
+  /**
    * 날짜 포맷: yyyy/yy/MM/dd/HH/mm/ss 토큰 치환. Date 인스턴스 또는
    * Date로 해석 가능한 문자열/숫자를 받는다. 해석 불가면 원본 문자열 반환.
    */
   function formatDate(value, pattern) {
     if (value === null || value === undefined || value === '') return '';
-    const d = value instanceof Date ? value : new Date(value);
+    const d = parseLocalDate(value);
     if (isNaN(d.getTime())) return String(value);
     function p2(x) { return x < 10 ? `0${x}` : String(x); }
     return String(pattern)
@@ -5807,6 +5822,7 @@
   DataGrid._test = {
     defaultComparator,
     typeComparator,
+    parseLocalDate,
     formatNumber,
     formatDate,
     formatValue,

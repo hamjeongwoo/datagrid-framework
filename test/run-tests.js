@@ -1187,6 +1187,32 @@ suite('typeComparator', function () {
   assert(T.typeComparator(undefined) === null, 'undefined → null');
 });
 
+/* ---------------- parseLocalDate ---------------- */
+suite('parseLocalDate', function () {
+  /* 시간대 표기가 없는 ISO는 로컬 시각 — 아래 단언들은 실행 시간대와 무관하게 성립한다.
+   * new Date('2024-03-15')(UTC 자정)로 파싱하면 KST에서 09시, 뉴욕에서 전날 19시가 되어
+   * getHours()/getDate()가 어긋난다 (BUG-008). */
+  var d = T.parseLocalDate('2024-03-15');
+  assertEq(d.getFullYear(), 2024, 'date-only ISO: year');
+  assertEq(d.getMonth(), 2, 'date-only ISO: month (local)');
+  assertEq(d.getDate(), 15, 'date-only ISO: day (local, no shift)');
+  assertEq(d.getHours(), 0, 'date-only ISO: local midnight, not UTC midnight');
+
+  var dt = T.parseLocalDate('2024-03-15T14:30');
+  assertEq(dt.getHours(), 14, 'datetime ISO: local hours');
+  assertEq(dt.getMinutes(), 30, 'datetime ISO: local minutes');
+  assertEq(T.parseLocalDate('2024-03-15T14:30:45').getSeconds(), 45, 'datetime ISO: seconds');
+  assertEq(T.parseLocalDate('2024-03-15 14:30').getHours(), 14, 'space separator accepted');
+
+  var inst = new Date(2024, 0, 1);
+  assert(T.parseLocalDate(inst) === inst, 'Date instance passes through');
+  assertEq(T.parseLocalDate(0).getTime(), 0, 'number → timestamp');
+
+  /* 시간대가 명시된 값은 절대 시각 — 그대로 존중한다 */
+  assertEq(T.parseLocalDate('2024-03-15T00:00:00Z').getTime(), Date.UTC(2024, 2, 15), 'zoned ISO respects Z');
+  assert(isNaN(T.parseLocalDate('garbage').getTime()), 'unparsable → Invalid Date');
+});
+
 /* ---------------- formatNumber / formatDate / formatValue ---------------- */
 suite('format', function () {
   assertEq(T.formatNumber(1234567.891, '#,##0.00'), '1,234,567.89', 'grouping + 2 decimals');
@@ -1207,6 +1233,9 @@ suite('format', function () {
   assertEq(T.formatDate(new Date(2024, 11, 25), 'yy/MM/dd'), '24/12/25', 'two-digit year');
   assertEq(T.formatDate('garbage', 'yyyy-MM-dd'), 'garbage', 'unparsable passthrough');
   assertEq(T.formatDate(null, 'yyyy'), '', 'null → empty');
+  /* 시간대 무관 왕복 — UTC 파싱이면 음수 오프셋 지역에서 하루 밀린다 (BUG-008) */
+  assertEq(T.formatDate('2024-03-15', 'yyyy-MM-dd'), '2024-03-15', 'date-only ISO round-trips in any timezone');
+  assertEq(T.formatDate('2024-01-01', 'yyyy-MM-dd'), '2024-01-01', 'year boundary does not shift');
 
   assertEq(T.formatValue(1234, '#,##0'), '1,234', 'dispatch to number on #/0');
   assertEq(T.formatValue('2024-03-05', 'yyyy.MM.dd'), '2024.03.05', 'dispatch to date otherwise');
