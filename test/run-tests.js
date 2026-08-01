@@ -1325,6 +1325,27 @@ suite('applyColumnState', function () {
   assertEq(r.columns[0].colId, 'b', 'malformed entries skipped');
 });
 
+/* ---------------- insertRowsAt ---------------- */
+suite('insertRowsAt', function () {
+  var a = { id: 'a' }, b = { id: 'b' }, c = { id: 'c' }, n1 = { id: 'n1' }, n2 = { id: 'n2' };
+  var base = [a, b, c];
+  var ids = function (rows) { return rows.map(function (r) { return r.id; }); };
+
+  assertEq(ids(T.insertRowsAt(base, [n1])), ['a', 'b', 'c', 'n1'], 'index 생략 → 맨 뒤');
+  assertEq(ids(T.insertRowsAt(base, [n1], null)), ['a', 'b', 'c', 'n1'], 'null → 맨 뒤');
+  assertEq(ids(T.insertRowsAt(base, [n1], 0)), ['n1', 'a', 'b', 'c'], 'index 0 → 맨 앞');
+  assertEq(ids(T.insertRowsAt(base, [n1], 2)), ['a', 'b', 'n1', 'c'], '중간 삽입');
+  assertEq(ids(T.insertRowsAt(base, [n1], 3)), ['a', 'b', 'c', 'n1'], 'index = length → 맨 뒤');
+  assertEq(ids(T.insertRowsAt(base, [n1], 99)), ['a', 'b', 'c', 'n1'], '범위 초과 → 맨 뒤로 클램프');
+  assertEq(ids(T.insertRowsAt(base, [n1], -5)), ['n1', 'a', 'b', 'c'], '음수 → 맨 앞으로 클램프');
+  assertEq(ids(T.insertRowsAt(base, [n1], 1.9)), ['a', 'n1', 'b', 'c'], '소수 → 내림');
+  assertEq(ids(T.insertRowsAt(base, [n1, n2], 1)), ['a', 'n1', 'n2', 'b', 'c'], '여러 행 순서 유지');
+  assertEq(ids(T.insertRowsAt([], [n1], 0)), ['n1'], '빈 배열에 삽입');
+  var before = base.slice();
+  T.insertRowsAt(base, [n1], 0);
+  assertEq(ids(base), ids(before), '입력 배열 불변');
+});
+
 /* ---------------- resolveStatusColumnConfig ---------------- */
 suite('resolveStatusColumnConfig', function () {
   var d = T.resolveStatusColumnConfig(true);

@@ -140,7 +140,7 @@ cellRenderer: DataGrid.renderers.checkbox()   // 값을 체크박스 모양으�
 
 ## API
 
-`setRowData(rows)` · `getRowData()` · `addRow(row)` / `addRows(rows)` · `updateRow(row, changes)` ·
+`setRowData(rows)` · `getRowData()` · `addRow(row, index?)` / `addRows(rows, index?)` (index 0 = 맨 앞 삽입) · `updateRow(row, changes)` ·
 `removeRows(rows)` / `removeSelectedRows()` / `restoreRows(rows)` / `getRowStatus(row)` · `getSelectedRows()` · `selectAll()` / `deselectAll()` · `getCellRange()` / `clearCellRange()` · `findNext(text)` ·
 `startEdit(row, field)` / `stopEdit(commit)` / `isEditing()` · `setEditable(bool)` / `isEditable()` ·
 `copy()` / `pasteTsv(text)` (Ctrl+C/V 엑셀 호환 TSV) ·

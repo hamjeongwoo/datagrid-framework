@@ -1160,6 +1160,18 @@
     return out;
   }
 
+  /**
+   * 행 배열의 index 위치에 새 행들을 삽입한 새 배열을 반환한다.
+   * index 생략(undefined/null) = 맨 뒤, [0, 행 수]로 클램프, 소수는 내림.
+   */
+  function insertRowsAt(rows, newRows, index) {
+    if (index === undefined || index === null) return rows.concat(newRows);
+    var at = Math.max(0, Math.min(Math.floor(index), rows.length));
+    var out = rows.slice();
+    out.splice.apply(out, [at, 0].concat(newRows));
+    return out;
+  }
+
   /** 뷰 행 배열 → field가 있는 컬럼만 담은 평범한 객체 배열 (getJson()용). */
   function buildJsonRows(rows, columns) {
     return rows.map(function (row) {
@@ -5236,13 +5248,17 @@
   DataGrid.prototype.getDisplayedRows = function () { return this._viewRows.slice(); };
   DataGrid.prototype.getDisplayedRowCount = function () { return this._viewRows.length; };
 
-  DataGrid.prototype.addRows = function (rows) {
-    this._rows = this._rows.concat(rows);
-    this._recordAdd(rows);
+  /**
+   * 행들을 추가한다. index를 주면 그 위치에 삽입(0 = 맨 앞), 생략하면 맨 뒤.
+   * index는 원본 배열 기준 — 정렬/그룹핑이 켜져 있으면 표시 순서는 뷰 파이프라인이 결정한다.
+   */
+  DataGrid.prototype.addRows = function (rows, index) {
+    this._rows = insertRowsAt(this._rows, rows, index);
+    this._recordAdd(rows, index);
     this.refresh();
     this._emitDataChanged();
   };
-  DataGrid.prototype.addRow = function (row) { this.addRows([row]); };
+  DataGrid.prototype.addRow = function (row, index) { this.addRows([row], index); };
 
   DataGrid.prototype.removeRows = function (rows) {
     var ids = {};
@@ -5439,9 +5455,9 @@
     this._pushHistory({ type: 'update', row: row, field: field, oldValue: oldValue, newValue: newValue });
   };
 
-  DataGrid.prototype._recordAdd = function (rows) {
+  DataGrid.prototype._recordAdd = function (rows, index) {
     this._trackAdd(rows);
-    this._pushHistory({ type: 'add', rows: rows.slice() });
+    this._pushHistory({ type: 'add', rows: rows.slice(), index: index });
   };
 
   DataGrid.prototype._recordRemove = function (entries) {
@@ -5546,7 +5562,7 @@
       a.row[a.field] = a.newValue;
       this._trackUpdate(a.row, a.field, a.oldValue, a.newValue);
     } else if (a.type === 'add') {
-      this._rows = this._rows.concat(a.rows);
+      this._rows = insertRowsAt(this._rows, a.rows, a.index); /* 원래 삽입 위치 유지 */
       this._trackAdd(a.rows);
     } else if (a.type === 'remove') {
       /* hard 엔트리만 물리 제거, soft 엔트리는 다시 삭제 표시 */
@@ -5854,7 +5870,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.6.0';
+  DataGrid.version = '2.7.0';
 
   /* Internals exposed for headless unit tests (not part of the public API). */
   DataGrid._test = {
@@ -5885,6 +5901,7 @@
     csvEscape: csvEscape,
     buildCsv: buildCsv,
     buildJsonRows: buildJsonRows,
+    insertRowsAt: insertRowsAt,
     applyValueGetters: applyValueGetters,
     rollbackRows: rollbackRows,
     findNextMatch: findNextMatch,

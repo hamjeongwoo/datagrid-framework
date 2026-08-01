@@ -22,7 +22,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.6.0',
+  version: '2.7.0',
   updated: '2026-08-01',
 
   sections: [
@@ -1327,10 +1327,15 @@ window.ApiDocs = {
         },
         {
           name: 'addRow',
-          demo: 'row-data-api',
+          demo: 'add-row-index',
           group: 'Data',
-          signature: 'addRow(row: object): void',
-          description: '행 하나를 추가합니다. <code>addRows(rows)</code>로 여러 행을 한 번에 추가할 수 있습니다.',
+          signature: 'addRow(row: object, index?: number): void',
+          description:
+            '행 하나를 추가합니다. <code>addRows(rows, index?)</code>로 여러 행을 한 번에 추가할 수 있습니다. ' +
+            '<code>index</code>(since 2.7.0)를 주면 그 위치에 삽입됩니다 — <code>0</code>이면 맨 앞, 생략하면 맨 뒤, ' +
+            '범위를 벗어나면 <code>[0, 행 수]</code>로 클램프. index는 원본 배열 기준이므로 정렬/그룹핑이 켜져 있으면 ' +
+            '표시 순서는 뷰 파이프라인이 결정합니다. undo/redo도 삽입 위치를 보존합니다.',
+          example: "grid.addRow({ name: '새 직원' }, 0);   // 맨 앞에 삽입",
         },
         {
           name: 'updateRow',

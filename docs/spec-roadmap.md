@@ -174,6 +174,12 @@
 ### v2.1 — "TreeGrid" (§6 T1~T4)
 - treeData 코어(계층 표시·펼침/접힘·계층 정렬/필터), 체크박스 캐스케이드, 부모 요약, 지연 로딩
 
+### v2.7 — addRow 삽입 위치 (사용자 요청)
+- `addRow(row, index?)` / `addRows(rows, index?)` — `index`를 주면 그 위치에 삽입(`0` = 맨 앞), 생략하면 기존처럼 맨 뒤. `[0, 행 수]`로 클램프, 소수는 내림. index는 원본 배열 기준 — 정렬/그룹핑이 켜져 있으면 표시 순서는 뷰 파이프라인이 결정(문서 명시).
+- undo/redo 정합: 'add' 히스토리 액션에 index를 기록해 redo가 같은 위치에 재삽입한다 (기존에는 redo 시 맨 뒤로 붙어 위치가 유실됐음).
+- 순수 함수 `insertRowsAt(rows, newRows, index)` — `_test` 노출.
+- 데모: #add-row-index 전용 카드(rowNumbers로 위치 시각화) + Built-in CRUD Staging 카드의 신규 버튼을 맨 앞 삽입으로 전환(스테이징 UX 개선 — 새 행을 찾으러 스크롤할 필요 없음).
+
 ### v2.6 — CRUD 스테이징 내장화: softDelete + statusColumn (사용자 요청)
 데모(#remote-crud-staging)에서 소비자 코드로 짜던 신규/수정/삭제 스테이징을 옵션으로 내장한다. 기존 `trackChanges` 추적 상태(added/updated/deleted)를 단일 진실로 사용 — 별도 상태 필드(`_rowStatus` 등)를 데이터에 심지 않는다.
 
