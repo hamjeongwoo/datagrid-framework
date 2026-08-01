@@ -174,6 +174,16 @@
 ### v2.1 — "TreeGrid" (§6 T1~T4)
 - treeData 코어(계층 표시·펼침/접힘·계층 정렬/필터), 체크박스 캐스케이드, 부모 요약, 지연 로딩
 
+### v2.6 — CRUD 스테이징 내장화: softDelete + statusColumn (사용자 요청)
+데모(#remote-crud-staging)에서 소비자 코드로 짜던 신규/수정/삭제 스테이징을 옵션으로 내장한다. 기존 `trackChanges` 추적 상태(added/updated/deleted)를 단일 진실로 사용 — 별도 상태 필드(`_rowStatus` 등)를 데이터에 심지 않는다.
+
+- `softDelete: true` — `removeRows`/`removeSelectedRows`의 의미를 스테이징으로 전환: **기준선(서버) 행은 제거하지 않고 "삭제 표시"**(행 유지 + `dg-row-deleted` 취소선/흐림, `--dg-deleted-row-opacity` 토큰), **추가(신규) 행은 지금처럼 로우 자체 제거**(흔적 없음). 삭제 표시 행은 UI 편집 차단(더블클릭/Enter/`startEdit`/붙여넣기/채우기 — API `updateRow`는 허용), 선택은 가능(복원 UX). `getChanges().deleted`에 표시 행이 그대로 나온다.
+- `statusColumn: true | { headerName: 'Status', width: 90, labels: { added: 'New', updated: 'Updated', deleted: 'Deleted' }, colors: { added: 'green', updated: 'yellow', deleted: 'red' } }` — 추적 상태를 표시하는 내장 컬럼(`__rowStatus`, 좌측 고정, 정렬/필터/편집 제외). dg-tag 렌더 재사용. `setOptions`로 켜고 끌 수 있음(컬럼 재구성 축에 추가).
+- `softDelete` 또는 `statusColumn`을 켜면 `trackChanges`가 자동 활성화된다 (옵션 하나로 동작하는 zero-config).
+- `restoreRows(rows) => number` — 삭제 표시 해제(복원된 행 수 반환). `getRowStatus(row) => 'added' | 'updated' | 'deleted' | null` 공개 메서드.
+- 기존 API와의 결합: `commitChanges()`는 삭제 표시 행을 **물리 제거**하고 기준선 확정(물리 제거를 가로지르는 undo 미지원 — 히스토리 클리어), `rollbackChanges()`는 표시만 해제(행은 이미 제자리). undo/redo는 소프트 삭제(`en.soft` 엔트리)·복원을 마크 토글로 되돌린다(재삽입/재제거 아님).
+- 순수 함수: `resolveStatusColumnConfig(option)`(기본값 병합), `partitionStagedRemoval(rows, allRows, addedRows, alreadyDeleted)`(hard/soft 분류) — `_test` 노출.
+
 ### v2.5 — Remote Data Source 서버 스펙 맞춤 (사용자 요청)
 - `dataSource.request(state) => params` — 기본 파라미터 매핑(`page·pageSize·sort·filter·quickFilter`)을 **대체**하는 커스텀 요청 빌더. state는 `{ page, pageSize, sortModel, filterModel, quickFilter, sortMode, filterMode, pageMode }` 읽기 전용 스냅샷. 반환 객체가 `params`(고정 파라미터) 위에 merge되며, 값이 `undefined`인 키는 생략된다(조건부 파라미터). 예외 시 `console.error` + 기본 매핑 폴백. `offset/limit`, `orderBy=field:dir` 등 어떤 서버 스펙에도 대응.
 - `dataSource.headers: object | () => object` — 요청 헤더(인증 토큰 등). 함수는 요청마다 평가(토큰 갱신 대응), 예외 시 헤더 없이 진행. POST의 `Content-Type: application/json` 기본값은 유지하되 같은 키를 주면 덮어쓴다.

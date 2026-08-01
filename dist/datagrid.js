@@ -1410,6 +1410,51 @@
   }
 
   /**
+   * statusColumn 옵션(true 또는 부분 설정 객체)을 완전한 설정으로 정규화한다.
+   * labels/colors는 키 단위로 병합 — { labels: { deleted: '삭제' } }처럼 일부만 바꿀 수 있다.
+   */
+  function resolveStatusColumnConfig(option) {
+    var cfg = {
+      headerName: 'Status',
+      width: 90,
+      labels: { added: 'New', updated: 'Updated', deleted: 'Deleted' },
+      colors: { added: 'green', updated: 'yellow', deleted: 'red' },
+    };
+    if (option && typeof option === 'object') {
+      if (option.headerName !== undefined) cfg.headerName = option.headerName;
+      if (typeof option.width === 'number') cfg.width = option.width;
+      var k;
+      if (option.labels) for (k in cfg.labels) {
+        if (option.labels[k] !== undefined) cfg.labels[k] = option.labels[k];
+      }
+      if (option.colors) for (k in cfg.colors) {
+        if (option.colors[k] !== undefined) cfg.colors[k] = option.colors[k];
+      }
+    }
+    return cfg;
+  }
+
+  /**
+   * softDelete용 삭제 분류: 추가(신규) 행은 hard(로우 자체 제거),
+   * 기준선 행은 soft(삭제 표시). 그리드에 없는 행과 이미 삭제 표시된 행은 무시.
+   * 엔트리 형태는 _recordRemove가 쓰는 { row, index, wasAdded, soft? }.
+   */
+  function partitionStagedRemoval(rows, allRows, addedRows, alreadyDeleted) {
+    var hard = [];
+    var soft = [];
+    (rows || []).forEach(function (r) {
+      var idx = allRows.indexOf(r);
+      if (idx === -1) return;
+      if (addedRows.indexOf(r) !== -1) {
+        hard.push({ row: r, index: idx, wasAdded: true });
+      } else if (alreadyDeleted.indexOf(r) === -1) {
+        soft.push({ row: r, index: idx, wasAdded: false, soft: true });
+      }
+    });
+    return { hard: hard, soft: soft };
+  }
+
+  /**
    * column.headerClass('foo bar' 문자열 또는 (colDef) => string 함수)를
    * 클래스명 배열로 변환한다. 콜백 예외는 잡아서 빈 배열 폴백 (그리드가 죽으면 안 된다).
    */
@@ -1638,8 +1683,9 @@
     this._rowHeight = options.rowHeight || 42;
     this._headerHeight = options.headerHeight || 48;
 
-    /* change tracking + undo/redo */
-    this._trackChanges = !!options.trackChanges;
+    /* change tracking + undo/redo — softDelete/statusColumn은 추적 상태가 필요하므로 자동 활성화 */
+    this._trackChanges = !!(options.trackChanges || options.softDelete || options.statusColumn);
+    this._softDelete = !!options.softDelete;
     this._undoRedo = !!options.undoRedo;
     this._resetTracking();
     this._undoStack = [];
@@ -1678,6 +1724,17 @@
         sortable: false, resizable: false, editable: false, filter: false,
         hide: false, pinned: 'left', align: 'center', __detailToggle: true,
       });
+    }
+    if (this.options.statusColumn) {
+      var sc = resolveStatusColumnConfig(this.options.statusColumn);
+      this._statusColConfig = sc;
+      cols.unshift({
+        colId: '__rowStatus', headerName: sc.headerName, width: sc.width, minWidth: 60,
+        sortable: false, resizable: true, editable: false, filter: false,
+        hide: false, pinned: 'left', align: 'center', __rowStatus: true, suppressMove: true,
+      });
+    } else {
+      this._statusColConfig = null;
     }
     if (this.options.rowNumbers) {
       cols.unshift({
@@ -2219,6 +2276,21 @@
     return true;
   };
 
+  /** 렌더된 행의 내장 상태 컬럼(statusColumn) 셀만 제자리에서 다시 그린다. */
+  DataGrid.prototype._refreshStatusCell = function (row) {
+    if (!this._statusColConfig) return;
+    var hit = this._renderedRowEntry(row);
+    if (!hit) return;
+    var cell = hit.el.querySelector('.dg-cell[data-col-id="__rowStatus"]');
+    if (!cell) return;
+    cell.innerHTML = '';
+    var rowStatus = this.getRowStatus(row);
+    if (rowStatus) {
+      var tag = el('span', 'dg-tag dg-tag-' + this._statusColConfig.colors[rowStatus], cell);
+      tag.textContent = this._statusColConfig.labels[rowStatus];
+    }
+  };
+
   /** 렌더된 모든 행에서 한 컬럼의 셀을 다시 그린다. 컬럼이 없으면 false. */
   DataGrid.prototype.refreshColumn = function (colId) {
     var col = this._columns.find(function (c) { return c.colId === colId || c.field === colId; });
@@ -2251,9 +2323,11 @@
     for (var k in patch) this.options[k] = patch[k];
 
     if ('columnDefs' in patch || 'defaultColDef' in patch ||
-        'rowNumbers' in patch || 'rowDetail' in patch) {
+        'rowNumbers' in patch || 'rowDetail' in patch || 'statusColumn' in patch) {
       this._columns = this._buildColumns();
       this._colWidths = {};
+      /* statusColumn을 켜면 추적도 필요하다 (생성자와 동일 규칙) */
+      if (this.options.statusColumn) this._trackChanges = true;
     }
     if ('rowHeight' in patch) {
       this._rowHeight = patch.rowHeight || 42;
@@ -2763,6 +2837,7 @@
     var dirtyFields = null;
     if (this._trackChanges) {
       if (this._addedRows.indexOf(row) !== -1) rowEl.classList.add('dg-row-added');
+      if (this._isRowDeleted(row)) rowEl.classList.add('dg-row-deleted');
       else if (this._originals) dirtyFields = this._originals.get(row) || null;
     }
     /* 스크롤로 새로 생성되는 행에도 셀 범위 표시를 적용 */
@@ -2842,6 +2917,16 @@
         cell.classList.add('dg-rownum-cell');
         var num = el('span', 'dg-cell-value', cell);
         num.textContent = (globalIndex + 1).toLocaleString();
+        return;
+      }
+
+      /* 내장 상태 컬럼 (statusColumn) — 추적 상태를 dg-tag로 표시 */
+      if (col.__rowStatus) {
+        var rowStatus = self.getRowStatus(row);
+        if (rowStatus && self._statusColConfig) {
+          var tag = el('span', 'dg-tag dg-tag-' + self._statusColConfig.colors[rowStatus], cell);
+          tag.textContent = self._statusColConfig.labels[rowStatus];
+        }
         return;
       }
 
@@ -3801,6 +3886,7 @@
         var tr = target.dir === 1 ? target.from + i : target.to - i;
         var trow = this._pageRows[tr];
         if (!trow || trow.__group || trow.__detail) continue;
+        if (this._isRowDeleted(trow)) continue; /* softDelete 삭제 표시 행은 채우기 제외 */
         var value = seq[i];
         var oldValue = trow[col.field];
         if (value === oldValue) continue;
@@ -4207,6 +4293,7 @@
   var editorSeq = 0; /* radio 에디터의 name 그룹 유일성 보장용 */
 
   DataGrid.prototype._startEdit = function (hit) {
+    if (this._isRowDeleted(hit.row)) return; /* softDelete 삭제 표시 행은 편집 불가 */
     this._cancelEdit();
     var col = hit.col;
     var row = hit.row;
@@ -4575,6 +4662,9 @@
         if (dirtyNow) cellEl.title = 'Original: ' + orig[col.field];
         else cellEl.removeAttribute('title');
       }
+      /* 같은 이유로 내장 상태 컬럼(statusColumn) 셀도 제자리 갱신 —
+       * 편집으로 updated 상태가 생기거나(원복 시) 사라질 수 있다 */
+      self._refreshStatusCell(row);
       if (committed) {
         self._emitter.emit('cellValueChanged', {
           data: row, colDef: col, oldValue: value, newValue: newValue,
@@ -4672,6 +4762,7 @@
   DataGrid.prototype.startEdit = function (row, field) {
     var col = this._visibleColumns().find(function (c) { return c.field === field; });
     if (!col || !col.editable || !this._editable || !row) return false;
+    if (this._isRowDeleted(row)) return false; /* softDelete 삭제 표시 행은 편집 불가 */
 
     var displayIndex = this._displayRows.indexOf(row);
     if (displayIndex === -1) return false;
@@ -4782,6 +4873,7 @@
     matrix.forEach(function (cells, i) {
       var row = self._pageRows[startR + i];
       if (!row || row.__group || row.__detail) return;
+      if (self._isRowDeleted(row)) return; /* softDelete 삭제 표시 행은 붙여넣기 제외 */
       var rowChanges = null;
       cells.forEach(function (raw, j) {
         var col = cols[startC + j];
@@ -5155,6 +5247,22 @@
   DataGrid.prototype.removeRows = function (rows) {
     var ids = {};
     var self = this;
+
+    /* softDelete: 기준선 행은 삭제 표시만(행 유지), 추가(신규) 행은 로우 자체 제거 */
+    if (this._softDelete) {
+      var parts = partitionStagedRemoval(rows, this._rows, this._addedRows, this._softDeletedRows);
+      if (parts.hard.length > 0) {
+        parts.hard.forEach(function (en) { ids[self._rowId(en.row)] = true; });
+        this._rows = this._rows.filter(function (r) { return !ids[self._rowId(r)]; });
+        parts.hard.forEach(function (en) { delete self._selection[self._rowId(en.row)]; });
+      }
+      var staged = parts.hard.concat(parts.soft);
+      if (staged.length > 0) this._recordRemove(staged);
+      this.refresh();
+      this._emitDataChanged();
+      return;
+    }
+
     var entries = [];
     rows.forEach(function (r) {
       var idx = self._rows.indexOf(r);
@@ -5168,6 +5276,33 @@
     if (entries.length > 0) this._recordRemove(entries);
     this.refresh();
     this._emitDataChanged();
+  };
+
+  /** softDelete로 삭제 표시된 행을 복원한다. 복원된 행 수를 반환. */
+  DataGrid.prototype.restoreRows = function (rows) {
+    if (!this._softDelete) return 0;
+    var self = this;
+    var entries = [];
+    (rows || []).forEach(function (r) {
+      if (!self._isRowDeleted(r)) return;
+      for (var i = 0; i < self._deletedRows.length; i++) {
+        if (self._deletedRows[i].row === r) { entries.push(self._deletedRows[i]); return; }
+      }
+    });
+    if (entries.length === 0) return 0;
+    this._untrackRemove(entries);
+    this._pushHistory({ type: 'restore', entries: entries.slice() });
+    this.refresh();
+    this._emitDataChanged();
+    return entries.length;
+  };
+
+  /** 추적 상태 기준 행 상태: 'added' | 'updated' | 'deleted' | null. */
+  DataGrid.prototype.getRowStatus = function (row) {
+    if (this._isRowDeleted(row)) return 'deleted';
+    if (this._addedRows.indexOf(row) !== -1) return 'added';
+    if (this._updatedRows.indexOf(row) !== -1) return 'updated';
+    return null;
   };
 
   DataGrid.prototype.removeSelectedRows = function () {
@@ -5216,7 +5351,13 @@
     this._originals = typeof WeakMap !== 'undefined' ? new WeakMap() : null;
     this._updatedRows = [];
     this._addedRows = [];
-    this._deletedRows = []; /* { row, index, wasAdded } */
+    this._deletedRows = []; /* { row, index, wasAdded, soft? } */
+    this._softDeletedRows = []; /* soft 엔트리의 행 (렌더/차단용 빠른 조회) */
+  };
+
+  /** softDelete로 삭제 표시된(그리드에 남아 있는) 행인가. */
+  DataGrid.prototype._isRowDeleted = function (row) {
+    return this._softDeletedRows.indexOf(row) !== -1;
   };
 
   /* -- 추적 상태만 갱신 (히스토리와 분리 — undo/redo도 재사용) -- */
@@ -5249,7 +5390,12 @@
     entries.forEach(function (en) {
       var ai = self._addedRows.indexOf(en.row);
       if (ai !== -1) self._addedRows.splice(ai, 1); /* 추가 후 삭제 = 흔적 없음 */
-      else self._deletedRows.push(en);
+      else {
+        self._deletedRows.push(en);
+        if (en.soft && self._softDeletedRows.indexOf(en.row) === -1) {
+          self._softDeletedRows.push(en.row);
+        }
+      }
       var ui = self._updatedRows.indexOf(en.row);
       if (ui !== -1) self._updatedRows.splice(ui, 1); /* 수정 이력은 삭제에 흡수 */
     });
@@ -5272,6 +5418,8 @@
         if (self._addedRows.indexOf(en.row) === -1) self._addedRows.push(en.row);
         return;
       }
+      var si = self._softDeletedRows.indexOf(en.row);
+      if (si !== -1) self._softDeletedRows.splice(si, 1);
       for (var i = 0; i < self._deletedRows.length; i++) {
         if (self._deletedRows[i].row === en.row) { self._deletedRows.splice(i, 1); return; }
       }
@@ -5316,10 +5464,25 @@
     return this._addedRows.length > 0 || this._updatedRows.length > 0 || this._deletedRows.length > 0;
   };
 
-  /** 현재 상태를 새 기준선으로 확정한다 (dirty 표시·변경 목록 초기화). */
+  /**
+   * 현재 상태를 새 기준선으로 확정한다 (dirty 표시·변경 목록 초기화).
+   * softDelete로 삭제 표시된 행은 이 시점에 물리 제거된다
+   * (물리 제거를 가로지르는 undo는 지원하지 않으므로 히스토리도 비운다).
+   */
   DataGrid.prototype.commitChanges = function () {
+    var self = this;
+    var softRows = this._softDeletedRows.slice();
+    if (softRows.length > 0) {
+      var ids = {};
+      softRows.forEach(function (r) { ids[self._rowId(r)] = true; });
+      this._rows = this._rows.filter(function (r) { return !ids[self._rowId(r)]; });
+      softRows.forEach(function (r) { delete self._selection[self._rowId(r)]; });
+      this._undoStack = [];
+      this._redoStack = [];
+    }
     this._resetTracking();
     this.refresh();
+    if (softRows.length > 0) this._emitDataChanged();
   };
 
   /** 모든 변경을 기준선으로 되돌린다: 수정 값 원복, 추가 행 제거, 삭제 행 복원. */
@@ -5332,7 +5495,12 @@
       });
     }
     this._addedRows.forEach(function (r) { delete self._selection[self._rowId(r)]; });
-    this._rows = rollbackRows(this._rows, this._addedRows, this._deletedRows);
+    /* soft 삭제 행은 이미 제자리에 있으므로 hard 엔트리만 재삽입한다 */
+    this._rows = rollbackRows(
+      this._rows,
+      this._addedRows,
+      this._deletedRows.filter(function (en) { return !en.soft; })
+    );
     this._resetTracking();
     this._undoStack = []; /* 롤백을 가로지르는 undo는 지원하지 않는다 */
     this._redoStack = [];
@@ -5356,8 +5524,12 @@
       a.rows.forEach(function (r) { delete self._selection[self._rowId(r)]; });
       this._untrackAdd(a.rows);
     } else if (a.type === 'remove') {
-      this._rows = rollbackRows(this._rows, [], a.entries);
+      /* soft 엔트리는 표시만 해제(행은 이미 제자리), hard 엔트리만 재삽입 */
+      var hardEntries = a.entries.filter(function (en) { return !en.soft; });
+      if (hardEntries.length > 0) this._rows = rollbackRows(this._rows, [], hardEntries);
       this._untrackRemove(a.entries);
+    } else if (a.type === 'restore') {
+      this._trackRemove(a.entries); /* 복원 취소 = 다시 삭제 표시 */
     }
     this._redoStack.push(a);
     this.refresh();
@@ -5377,11 +5549,17 @@
       this._rows = this._rows.concat(a.rows);
       this._trackAdd(a.rows);
     } else if (a.type === 'remove') {
-      var ids = {};
-      a.entries.forEach(function (en) { ids[self._rowId(en.row)] = true; });
-      this._rows = this._rows.filter(function (r) { return !ids[self._rowId(r)]; });
-      a.entries.forEach(function (en) { delete self._selection[self._rowId(en.row)]; });
+      /* hard 엔트리만 물리 제거, soft 엔트리는 다시 삭제 표시 */
+      var hardEntries = a.entries.filter(function (en) { return !en.soft; });
+      if (hardEntries.length > 0) {
+        var ids = {};
+        hardEntries.forEach(function (en) { ids[self._rowId(en.row)] = true; });
+        this._rows = this._rows.filter(function (r) { return !ids[self._rowId(r)]; });
+        hardEntries.forEach(function (en) { delete self._selection[self._rowId(en.row)]; });
+      }
       this._trackRemove(a.entries);
+    } else if (a.type === 'restore') {
+      this._untrackRemove(a.entries); /* 복원 재적용 = 삭제 표시 해제 */
     }
     this._undoStack.push(a);
     this.refresh();
@@ -5676,7 +5854,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.5.0';
+  DataGrid.version = '2.6.0';
 
   /* Internals exposed for headless unit tests (not part of the public API). */
   DataGrid._test = {
@@ -5735,6 +5913,8 @@
     buildXlsxParts: buildXlsxParts,
     normalizeColumns: normalizeColumns,
     resolveHeaderClass: resolveHeaderClass,
+    resolveStatusColumnConfig: resolveStatusColumnConfig,
+    partitionStagedRemoval: partitionStagedRemoval,
     applyColumnState: applyColumnState,
     computeColumnWidths: computeColumnWidths,
     computeColumnWindow: computeColumnWindow,

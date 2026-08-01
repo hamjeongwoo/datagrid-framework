@@ -22,7 +22,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.5.0',
+  version: '2.6.0',
   updated: '2026-08-01',
 
   sections: [
@@ -484,7 +484,51 @@ window.ApiDocs = {
             '수정된 셀은 모서리 마커(dirty, 툴팁에 원래 값), 추가된 행은 배경색으로 표시되고 ' +
             '<a href="#api-methods-getChanges"><code>getChanges()</code></a> / ' +
             '<code>commitChanges()</code> / <code>rollbackChanges()</code>로 제어합니다. ' +
-            '값이 원래대로 돌아오면 dirty가 자동 해제됩니다.',
+            '값이 원래대로 돌아오면 dirty가 자동 해제됩니다. ' +
+            '<code>softDelete</code> 또는 <code>statusColumn</code>을 켜면 자동으로 활성화됩니다.',
+        },
+        {
+          name: 'softDelete',
+          demo: 'builtin-crud-staging',
+          type: 'boolean',
+          default: 'false',
+          since: '2.6.0',
+          description:
+            'CRUD 스테이징용 소프트 삭제. <code>removeRows()</code>/<code>removeSelectedRows()</code>가 ' +
+            '<strong>기준선(서버) 행은 제거하지 않고 "삭제 표시"</strong>로 전환합니다 — 행은 취소선+흐림으로 ' +
+            '남고(<code>--dg-deleted-row-opacity</code> 토큰) <code>getChanges().deleted</code>에 나타납니다. ' +
+            '<strong>추가된(신규) 행은 지금처럼 로우 자체가 제거</strong>됩니다(흔적 없음). ' +
+            '삭제 표시 행은 UI 편집(더블클릭/Enter/<code>startEdit</code>/붙여넣기/채우기)이 차단되고 ' +
+            '선택은 가능합니다(복원 UX). <code>restoreRows()</code>로 표시를 해제하고, ' +
+            '<code>commitChanges()</code>가 이 행들을 물리 제거하며, <code>rollbackChanges()</code>는 표시만 ' +
+            '해제합니다. undo/redo는 표시 토글로 되돌립니다. <code>trackChanges</code>를 자동 활성화합니다.',
+          example:
+            'var grid = new DataGrid(el, {\n' +
+            '  softDelete: true,\n' +
+            '  statusColumn: true,   // 상태 컬럼과 함께 쓰면 zero-config 스테이징\n' +
+            '  columnDefs: [ /* ... */ ],\n' +
+            '});',
+        },
+        {
+          name: 'statusColumn',
+          demo: 'builtin-crud-staging',
+          type: 'true | { headerName?, width?, labels?, colors? }',
+          default: 'false',
+          since: '2.6.0',
+          description:
+            '변경 추적 상태(added/updated/deleted)를 태그로 표시하는 내장 컬럼을 좌측에 추가합니다 ' +
+            '(정렬/필터/편집/드래그 제외, 데이터에 상태 필드를 심지 않음 — 추적 상태가 단일 진실). ' +
+            '기본값: <code>headerName: \'Status\'</code>, <code>width: 90</code>, ' +
+            '<code>labels: { added: \'New\', updated: \'Updated\', deleted: \'Deleted\' }</code>, ' +
+            '<code>colors: { added: \'green\', updated: \'yellow\', deleted: \'red\' }</code> ' +
+            '(색은 <code>renderers.tag</code>와 같은 green/red/blue/yellow/gray). ' +
+            'labels/colors는 키 단위로 부분 지정할 수 있습니다. <code>trackChanges</code>를 자동 활성화하며 ' +
+            '<code>setOptions({ statusColumn })</code>로 런타임에 켜고 끌 수 있습니다.',
+          example:
+            "statusColumn: {\n" +
+            "  headerName: '상태',\n" +
+            "  labels: { added: '신규', updated: '수정', deleted: '삭제' },\n" +
+            '}',
         },
         {
           name: 'undoRedo',
@@ -1301,7 +1345,32 @@ window.ApiDocs = {
           demo: 'row-data-api',
           group: 'Data',
           signature: 'removeRows(rows: object[]): void',
-          description: '지정한 행들을 제거합니다. <code>removeSelectedRows()</code>는 선택된 행을 제거합니다.',
+          description:
+            '지정한 행들을 제거합니다. <code>removeSelectedRows()</code>는 선택된 행을 제거합니다. ' +
+            '<code>softDelete: true</code>면 기준선(서버) 행은 제거 대신 "삭제 표시"가 되고 ' +
+            '추가된(신규) 행만 실제로 제거됩니다.',
+        },
+        {
+          name: 'restoreRows',
+          demo: 'builtin-crud-staging',
+          group: 'Data',
+          signature: 'restoreRows(rows: object[]): number',
+          since: '2.6.0',
+          description:
+            '<code>softDelete</code>로 삭제 표시된 행을 복원합니다(표시 해제). 복원된 행 수를 반환하며, ' +
+            '삭제 표시가 아닌 행은 무시됩니다. undo/redo 히스토리에도 기록됩니다.',
+          example: 'grid.restoreRows(grid.getSelectedRows());',
+        },
+        {
+          name: 'getRowStatus',
+          demo: 'builtin-crud-staging',
+          group: 'Data',
+          signature: "getRowStatus(row: object): 'added' | 'updated' | 'deleted' | null",
+          since: '2.6.0',
+          description:
+            '변경 추적 기준 행 상태를 반환합니다 — <code>statusColumn</code>이 표시하는 값과 동일합니다. ' +
+            '기준선 그대로인 행은 <code>null</code>. <code>trackChanges</code>(또는 이를 자동 활성화하는 ' +
+            '<code>softDelete</code>/<code>statusColumn</code>)가 필요합니다.',
         },
 
         /* ---- 선택 ---- */
@@ -1583,7 +1652,8 @@ window.ApiDocs = {
           since: '1.2.0',
           description:
             '현재 상태를 새 기준선으로 확정합니다 — 변경 목록과 dirty 표시가 초기화됩니다. ' +
-            '서버 저장이 성공한 뒤 호출하세요.',
+            '서버 저장이 성공한 뒤 호출하세요. <code>softDelete</code>로 삭제 표시된 행은 이 시점에 ' +
+            '물리 제거됩니다(물리 제거를 가로지르는 undo는 지원하지 않아 히스토리도 비워집니다).',
         },
         {
           name: 'rollbackChanges',
@@ -1592,7 +1662,8 @@ window.ApiDocs = {
           signature: 'rollbackChanges(): void',
           since: '1.2.0',
           description:
-            '모든 변경을 기준선으로 되돌립니다: 수정 값 원복, 추가 행 제거, 삭제 행을 원래 위치에 복원. ' +
+            '모든 변경을 기준선으로 되돌립니다: 수정 값 원복, 추가 행 제거, 삭제 행을 원래 위치에 복원 ' +
+            '(<code>softDelete</code>의 삭제 표시 행은 표시만 해제 — 행은 이미 제자리). ' +
             'undo/redo 스택도 함께 비워집니다(롤백을 가로지르는 undo는 지원하지 않음).',
         },
         {

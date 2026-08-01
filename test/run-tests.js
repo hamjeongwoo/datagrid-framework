@@ -1325,6 +1325,61 @@ suite('applyColumnState', function () {
   assertEq(r.columns[0].colId, 'b', 'malformed entries skipped');
 });
 
+/* ---------------- resolveStatusColumnConfig ---------------- */
+suite('resolveStatusColumnConfig', function () {
+  var d = T.resolveStatusColumnConfig(true);
+  assertEq(d.headerName, 'Status', 'true → default headerName');
+  assertEq(d.width, 90, 'true → default width');
+  assertEq(d.labels, { added: 'New', updated: 'Updated', deleted: 'Deleted' }, 'true → default labels');
+  assertEq(d.colors, { added: 'green', updated: 'yellow', deleted: 'red' }, 'true → default colors');
+
+  var c = T.resolveStatusColumnConfig({
+    headerName: '상태', width: 80,
+    labels: { added: '신규', deleted: '삭제' },
+    colors: { updated: 'blue' },
+  });
+  assertEq(c.headerName, '상태', 'headerName override');
+  assertEq(c.width, 80, 'width override');
+  assertEq(c.labels, { added: '신규', updated: 'Updated', deleted: '삭제' }, 'labels merged per key');
+  assertEq(c.colors, { added: 'green', updated: 'blue', deleted: 'red' }, 'colors merged per key');
+
+  var w = T.resolveStatusColumnConfig({ width: 'wide' });
+  assertEq(w.width, 90, 'non-numeric width ignored');
+
+  var e = T.resolveStatusColumnConfig({ headerName: '' });
+  assertEq(e.headerName, '', 'empty headerName respected');
+});
+
+/* ---------------- partitionStagedRemoval ---------------- */
+suite('partitionStagedRemoval', function () {
+  var a = { id: 1 }, b = { id: 2 }, c = { id: 3 }, ghost = { id: 9 };
+  var all = [a, b, c];
+
+  var r = T.partitionStagedRemoval([b], all, [b], []);
+  assertEq(r.hard.length, 1, 'added row → hard');
+  assertEq(r.hard[0].wasAdded, true, 'hard entry wasAdded');
+  assertEq(r.hard[0].index, 1, 'hard entry keeps index');
+  assertEq(r.soft.length, 0, 'added row not soft');
+
+  r = T.partitionStagedRemoval([a, c], all, [], []);
+  assertEq(r.hard.length, 0, 'baseline rows not hard');
+  assertEq(r.soft.map(function (en) { return en.row; }), [a, c], 'baseline rows → soft');
+  assert(r.soft[0].soft === true && r.soft[0].wasAdded === false, 'soft entry flags');
+
+  r = T.partitionStagedRemoval([a, b], all, [b], []);
+  assertEq(r.hard.length, 1, 'mixed: added → hard');
+  assertEq(r.soft.length, 1, 'mixed: baseline → soft');
+
+  r = T.partitionStagedRemoval([a], all, [], [a]);
+  assertEq(r.soft.length, 0, 'already soft-deleted row skipped');
+
+  r = T.partitionStagedRemoval([ghost], all, [], []);
+  assertEq(r.hard.length + r.soft.length, 0, 'row not in grid ignored');
+
+  r = T.partitionStagedRemoval(null, all, [], []);
+  assertEq(r.hard.length + r.soft.length, 0, 'null rows → empty');
+});
+
 /* ---------------- resolveHeaderClass ---------------- */
 suite('resolveHeaderClass', function () {
   assertEq(T.resolveHeaderClass('hl', { colId: 'a' }), ['hl'], 'string class');

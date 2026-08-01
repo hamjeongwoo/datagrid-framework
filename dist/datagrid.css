@@ -33,6 +33,7 @@
   --dg-invalid-color: #e02525;
   --dg-dirty-color: #e07c00;
   --dg-added-row-background-color: rgba(13, 138, 68, 0.08);
+  --dg-deleted-row-opacity: 0.55;
   --dg-range-background-color: rgba(33, 150, 243, 0.14);
   --dg-group-row-background-color: #f3f6fa;
   --dg-group-indent: 20px;
@@ -90,6 +91,7 @@
   --dg-menu-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
   --dg-dirty-color: #ffa940;
   --dg-added-row-background-color: rgba(52, 199, 119, 0.12);
+  --dg-deleted-row-opacity: 0.5;
   --dg-range-background-color: rgba(33, 150, 243, 0.26);
   --dg-group-row-background-color: #22282c;
 }
@@ -540,6 +542,13 @@
     var(--dg-added-row-background-color)
   );
 }
+
+/* softDelete: 삭제 표시된(스테이징) 행 — 취소선 + 흐림. 상태 태그에는 취소선을 긋지 않는다 */
+.dg-row-deleted .dg-cell {
+  text-decoration: line-through;
+  opacity: var(--dg-deleted-row-opacity);
+}
+.dg-row-deleted .dg-cell .dg-tag { text-decoration: none; }
 
 /* 커스텀/인라인(checkbox·radio·multiselect) 에디터가 열린 셀.
  * position: relative는 multiselect 패널의 앵커, z-index는 이웃 행 위로. */

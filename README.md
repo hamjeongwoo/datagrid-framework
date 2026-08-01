@@ -71,7 +71,9 @@ python demo/server.py
 | `getRowClass(row, index)` | function | 행별 CSS 클래스 |
 | `editable` | boolean | 그리드 전체 편집 잠금 (`false`면 컬럼 설정 무시, `setEditable`로 전환) |
 | `editOnSingleClick` / `enterMovesDown` / `tabMovesRight` | boolean | 클릭 한 번 편집 / Enter·Tab 연속 편집 |
-| `trackChanges` | boolean | 변경 추적 — dirty 셀 표시 + `getChanges`/`commitChanges`/`rollbackChanges` |
+| `trackChanges` | boolean | 변경 추적 — dirty 셀 표시 + `getChanges`/`commitChanges`/`rollbackChanges` (`softDelete`/`statusColumn`이 자동 활성화) |
+| `softDelete` | boolean | CRUD 스테이징 삭제 — 서버(기준선) 행은 삭제 표시(취소선, 편집 차단, `restoreRows`로 복원), 신규 행은 로우 제거. `commitChanges`가 표시 행을 물리 제거 |
+| `statusColumn` | boolean 또는 object | 변경 상태(신규/수정/삭제) 태그 컬럼 자동 표시 — `{ headerName, width, labels, colors }` 부분 지정 가능 |
 | `undoRedo` | boolean | Ctrl+Z/Y 실행 취소 스택 (`undo`/`redo`/`canUndo`/`canRedo`) |
 | `cellSelection` | boolean | 셀/블록 범위 선택 (드래그·Shift+화살표, Ctrl+C 블록 복사) |
 | `fillHandle` | boolean | 엑셀식 채우기 핸들 (숫자 등차 외삽 / 패턴 반복) |
@@ -139,7 +141,7 @@ cellRenderer: DataGrid.renderers.checkbox()   // 값을 체크박스 모양으�
 ## API
 
 `setRowData(rows)` · `getRowData()` · `addRow(row)` / `addRows(rows)` · `updateRow(row, changes)` ·
-`removeRows(rows)` / `removeSelectedRows()` · `getSelectedRows()` · `selectAll()` / `deselectAll()` · `getCellRange()` / `clearCellRange()` · `findNext(text)` ·
+`removeRows(rows)` / `removeSelectedRows()` / `restoreRows(rows)` / `getRowStatus(row)` · `getSelectedRows()` · `selectAll()` / `deselectAll()` · `getCellRange()` / `clearCellRange()` · `findNext(text)` ·
 `startEdit(row, field)` / `stopEdit(commit)` / `isEditing()` · `setEditable(bool)` / `isEditable()` ·
 `copy()` / `pasteTsv(text)` (Ctrl+C/V 엑셀 호환 TSV) ·
 `getChanges()` / `isDirty()` / `commitChanges()` / `rollbackChanges()` · `undo()` / `redo()` / `canUndo()` / `canRedo()` ·

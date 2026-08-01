@@ -2518,6 +2518,9 @@
     <strong>삭제</strong>는 서버 행에 삭제 표시(<code class="inline">getRowClass</code>로 취소선).
     <strong>신규 행을 삭제하면 서버에 없는 데이터이므로 로우 자체가 제거</strong>됩니다(<code class="inline">removeRows</code>).
     삭제 표시된 행은 <code class="inline">beforeCellSave</code>로 편집이 차단됩니다.
+    <strong>v2.6부터는 이 패턴이 <code class="inline">statusColumn</code> / <code class="inline">softDelete</code>
+    옵션으로 내장</strong>되어 아래 Built-in CRUD Staging 카드처럼 소비자 코드 없이 동작합니다 —
+    이 카드는 옵션 없이 직접 구현할 때의 레시피로 남겨둡니다.
   </p>
   <div class="example-card">
     <div class="example-html">
@@ -2626,6 +2629,90 @@
       });
 
       grid.on('dataChanged', function () { summary(); });
+      grid.on('dataLoadError', function (e) {
+        status.textContent = '로드 실패: ' + e.error.message + ' — 데모 서버로 열었는지 확인하세요.';
+      });
+    </script>
+  </div>
+
+  <!-- ======================================================== 내장 CRUD 스테이징 -->
+  <h2 class="section" id="builtin-crud-staging">Built-in CRUD Staging (statusColumn / softDelete)</h2>
+  <p class="section-desc">
+    위 카드의 스테이징 패턴을 옵션 두 개로 처리합니다 — 상태 관리 코드가 전혀 없습니다.
+    <code class="inline">statusColumn</code>은 변경 추적 상태(added/updated/deleted)를 태그 컬럼으로 표시하고,
+    <code class="inline">softDelete: true</code>는 삭제를 스테이징으로 바꿉니다:
+    서버 행은 <strong>삭제 표시</strong>(취소선, 편집 차단, <code class="inline">restoreRows()</code>로 복원),
+    <strong>신규 행은 로우 자체 제거</strong>. 셀을 더블클릭해 편집하면 자동으로 &lsquo;수정&rsquo;이 되고,
+    <code class="inline">commitChanges()</code>(저장 성공 후 — 삭제 표시 행 물리 제거) /
+    <code class="inline">rollbackChanges()</code>(전부 되돌리기)로 마무리합니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn" id="bsAddBtn" type="button">신규 (addRow)</button>
+        <button class="tb-btn" id="bsDelBtn" type="button">선택 삭제</button>
+        <button class="tb-btn" id="bsRestoreBtn" type="button">선택 복원 (restoreRows)</button>
+        <button class="tb-btn" id="bsCommitBtn" type="button">커밋 (commitChanges)</button>
+        <button class="tb-btn" id="bsRollbackBtn" type="button">롤백 (rollbackChanges)</button>
+      </div>
+      <div id="gridBuiltinStaging" class="grid-wrap-sm"></div>
+      <div class="status-line" id="bsStatus">서버 데이터 로드 중… 이름/급여 셀을 더블클릭해 편집해 보세요.</div>
+    </div>
+    <script type="text/x-example">
+      var status = document.getElementById('bsStatus');
+      var nextNewId = -1;
+
+      var grid = new DataGrid(document.getElementById('gridBuiltinStaging'), {
+        dataSource: { url: '/api/employees', params: { page: 0, pageSize: 12 } },
+        getRowId: function (row) { return row.id; },
+        rowSelection: 'multiple',
+        /* 스테이징 내장 옵션 — trackChanges는 자동 활성화된다 */
+        softDelete: true,
+        statusColumn: {
+          headerName: '상태',
+          labels: { added: '신규', updated: '수정', deleted: '삭제' },
+        },
+        columnDefs: [
+          { colId: 'sel', headerName: '', width: 44, minWidth: 44,
+            checkboxSelection: true, headerCheckboxSelection: true,
+            sortable: false, resizable: false },
+          { field: 'id', headerName: 'ID', width: 70 },
+          { field: 'name', headerName: 'Name', flex: 1, editable: true },
+          { field: 'department', headerName: 'Department', width: 140 },
+          { field: 'salary', headerName: 'Salary', dataType: 'number', format: '$#,##0',
+            width: 120, editable: true, editor: 'number' },
+        ],
+      });
+
+      function summary() {
+        var ch = grid.getChanges();
+        status.textContent = 'getChanges() — 신규 ' + ch.added.length +
+          ' · 수정 ' + ch.updated.length + ' · 삭제 ' + ch.deleted.length +
+          ' (전체 ' + grid.getRowData().length + '행)' +
+          (grid.isDirty() ? ' — 커밋하면 삭제 표시 행이 물리 제거됩니다.' : ' — 변경 없음.');
+      }
+
+      document.getElementById('bsAddBtn').addEventListener('click', function () {
+        grid.addRow({ id: nextNewId--, name: '새 직원', department: 'Engineering', salary: 50000 });
+      });
+      document.getElementById('bsDelBtn').addEventListener('click', function () {
+        if (grid.getSelectedRows().length === 0) { status.textContent = '삭제할 행을 먼저 선택하세요.'; return; }
+        grid.removeSelectedRows();   // softDelete: 서버 행은 표시, 신규 행은 제거
+      });
+      document.getElementById('bsRestoreBtn').addEventListener('click', function () {
+        var n = grid.restoreRows(grid.getSelectedRows());
+        if (n === 0) status.textContent = '복원할 삭제 표시 행을 선택하세요.';
+      });
+      document.getElementById('bsCommitBtn').addEventListener('click', function () {
+        grid.commitChanges();        // 실무에서는 getChanges()를 서버에 저장한 뒤 호출
+        summary();
+      });
+      document.getElementById('bsRollbackBtn').addEventListener('click', function () {
+        grid.rollbackChanges();
+      });
+
+      grid.on('dataChanged', function () { summary(); });
+      grid.on('cellValueChanged', function () { summary(); });
       grid.on('dataLoadError', function (e) {
         status.textContent = '로드 실패: ' + e.error.message + ' — 데모 서버로 열었는지 확인하세요.';
       });
