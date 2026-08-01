@@ -202,13 +202,15 @@
     <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" class="dg-checkbox" checked disabled> Checked disabled</label>
   </div>
 
-  <!-- Radio -->
-  <h2 class="section">Radio</h2>
-  <p class="section-desc"><code class="inline">editor: 'radio'</code>가 셀 안에 그리는 라디오 그룹. unchecked · checked · focus 링은 체크박스와 동일한 토큰을 씁니다.</p>
-  <div class="card gallery-row dg-root">
-    <label style="display:flex;align-items:center;gap:5px"><input type="radio" name="specRadio" class="dg-radio"> Junior</label>
-    <label style="display:flex;align-items:center;gap:5px"><input type="radio" name="specRadio" class="dg-radio" checked> Middle</label>
-    <label style="display:flex;align-items:center;gap:5px"><input type="radio" name="specRadio" class="dg-radio"> Senior</label>
+  <!-- Radio editor panel -->
+  <h2 class="section">Radio Editor Panel</h2>
+  <p class="section-desc"><code class="inline">editor: 'radio'</code>가 셀 아래(공간이 없으면 위)에 펼치는 단일 선택 패널. multiselect 패널과 배경/그림자 토큰을 공유하고, 라디오의 unchecked · checked · focus 링은 체크박스와 동일한 토큰을 씁니다.</p>
+  <div class="gallery-row dg-root" style="align-items:flex-start">
+    <div class="dg-editor-radio" style="position:static;min-width:200px">
+      <label><input type="radio" name="specRadio" class="dg-radio"> Junior</label>
+      <label><input type="radio" name="specRadio" class="dg-radio" checked> Middle</label>
+      <label><input type="radio" name="specRadio" class="dg-radio"> Senior</label>
+    </div>
   </div>
 
   <!-- Multiselect editor panel -->

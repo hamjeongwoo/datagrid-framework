@@ -584,23 +584,9 @@
   border-radius: 50%;
   background: var(--dg-accent-color);
 }
+/* multiselect/radio 에디터 — 셀에 앵커된 선택 패널 (스타일 공용) */
+.dg-editor-multiselect,
 .dg-editor-radio {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  height: 100%;
-  white-space: nowrap;
-}
-.dg-editor-radio label {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-/* multiselect 에디터 — 셀에 앵커된 체크리스트 패널 */
-.dg-editor-multiselect {
   position: absolute;
   top: calc(100% + 2px);
   left: 0;
@@ -618,7 +604,8 @@
   box-shadow: var(--dg-menu-shadow);
   outline: none;
 }
-.dg-editor-multiselect label {
+.dg-editor-multiselect label,
+.dg-editor-radio label {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -628,7 +615,8 @@
   font-size: 13px;
   white-space: nowrap;
 }
-.dg-editor-multiselect label:hover { background: var(--dg-row-hover-color); }
+.dg-editor-multiselect label:hover,
+.dg-editor-radio label:hover { background: var(--dg-row-hover-color); }
 
 /* ==========================================================================
    Row grouping + summary rows

@@ -4117,6 +4117,18 @@
     var getValue;
     var cleanup = null;
 
+    /* 셀 앵커 패널(multiselect/radio 공용) — 아래 공간이 부족하고 위가
+     * 더 넉넉하면 위로 펼침 */
+    var flipPanelUp = function (panel) {
+      var bodyRect = self._bodyEl.getBoundingClientRect();
+      var cellRect = cellEl.getBoundingClientRect();
+      if (cellRect.bottom + panel.offsetHeight + 4 > bodyRect.bottom &&
+          cellRect.top - panel.offsetHeight - 4 > bodyRect.top) {
+        panel.style.top = 'auto';
+        panel.style.bottom = 'calc(100% + 2px)';
+      }
+    };
+
     if (isCustom) {
       try {
         col.editor.init(cellEl, value, row, col);
@@ -4164,9 +4176,10 @@
       };
       invalidEl = cellEl;
     } else if (editorType === 'radio') {
-      /* 인라인 라디오 그룹 — editorOptions에서 단일 선택 */
+      /* 라디오 패널 — multiselect와 같은 셀 앵커 패널에서 단일 선택 */
       var radioOptions = normalizeEditorOptions(col.editorOptions);
       var radioWrap = el('div', 'dg-editor-radio', cellEl);
+      radioWrap.tabIndex = -1; /* 패널 배경 클릭 시에도 포커스가 셀 안에 머물게 */
       var radioName = 'dg-radio-' + (editorSeq++);
       radioOptions.forEach(function (o) {
         var lab = el('label', '', radioWrap);
@@ -4181,6 +4194,7 @@
         lab.appendChild(document.createTextNode(o.label));
       });
       cellEl.classList.add('dg-cell-editing');
+      flipPanelUp(radioWrap);
       cleanup = function () { cellEl.classList.remove('dg-cell-editing'); };
       var checkedRadio = radioWrap.querySelector('input:checked') || radioWrap.querySelector('input');
       if (checkedRadio) checkedRadio.focus();
@@ -4209,14 +4223,7 @@
         lab.appendChild(document.createTextNode(o.label));
       });
       cellEl.classList.add('dg-cell-editing');
-      /* 아래 공간이 부족하고 위가 더 넉넉하면 위로 펼침 */
-      var bodyRect = this._bodyEl.getBoundingClientRect();
-      var cellRect = cellEl.getBoundingClientRect();
-      if (cellRect.bottom + panel.offsetHeight + 4 > bodyRect.bottom &&
-          cellRect.top - panel.offsetHeight - 4 > bodyRect.top) {
-        panel.style.top = 'auto';
-        panel.style.bottom = 'calc(100% + 2px)';
-      }
+      flipPanelUp(panel);
       cleanup = function () { cellEl.classList.remove('dg-cell-editing'); };
       var firstCb = panel.querySelector('input');
       (firstCb || panel).focus();
