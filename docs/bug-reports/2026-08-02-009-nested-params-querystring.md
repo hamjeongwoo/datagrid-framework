@@ -77,9 +77,17 @@ v2.5에서 `dataSource.request`를 열어 "어떤 서버 스펙에도 대응"하
 { tags: ['x', 'y'] }          → tags[0]=x&tags[1]=y
 ```
 
-표기 선택 근거: qs(Express 기본 파서)·PHP·Rails·Spring이 **추가 설정 없이 그대로
-파싱**하는 사실상의 표준이다. `qs.stringify`의 기본 출력과 동일한 규칙(배열은 인덱스)을
-따랐다.
+> **후속 (v2.11.0)**: 제보자 서버가 닷 표기(`page.selectPage=0`)를 쓴다는 사실이 확인되어
+> `dataSource.paramsFormat`을 추가하고 **기본값을 `'dot'`으로 바꿨다.** 아래 "표기 선택 근거"는
+> 최초 수정(v2.10.0) 시점의 판단이며, 현재 기본 출력은 `page.selectPage=1` ·
+> `sorts[0].field=name`이다. 브래킷 표기는 `paramsFormat: 'bracket'`으로 옵트인한다.
+> 자세한 비교는 [로드맵 §4 v2.10](../spec-roadmap.md) 참고.
+
+표기 선택 근거: qs(Express 기본 파서)·PHP·Rails가 **추가 설정 없이 그대로 파싱**하는
+사실상의 표준이다. `qs.stringify`의 기본 출력과 동일한 규칙(배열은 인덱스)을 따랐다.
+— 다만 쿼리스트링의 중첩 표기에는 RFC 표준이 없어, 이 "표준"은 **JS·PHP·Ruby 생태계 한정**의
+관례다. Java(Spring)·.NET 진영은 닷 표기를 쓴다. 어느 쪽이 옳다가 아니라 서버에 맞추는
+문제라는 것이 이 버그의 진짜 교훈이다(위 후속 참고).
 
 부수 규칙:
 

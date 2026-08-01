@@ -774,19 +774,30 @@
   }
 
   /**
-   * 파라미터 객체 → 쿼리스트링. 중첩 객체·배열은 브래킷 표기로 편다:
-   *   { page: { selectPage: 1 } }        → page[selectPage]=1
-   *   { sorts: [{ field: 'a' }] }        → sorts[0][field]=a
-   *   { tags: ['x', 'y'] }               → tags[0]=x&tags[1]=y
-   * qs(Express)·PHP·Rails·Spring이 그대로 파싱하는 표기다. 서버가 다른 형식을
-   * 원하면 dataSource.paramsSerializer로 통째로 대체할 수 있다.
+   * 파라미터 객체 → 쿼리스트링. 중첩 객체·배열을 어떤 표기로 펼지는 format이 정한다.
+   * 쿼리스트링의 중첩 표기는 RFC에 정의된 표준이 없고 서버 프레임워크마다 관례가
+   * 다르므로, 어느 쪽이 "옳다"가 아니라 서버에 맞추는 문제다.
+   *
+   *   format: 'dot' (기본) — Spring MVC/Boot·ASP.NET Core의 데이터 바인딩 표기.
+   *     객체 속성은 점으로, 배열 인덱스는 대괄호로 (Spring의 List 바인딩 규약).
+   *     { page: { selectPage: 1 } }   → page.selectPage=1
+   *     { sorts: [{ field: 'a' }] }   → sorts[0].field=a
+   *     { tags: ['x', 'y'] }          → tags[0]=x&tags[1]=y
+   *
+   *   format: 'bracket' — qs(Express)·PHP·Rails·Laravel·jQuery $.param()
+   *     { page: { selectPage: 1 } }   → page[selectPage]=1
+   *     { sorts: [{ field: 'a' }] }   → sorts[0][field]=a
+   *     { tags: ['x', 'y'] }          → tags[0]=x&tags[1]=y
+   *
+   * 둘 다 아닌 서버는 dataSource.paramsSerializer로 통째로 대체한다.
    *
    * - undefined 값은 생략(조건부 파라미터), null은 빈 값(`key=`)
    * - Date는 ISO 문자열 (String(date)의 장황한 표기 대신)
    * - 순환 참조는 건너뛴다 — 소비자가 준 객체 때문에 그리드가 스택 오버플로로
    *   죽지 않게. 형제로 같은 객체가 두 번 나오는 것은 정상이므로 경로 기준으로 본다.
    */
-  function buildQueryString(params) {
+  function buildQueryString(params, format) {
+    const dot = format !== 'bracket'; /* 기본 'dot' — 'bracket'만 명시적으로 옵트인 */
     const parts = [];
     const path = new WeakSet();
     const walk = (key, value) => {
@@ -799,8 +810,9 @@
       if (typeof value === 'object') {
         if (path.has(value)) return; /* 순환 참조 */
         path.add(value);
+        /* 배열 인덱스는 두 표기 모두 대괄호 — Spring도 List는 sorts[0].field로 받는다 */
         if (Array.isArray(value)) value.forEach((v, i) => walk(`${key}[${i}]`, v));
-        else Object.keys(value).forEach(k => walk(`${key}[${k}]`, value[k]));
+        else Object.keys(value).forEach(k => walk(dot ? `${key}.${k}` : `${key}[${k}]`, value[k]));
         path.delete(value);
         return;
       }
@@ -893,10 +905,10 @@
           qs = String(dataSource.paramsSerializer(params) || '');
         } catch (e) {
           console.error('[DataGrid] dataSource.paramsSerializer failed:', e);
-          qs = buildQueryString(params);
+          qs = buildQueryString(params, dataSource.paramsFormat);
         }
       } else {
-        qs = buildQueryString(params);
+        qs = buildQueryString(params, dataSource.paramsFormat);
       }
       qs = qs.replace(/^[?&]+/, ''); /* '?a=1'처럼 반환해도 안전하게 */
       if (qs) url += (!url.includes('?') ? '?' : '&') + qs;
@@ -5985,7 +5997,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.10.0';
+  DataGrid.version = '2.11.0';
 
   /* Internals exposed for headless unit tests (not part of the public API). */
   DataGrid._test = {

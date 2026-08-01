@@ -9,8 +9,9 @@
  *   GET /api/employees-v2?offset=0&limit=25&orderBy=salary:desc&q=text&dept=Engineering
  *   → { result: { items: [...], totalCount: n, receivedToken: 'X-Demo-Token 헤더 값' | null } }
  *
- * 중첩 파라미터 시연용 v3 (BUG-009 — 브래킷 표기 직렬화 데모):
+ * 중첩 파라미터 시연용 v3 (BUG-009 — 중첩 직렬화 데모). 브래킷·닷 두 표기를 모두 받는다:
  *   GET /api/employees-v3?page[selectPage]=1&page[pageSize]=20&sorts[0][field]=name&sorts[0][dir]=asc
+ *   GET /api/employees-v3?page.selectPage=1&page.pageSize=20&sorts[0].field=name&sorts[0].dir=asc
  *   (paramsSerializer용 compact 표기 sortSpec=name:asc,salary:desc도 수용)
  *   → { rows: [...], total: n, receivedParams: 서버가 복원한 중첩 구조 }
  */
@@ -135,16 +136,15 @@ function handleEmployeesV2Api(req, res, query) {
   }, 120);
 }
 
-/* "page[selectPage]=1&sorts[0][field]=name" 같은 브래킷 표기를 중첩 객체로 되돌린다.
- * qs(Express)·PHP·Rails가 하는 것과 같은 규칙 — 숫자 키가 이어지면 배열로 만든다.
+/* 중첩 파라미터 키를 조각으로 나눈다. 브래킷·닷 두 표기를 모두 받는다:
+ *   page[selectPage] · page.selectPage      → ['page', 'selectPage']
+ *   sorts[0][field]  · sorts[0].field       → ['sorts', '0', 'field']
  * (데모 서버는 의존성 0 원칙을 지키므로 qs 패키지 대신 직접 파싱한다) */
 function splitParamKeys(rawKey) {
-  var open = rawKey.indexOf('[');
-  if (open === -1) return [rawKey];
-  var keys = [rawKey.slice(0, open)];
-  var re = /\[([^\]]*)\]/g;
+  var keys = [];
+  var re = /[^.[\]]+/g;
   var m;
-  while ((m = re.exec(rawKey)) !== null) keys.push(m[1]);
+  while ((m = re.exec(rawKey)) !== null) keys.push(m[0]);
   return keys;
 }
 

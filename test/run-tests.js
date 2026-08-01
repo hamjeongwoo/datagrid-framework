@@ -570,8 +570,8 @@ suite('computeRowTops / findRowAtOffset', function () {
 });
 
 /* ---------------- buildQueryString ---------------- */
-suite('buildQueryString', function () {
-  var dec = function (params) { return decodeURIComponent(T.buildQueryString(params)); };
+suite('buildQueryString — bracket 표기 (qs/PHP/Rails)', function () {
+  var dec = function (params) { return decodeURIComponent(T.buildQueryString(params, 'bracket')); };
 
   assertEq(dec({ a: 1, b: 'x' }), 'a=1&b=x', '평면 파라미터');
   assertEq(dec({}), '', '빈 객체 → 빈 문자열');
@@ -585,7 +585,7 @@ suite('buildQueryString', function () {
     '객체 배열 → 인덱스 + 브래킷');
   assertEq(dec({ tags: ['x', 'y'] }), 'tags[0]=x&tags[1]=y', '원시값 배열 → 인덱스');
   assertEq(dec({ a: { b: { c: 1 } } }), 'a[b][c]=1', '3단 중첩');
-  assert(T.buildQueryString({ a: { b: 1 } }).indexOf('%5B') !== -1, '브래킷은 인코딩된다');
+  assert(T.buildQueryString({ a: { b: 1 } }, 'bracket').indexOf('%5B') !== -1, '브래킷은 인코딩된다');
 
   /* 빈 값 규칙 */
   assertEq(dec({ a: 1, b: undefined, c: 2 }), 'a=1&c=2', 'undefined는 생략');
@@ -612,6 +612,30 @@ suite('buildQueryString', function () {
   /* 형제로 같은 객체가 두 번 나오는 것은 순환이 아니다 */
   var shared = { v: 1 };
   assertEq(dec({ a: shared, b: shared }), 'a[v]=1&b[v]=1', '공유 참조는 양쪽 다 직렬화');
+});
+
+suite('buildQueryString — dot 표기 (기본, Spring/ASP.NET)', function () {
+  var dot = function (params) { return decodeURIComponent(T.buildQueryString(params, 'dot')); };
+
+  assertEq(dot({ page: { selectPage: 0, pageSize: 20 } }),
+    'page.selectPage=0&page.pageSize=20', '중첩 객체 → 점 표기');
+  assertEq(dot({ a: { b: { c: 1 } } }), 'a.b.c=1', '3단 중첩도 점으로');
+
+  /* 배열 인덱스는 두 표기 모두 대괄호 — Spring의 List 바인딩이 sorts[0].field 규약 */
+  assertEq(dot({ sorts: [{ field: 'name', dir: 'asc' }] }),
+    'sorts[0].field=name&sorts[0].dir=asc', '객체 배열 → 인덱스는 대괄호, 속성은 점');
+  assertEq(dot({ tags: ['x', 'y'] }), 'tags[0]=x&tags[1]=y', '원시값 배열은 두 표기 동일');
+  assertEq(dot({ m: [[1, 2]] }), 'm[0][0]=1&m[0][1]=2', '중첩 배열');
+
+  /* 평면 파라미터와 빈 값 규칙은 bracket과 동일 */
+  assertEq(dot({ a: 1, b: 'x' }), 'a=1&b=x', '평면 파라미터는 표기 무관');
+  assertEq(dot({ a: undefined, b: null }), 'b=', 'undefined 생략 / null 빈 값');
+
+  /* 기본값이 dot — bracket만 명시적으로 옵트인한다 */
+  assertEq(decodeURIComponent(T.buildQueryString({ p: { a: 1 } })), 'p.a=1', '기본은 dot');
+  assertEq(decodeURIComponent(T.buildQueryString({ p: { a: 1 } }, 'dot')), 'p.a=1', "'dot' 명시");
+  assertEq(decodeURIComponent(T.buildQueryString({ p: { a: 1 } }, 'bracket')), 'p[a]=1', "'bracket' 옵트인");
+  assertEq(decodeURIComponent(T.buildQueryString({ p: { a: 1 } }, 'nope')), 'p.a=1', '모르는 값 → 기본(dot)');
 });
 
 /* ---------------- buildDataSourceRequest / parseDataSourceResponse ---------------- */

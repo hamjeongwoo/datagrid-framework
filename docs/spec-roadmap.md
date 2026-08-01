@@ -178,7 +178,8 @@
 
 ### v2.10 — 중첩 요청 파라미터 직렬화 (사용자 제보 버그 + 탈출구)
 - [BUG-009](bug-reports/2026-08-02-009-nested-params-querystring.md) — `dataSource.request`/`params`가 중첩 객체·배열을 반환하면 GET 쿼리스트링에서 `[object Object]`가 되던 문제. `encodeURIComponent(value)`가 값에 `String()`을 걸기 때문. v2.5에서 `request` 훅으로 반환 구조를 자유화하면서 직렬화는 평면 전제 그대로 둔 것이 원인.
-- 순수 함수 `buildQueryString(params)` — 중첩을 브래킷 표기로 전개(`page[selectPage]=1`, `sorts[0][field]=name`, `tags[0]=x`). qs(Express)·PHP·Rails·Spring이 설정 없이 파싱하는 표준 표기를 골랐고, 배열 인덱스 규칙은 `qs.stringify` 기본값과 맞췄다. `undefined` 생략 · `null`은 `key=` · `Date`는 ISO · 순환 참조는 경로 기준으로 건너뜀(소비자 객체 때문에 그리드가 스택 오버플로로 죽지 않게). `_test` 노출.
+- 순수 함수 `buildQueryString(params, format)` — 중첩을 편다. `undefined` 생략 · `null`은 `key=` · `Date`는 ISO · 순환 참조는 경로 기준으로 건너뜀(소비자 객체 때문에 그리드가 스택 오버플로로 죽지 않게). `_test` 노출.
+- `dataSource.paramsFormat: 'dot' | 'bracket'` (v2.11.0) — **쿼리스트링의 중첩 표기는 RFC 표준이 없고 서버 프레임워크마다 관례가 다르다**(어느 쪽이 옳다가 아니라 서버에 맞추는 문제). `'dot'`(기본) = `page.selectPage=1`·`sorts[0].field=name` (Spring MVC/Boot·ASP.NET Core), `'bracket'` = `page[selectPage]=1`·`sorts[0][field]=name` (qs·PHP·Rails·Laravel·jQuery `$.param()`). **배열 인덱스는 두 표기 모두 대괄호** — Spring의 List 바인딩이 `sorts[0].field` 규약이기 때문. 처음엔 bracket을 기본으로 냈다가 사용자 서버(닷 표기)에 맞춰 기본값을 dot으로 전환했다.
 - `dataSource.paramsSerializer(params) => string` — 브래킷 표기로 표현 못 하는 서버(반복 키·JSON-in-query·compact 표기)를 위해 쿼리스트링 생성을 통째로 대체. `request`/`parse`/`headers`와 같은 "기본 동작 대체 훅" 패턴이며 예외 시 기본 직렬화로 폴백. 반환값 앞의 `?`/`&`는 떼고 붙인다.
 - 데모 서버에 `/api/employees-v3` 추가(브래킷 표기 파싱 + compact `sortSpec` 수용 + `receivedParams` 에코) — server.js·server.py 양쪽. features.html `#nested-params` 카드에서 서버가 복원한 구조를 status line에 그대로 노출하고 paramsSerializer 토글도 제공.
 - 검증: 실제 `qs` 파서로 왕복(구조 완전 복원) + 데모 서버 실요청.

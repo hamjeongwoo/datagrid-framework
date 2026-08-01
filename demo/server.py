@@ -24,15 +24,13 @@ DEFAULT_PORT = 8087
 
 
 def _split_param_keys(raw_key):
-    """'sorts[0][field]' → ['sorts', '0', 'field']"""
-    open_at = raw_key.find("[")
-    if open_at == -1:
-        return [raw_key]
-    return [raw_key[:open_at]] + re.findall(r"\[([^\]]*)\]", raw_key)
+    """중첩 파라미터 키를 조각으로 (브래킷·닷 두 표기 모두 수용):
+    'sorts[0][field]' · 'sorts[0].field' → ['sorts', '0', 'field']"""
+    return re.findall(r"[^.\[\]]+", raw_key)
 
 
 def _parse_nested_query(query):
-    """브래킷 표기를 중첩 객체로 되돌린다 (server.js의 parseNestedQuery와 동일 규칙).
+    """중첩 파라미터를 객체로 되돌린다 (server.js의 parseNestedQuery와 동일 규칙).
     qs·PHP·Rails와 같이 숫자 키가 이어지면 배열로 만든다."""
     out = {}
     for raw_key, values in query.items():
