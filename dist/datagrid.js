@@ -2131,6 +2131,9 @@
   DataGrid.prototype.refreshRow = function (row) {
     var hit = this._renderedRowEntry(row);
     if (!hit) return false;
+    /* 이벤트 핸들러 재진입 등으로 추적 중인 행이 이미 캔버스에서 떨어져
+     * 있으면 교체를 시도하지 않는다 (BUG-007 방어선). */
+    if (hit.el.parentNode !== this._canvasEl) return false;
     var fresh = this._buildRowEl(hit.index);
     this._canvasEl.replaceChild(fresh, hit.el);
     this._renderedRows[hit.index] = fresh;
@@ -4305,14 +4308,12 @@
           self._recordUpdate(row, col.field, value, evt.newValue);
           newValue = evt.newValue;
           committed = true;
-          self._emitter.emit('cellValueChanged', {
-            data: row, colDef: col, oldValue: value, newValue: evt.newValue,
-          });
-          var rowChanges = {};
-          rowChanges[col.field] = { oldValue: value, newValue: evt.newValue };
-          self._emitter.emit('rowValueChanged', { data: row, changes: rowChanges });
         }
       }
+      /* 커밋/취소가 확정된 뒤에는 이벤트 발사 전에 에디터를 먼저 완전히 닫는다.
+       * 이벤트를 열린 상태에서 발사하면, 핸들러가 refreshRow 등으로 포커스된
+       * 에디터를 DOM에서 제거할 때 blur가 동기 발화해 finish가 재진입한다
+       * (BUG-007 — 이중 커밋 + 떼어진 행에 replaceChild → NotFoundError). */
       finished = true;
       self._editing = null;
       if (cleanup) cleanup();
@@ -4326,6 +4327,14 @@
         cellEl.classList.toggle('dg-cell-dirty', dirtyNow);
         if (dirtyNow) cellEl.title = 'Original: ' + orig[col.field];
         else cellEl.removeAttribute('title');
+      }
+      if (committed) {
+        self._emitter.emit('cellValueChanged', {
+          data: row, colDef: col, oldValue: value, newValue: newValue,
+        });
+        var rowChanges = {};
+        rowChanges[col.field] = { oldValue: value, newValue: newValue };
+        self._emitter.emit('rowValueChanged', { data: row, changes: rowChanges });
       }
       self._emitter.emit('editingStopped', {
         data: row,
