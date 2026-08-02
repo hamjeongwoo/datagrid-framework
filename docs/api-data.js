@@ -188,7 +188,9 @@ window.ApiDocs = {
             '접지 않습니다.<br>' +
             '<code>position</code>: <code>\'center\'</code>(기본) | <code>\'left\'</code> | ' +
             '<code>\'right\'</code>(슬라이드 패널) · <code>width</code>(기본 420) · ' +
-            '<code>columns</code>: 1 | 2 · <code>title</code>: string | (row) => string · ' +
+            '<code>columns</code>: 1 | 2 (<strong>폭이 모자라면 자동으로 1열</strong>로 떨어지고, ' +
+            '더 좁아지면 라벨이 입력 위로 올라갑니다 — 기준은 ' +
+            '<code>--dg-popup-field-min</code> 토큰) · <code>title</code>: string | (row) => string · ' +
             '<code>trigger</code>: <code>\'dblclick\'</code>(기본) | <code>\'none\'</code>(API로만) · ' +
             '<code>fields</code>: 표시할 field 목록(순서도 결정) · ' +
             '<code>instantUpdate</code> · <code>closeOnBackdrop</code> · ' +
@@ -2945,6 +2947,14 @@ window.ApiDocs = {
         { name: '--dg-cell-horizontal-padding', default: '16px', description: '셀 좌우 패딩.' },
         { name: '--dg-wrapper-border-radius', default: '8px', description: '그리드 외곽 모서리.' },
         { name: '--dg-border-radius', default: '4px', description: '버튼·입력·체크박스 모서리.' },
+        { name: '--dg-deleted-row-opacity', default: '0.55', description: 'softDelete 삭제 표시 행의 흐림 정도.', since: '2.6.0' },
+        { name: '--dg-popup-backdrop-color', default: 'rgba(24,29,31,.32)', description: '팝업 에디터 뒷배경.', since: '2.16.0' },
+        { name: '--dg-popup-shadow', default: '0 12px 40px rgba(24,29,31,.22)', description: '팝업 에디터 그림자.', since: '2.16.0' },
+        { name: '--dg-popup-radius', default: '8px', description: '중앙 팝업 모서리(슬라이드 패널은 각짐).', since: '2.16.0' },
+        { name: '--dg-popup-label-width', default: '120px', description: '팝업 폼 라벨 열 너비(좁아지면 라벨이 입력 위로 올라감).', since: '2.16.0' },
+        { name: '--dg-popup-field-min', default: '320px', description: '팝업 폼 필드의 최소 폭 — <code>columns: 2</code>가 이 폭을 못 주면 자동으로 1열이 된다.', since: '2.16.0' },
+        { name: '--dg-popup-input-min', default: '150px', description: '팝업 폼 입력의 최소 폭 — 필드 버튼이 붙어도 이보다 좁아지지 않고 버튼이 줄바꿈된다.', since: '2.16.0' },
+        { name: '--dg-slide-duration', default: '180ms', description: '팝업 진입 효과 길이(가시성은 여기에 의존하지 않음).', since: '2.16.0' },
       ],
     },
 

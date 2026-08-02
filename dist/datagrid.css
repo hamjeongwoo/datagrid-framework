@@ -36,6 +36,8 @@
   --dg-popup-shadow: 0 12px 40px rgba(24, 29, 31, 0.22);
   --dg-popup-radius: 8px;
   --dg-popup-label-width: 120px;
+  --dg-popup-field-min: 320px;   /* 2열이 이 폭을 못 주면 자동으로 1열로 떨어진다 */
+  --dg-popup-input-min: 150px;   /* 필드 버튼이 붙어도 입력이 이보다 좁아지지 않는다 */
   --dg-slide-duration: 180ms;
   --dg-invalid-color: #e02525;
   --dg-dirty-color: #e07c00;
@@ -1222,19 +1224,27 @@
   min-height: 0;
   overflow-y: auto;
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   padding: 18px;
   align-content: start;
+  /* 아래 @container의 기준 — 필드 레이아웃이 팝업 폭에 따라 스스로 바뀐다 */
+  container-type: inline-size;
 }
-.dg-popup-body.dg-popup-cols-2 { grid-template-columns: 1fr 1fr; }
-.dg-popup-body.dg-popup-cols-2 .dg-popup-field[data-span="2"] { grid-column: span 2; }
+/* 2열은 "폭이 충분할 때만" — auto-fit이라 좁으면 알아서 1열로 떨어진다.
+   고정 1fr 1fr로 두면 좁은 팝업에서 라벨(고정폭)이 컨트롤을 짓눌러 깨진다. */
+.dg-popup-body.dg-popup-cols-2 {
+  grid-template-columns: repeat(auto-fit, minmax(var(--dg-popup-field-min), 1fr));
+}
+.dg-popup-body.dg-popup-cols-2 .dg-popup-field[data-span="2"] { grid-column: 1 / -1; }
 
 .dg-popup-field {
   display: grid;
-  grid-template-columns: var(--dg-popup-label-width) 1fr;
+  /* minmax(0, ...)이 있어야 긴 내용이 트랙을 밀어내지 않는다 */
+  grid-template-columns: minmax(0, var(--dg-popup-label-width)) minmax(0, 1fr);
   align-items: center;
   gap: 4px 12px;
+  min-width: 0;
 }
 .dg-popup-label {
   grid-column: 1;
@@ -1245,14 +1255,31 @@
   grid-column: 2;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;   /* 필드 버튼이 많으면 줄바꿈 — 입력을 짓누르지 않는다 */
   gap: 6px;
   min-width: 0;
 }
-.dg-popup-input { flex: 1; min-width: 0; position: relative; }
+.dg-popup-input {
+  flex: 1 1 var(--dg-popup-input-min);
+  min-width: 0;
+  position: relative;
+}
 .dg-popup-before,
 .dg-popup-after { grid-column: 1 / -1; }
 .dg-popup-hint,
 .dg-popup-error { grid-column: 2; font-size: 12px; }
+
+/* 필드가 좁아지면 라벨을 위로 올린다 — 고정폭 라벨 + 좁은 컨트롤 조합이
+   입력을 수십 px로 뭉개는 것을 막는다. 컨테이너 쿼리를 지원하지 않는
+   브라우저에서는 위의 flex-wrap과 auto-fit만으로도 무너지지는 않는다. */
+@container (max-width: 400px) {
+  .dg-popup-field { grid-template-columns: minmax(0, 1fr); }
+  .dg-popup-label,
+  .dg-popup-control,
+  .dg-popup-hint,
+  .dg-popup-error { grid-column: 1; }
+  .dg-popup-field-tall .dg-popup-label { padding-top: 0; }
+}
 .dg-popup-hint { color: var(--dg-secondary-foreground-color); }
 .dg-popup-error { color: var(--dg-invalid-color); }
 .dg-popup-invalid .dg-popup-label { color: var(--dg-invalid-color); }

@@ -3148,11 +3148,15 @@
     폼의 각 필드는 <strong>컬럼 정의를 그대로 재사용</strong>하므로
     <code class="inline">editor</code> · <code class="inline">editorOptions</code> ·
     <code class="inline">validator</code>가 인라인과 똑같이 동작합니다 —
-    아래 예제는 <strong>에디터 10종 전부</strong>(text · number · date · datetime · select ·
-    검색형 select · multiselect · radio · checkbox · 커스텀 객체)를 한 폼에 담았습니다.
-    편집 불가 컬럼은 읽기 전용으로 표시되고, 검증에 실패하면 라벨이 빨갛게 바뀌며 저장이 막힙니다.
+    아래 예제는 <strong>지원하는 에디터 형식을 전부</strong> 한 폼에 담았습니다:
+    text · text+validator · number · date · datetime · select(문자열) ·
+    select(<code class="inline">{ label, value }</code>) · 검색형 select(정적) ·
+    <strong>검색형 select(lazy <code class="inline">fetch</code>)</strong> · multiselect · radio ·
+    checkbox(불리언) · <strong>checkbox(Y/N 값 매핑)</strong> · 커스텀 객체 · 읽기 전용.
+    검증에 실패하면 라벨이 빨갛게 바뀌며 저장이 막힙니다.
     위치는 <code class="inline">'center'</code>(기본) · <code class="inline">'left'</code> ·
-    <code class="inline">'right'</code>(슬라이드 패널), 배치는 <code class="inline">columns: 1 | 2</code>.
+    <code class="inline">'right'</code>(슬라이드 패널), 배치는 <code class="inline">columns: 1 | 2</code>
+    (폭이 모자라면 <strong>자동으로 1열</strong>이 되고, 더 좁아지면 라벨이 입력 위로 올라갑니다).
     행을 더블클릭하거나 아래 버튼을 눌러 보세요.
   </p>
   <div class="example-card">
@@ -3188,6 +3192,11 @@
         { label: 'Figma', value: 'figma' }, { label: 'Excel', value: 'xls' },
       ];
 
+      // lazy 검색용 원격 목록 (실제로는 서버 호출) — value는 사번, label은 이름
+      var MANAGERS = ['Aiden Kim', 'Bella Lee', 'Chris Park', 'Dana Choi', 'Eli Jung',
+        'Fiona Smith', 'Grace Johnson', 'Hana Garcia', 'Ian Chen', 'Jisoo Tanaka']
+        .map(function (n, i) { return { label: n, value: 'M-' + (101 + i) }; });
+
       // 커스텀 에디터 — 내장 에디터로 안 되는 UI는 { init, getValue, destroy? } 객체로
       var sliderEditor = {
         init: function (cell, value) {
@@ -3202,12 +3211,14 @@
         getValue: function () { return Number(this._input.value); },
       };
 
-      // 데모 데이터에 없는 두 필드를 결정적으로 파생 (demo/data.js는 다른 예제와 공유)
+      // 데모 데이터에 없는 필드를 결정적으로 파생 (demo/data.js는 다른 예제와 공유)
       var rows = DemoData.makeEmployees(40, 11).map(function (r, i) {
         var p = r.hireDate.split('-');
         r.skills = [SKILL_OPTIONS[i % 6].value, SKILL_OPTIONS[(i * 5 + 2) % 6].value]
           .filter(function (v, k, arr) { return arr.indexOf(v) === k; });
         r.lastReview = new Date(+p[0] + 1, +p[1] - 1, +p[2], 9 + (i % 8), (i % 4) * 15);
+        r.manager = MANAGERS[i % MANAGERS.length].value;   // lazy searchselect 대상
+        r.contract = i % 3 === 0 ? 'Y' : 'N';              // checkbox 값 매핑 대상
         return r;
       });
 
@@ -3227,9 +3238,31 @@
             editor: 'select', editorOptions: DEPT_OPTIONS,
             cellRenderer: DataGrid.renderers.select(DEPT_OPTIONS) },
 
-          { field: 'city', headerName: 'City', width: 120,                          // 검색형 select
+          { field: 'city', headerName: 'City', width: 120,                          // 검색형 select (정적)
             editor: 'select', editorOptions: CITY_OPTIONS, editorSearch: true,
             validator: function (v) { return v ? true : '도시를 선택하세요'; } },
+
+          { field: 'manager', headerName: 'Manager', width: 130,                    // 검색형 select (lazy)
+            editor: 'select',
+            // 검색은 fetch가 하지만, 저장된 값을 label로 보여주려면 표시용 목록이 필요하다
+            // (lazy로 한 번 고른 값은 그리드가 캐시해 두므로 목록에 없어도 이름으로 표시된다)
+            editorOptions: MANAGERS,
+            editorSearch: {
+              minLength: 0, debounce: 200, placeholder: '이름으로 검색…',
+              // 실제로는 fetch(...) — 여기서는 지연을 흉내낸 로컬 검색
+              fetch: function (query) {
+                return new Promise(function (resolve) {
+                  setTimeout(function () {
+                    var q = query.toLowerCase();
+                    resolve(MANAGERS.filter(function (m) {
+                      return !q || m.label.toLowerCase().indexOf(q) !== -1;
+                    }));
+                  }, 200);
+                });
+              },
+            },
+            // 짝꿍 렌더러 — lazy로 고른 값도 그리드가 기억한 label로 표시
+            cellRenderer: DataGrid.renderers.searchselect(MANAGERS) },
 
           { field: 'status', headerName: 'Status', width: 110,                      // radio
             editor: 'radio', editorOptions: ['Active', 'On Leave', 'Contract', 'Inactive'],
@@ -3239,8 +3272,12 @@
             editor: 'multiselect', editorOptions: SKILL_OPTIONS,
             cellRenderer: DataGrid.renderers.multiselect(SKILL_OPTIONS) },
 
-          { field: 'remote', headerName: 'Remote', width: 90, align: 'center',      // checkbox
+          { field: 'remote', headerName: 'Remote', width: 90, align: 'center',      // checkbox (불리언)
             editor: 'checkbox', cellRenderer: DataGrid.renderers.checkbox() },
+
+          { field: 'contract', headerName: 'Contract', width: 100, align: 'center', // checkbox (값 매핑)
+            editor: 'checkbox', editorOptions: { checked: 'Y', unchecked: 'N' },
+            cellRenderer: DataGrid.renderers.checkbox({ checked: 'Y', unchecked: 'N' }) },
 
           { field: 'salary', headerName: 'Salary', width: 120, align: 'right',      // number
             editable: true, dataType: 'number', format: '$#,##0',
@@ -3256,8 +3293,8 @@
         ],
         popupEditor: {
           position: 'center',
-          columns: 2,        // 필드가 많으니 2열로
-          width: 720,
+          columns: 2,        // 필드가 많으니 2열로 (폭이 부족하면 자동으로 1열)
+          width: 780,
           title: function (row) { return row.name + ' 편집'; },
         },
       });
@@ -3268,7 +3305,7 @@
           popupEditor: {
             position: pos,
             columns: document.getElementById('peTwoCol').checked ? 2 : 1,
-            width: document.getElementById('peTwoCol').checked ? 720 : 460,
+            width: document.getElementById('peTwoCol').checked ? 780 : 480,
             instantUpdate: document.getElementById('peInstant').checked,
             title: function (row) { return row.name + ' 편집'; },
           },
@@ -3316,6 +3353,13 @@
   </p>
   <div class="example-card">
     <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn" id="pcCenterBtn" type="button">중앙 팝업</button>
+        <button class="tb-btn primary" id="pcRightBtn" type="button">오른쪽 슬라이드</button>
+        <button class="tb-btn" id="pcLeftBtn" type="button">왼쪽 슬라이드</button>
+        <label class="tb-check"><input type="checkbox" id="pcTwoCol" checked> 2열 배치</label>
+        <button class="tb-btn" id="pcOpenBtn" type="button">첫 행 편집</button>
+      </div>
       <div id="gridPopupCustom" class="grid-wrap-md"></div>
       <div class="status-line" id="popupCustomStatus">행을 더블클릭하면 커스터마이즈된 폼이 열립니다.</div>
     </div>
@@ -3390,10 +3434,15 @@
           { field: 'email', headerName: 'Email', width: 190, editable: true,
             popupEditor: false },   // 폼에서 제외
         ],
-        popupEditor: {
-          position: 'right',
-          width: 520,
-          columns: 2,
+        popupEditor: popupOptions('right', true),
+      });
+
+      // position·columns만 바뀌는 같은 설정 — 툴바에서 재사용한다
+      function popupOptions(position, twoCol) {
+        return {
+          position: position,
+          columns: twoCol ? 2 : 1,
+          width: twoCol ? 760 : 480,   // 2열은 폭이 충분해야 한다 (부족하면 자동 1열)
           title: function (row) { return row.name + ' 편집'; },
           buttons: [
             { key: 'reset', text: '초기화', onClick: function (ctx) { ctx.reset(); } },
@@ -3405,7 +3454,21 @@
               } },
             'save', 'cancel',
           ],
-        },
+        };
+      }
+
+      var pcPos = 'right';
+      function pcApply(position, label) {
+        pcPos = position;
+        grid.setOptions({ popupEditor: popupOptions(position, document.getElementById('pcTwoCol').checked) });
+        status.textContent = label + ' — 행을 더블클릭하거나 "첫 행 편집"을 눌러 보세요.';
+      }
+      document.getElementById('pcCenterBtn').addEventListener('click', function () { pcApply('center', '중앙 팝업'); });
+      document.getElementById('pcRightBtn').addEventListener('click', function () { pcApply('right', '오른쪽 슬라이드'); });
+      document.getElementById('pcLeftBtn').addEventListener('click', function () { pcApply('left', '왼쪽 슬라이드'); });
+      document.getElementById('pcTwoCol').addEventListener('change', function () { pcApply(pcPos, '배치 변경'); });
+      document.getElementById('pcOpenBtn').addEventListener('click', function () {
+        grid.openEditPopup(grid.getDisplayedRows()[0]);
       });
 
       grid.on('popupFieldChanged', function (e) {
