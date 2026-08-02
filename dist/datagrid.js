@@ -2352,6 +2352,8 @@
       if (this.options.zebra) root.classList.add('dg-zebra');
       if (this._domLayout === 'autoHeight') root.classList.add('dg-auto-height');
       if (this.options.showHeader === false) root.classList.add('dg-no-header');
+      /* 단일 클릭 편집일 때만 편집 가능 셀에 I빔 커서를 준다 (BUG-012) */
+      if (this.options.editOnSingleClick) root.classList.add('dg-edit-single-click');
       root.style.setProperty('--dg-row-height', `${this._rowHeight}px`);
       root.style.setProperty('--dg-header-height', `${this._headerHeight}px`);
 
@@ -2947,6 +2949,10 @@
         this._popupConfig = resolvePopupEditorConfig(patch.popupEditor);
       }
       if ('zebra' in patch) this._rootEl.classList.toggle('dg-zebra', !!patch.zebra);
+      /* 커서가 편집 진입 방식을 그대로 반영하도록 런타임 토글도 따라간다 (BUG-012) */
+      if ('editOnSingleClick' in patch) {
+        this._rootEl.classList.toggle('dg-edit-single-click', !!patch.editOnSingleClick);
+      }
       if ('theme' in patch) this.setTheme(patch.theme);
       if ('editable' in patch) this._editable = patch.editable !== false;
       if ('sortModel' in patch) this._sortModel = (patch.sortModel || []).slice();
@@ -4091,6 +4097,11 @@
     /** treeData + checkboxSelection 컬럼이 있으면 트리 체크박스 모드. */
     _hasTreeCheckbox() {
       if (!this._treeData) return false;
+      return this._hasCheckboxColumn();
+    }
+
+    /** checkboxSelection 컬럼이 있는가. 있으면 선택 진입점을 체크박스 셀로 한정한다. */
+    _hasCheckboxColumn() {
       return this._columns.some(c => c.checkboxSelection);
     }
 
@@ -4608,9 +4619,22 @@
 
       this._setFocusedCell(hit.r, hit.c);
 
-      /* cellSelection에서는 클릭 행 선택을 끈다 (체크박스 선택은 유지) */
+      /* 선택 진입점 —
+       * ① 체크박스 셀은 여백을 클릭해도 체크박스를 누른 것으로 친다. 실제 토글은
+       *    체크박스의 change 핸들러에 위임한다(트리 3상태 처리를 한 곳에 둔다 — BUG-004).
+       * ② checkboxSelection 컬럼이 있으면 다른 셀 클릭은 선택을 바꾸지 않는다.
+       *    체크박스가 없는 그리드에서만 행 클릭 선택이 남는다 — 아니면 선택 수단이 사라진다.
+       * ③ cellSelection에서도 행 클릭 선택을 끈다. */
+      const onCheckbox = !!(e.target.closest && e.target.closest('.dg-checkbox'));
+      const cbCell = e.target.closest ? e.target.closest('.dg-checkbox-cell') : null;
+      if (cbCell && !onCheckbox) {
+        const cb = cbCell.querySelector('.dg-checkbox');
+        /* disabled 체크박스는 click()이 활성화 동작을 실행하지 않는다 — 여백도 같이 무시 */
+        if (cb) cb.click();
+      }
+
       const mode = this.options.rowSelection;
-      if (mode && !this._cellSelection && !e.target.closest('.dg-checkbox')) {
+      if (mode && !this._cellSelection && !onCheckbox && !cbCell && !this._hasCheckboxColumn()) {
         const id = this._rowId(hit.row);
         if (mode === 'multiple' && e.shiftKey && this._lastClickedViewIndex !== -1) {
           const from = Math.min(this._lastClickedViewIndex, hit.r);
@@ -7228,7 +7252,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.16.0';
+  DataGrid.version = '2.17.0';
 
   /**
    * 내장 로케일. `localeText: DataGrid.locales.ko`처럼 통째로 쓰거나,

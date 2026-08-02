@@ -22,7 +22,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.16.0',
+  version: '2.17.0',
   updated: '2026-08-02',
 
   sections: [
@@ -108,7 +108,12 @@ window.ApiDocs = {
           default: 'undefined (선택 비활성)',
           description:
             '행 선택 모드. <code>\'multiple\'</code>이면 Ctrl/⌘+클릭 토글, Shift+클릭 범위 선택, ' +
-            '체크박스 컬럼(<code>checkboxSelection</code>)과 헤더 전체 선택을 사용할 수 있습니다.',
+            '체크박스 컬럼(<code>checkboxSelection</code>)과 헤더 전체 선택을 사용할 수 있습니다. ' +
+            '<strong>선택 진입점은 체크박스 컬럼의 유무로 갈립니다</strong>(v2.17) — ' +
+            '<code>checkboxSelection</code> 컬럼이 있으면 선택은 그 컬럼에서만 이뤄지고 ' +
+            '다른 셀을 클릭해도 선택이 바뀌지 않습니다(포커스만 이동). ' +
+            '체크박스 컬럼이 없으면 종전대로 행의 아무 셀이나 클릭해 선택합니다. ' +
+            '<code>cellSelection: true</code>에서는 행 클릭 선택이 항상 꺼집니다.',
         },
         {
           name: 'pagination',
@@ -1595,6 +1600,9 @@ window.ApiDocs = {
           default: 'false',
           description:
             '셀 앞에 선택 체크박스를 표시합니다. 보통 <code>field</code> 없는 전용 컬럼으로 만듭니다. ' +
+            '<strong>이 컬럼을 두면 그리드의 선택 진입점이 여기로 한정됩니다</strong>(v2.17) — ' +
+            '다른 셀을 클릭해도 선택이 바뀌지 않고, 체크박스 셀은 체크박스를 정확히 누르지 않고 ' +
+            '셀 여백을 클릭해도 토글됩니다(비활성 체크박스는 여백도 무시). ' +
             '<code>treeData</code> 그리드에서는 3상태 캐스케이드 체크박스(부모↔자손 선택 연동, ' +
             'indeterminate 표시)로 동작합니다. indeterminate 부모를 클릭하면 남은 체크 가능 리프가 ' +
             '있을 때는 전부 체크하고, 없을 때(비활성 리프만 미체크)는 해제합니다.',

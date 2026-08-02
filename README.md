@@ -54,7 +54,7 @@ python demo/server.py
 | `columnDefs` | array | 컬럼 정의 (아래 참조) |
 | `rowData` | array | 행 객체 배열 |
 | `defaultColDef` | object | 모든 컬럼의 기본값 |
-| `rowSelection` | `'single'` \| `'multiple'` | 행 선택 모드 |
+| `rowSelection` | `'single'` \| `'multiple'` | 행 선택 모드. `checkboxSelection` 컬럼이 있으면 선택은 그 컬럼에서만 이뤄진다(다른 셀 클릭은 포커스만 이동). 체크박스 컬럼이 없으면 행의 아무 셀이나 클릭해 선택 |
 | `pagination` | boolean | 페이지네이션 사용 |
 | `paginationPageSize` | number | 페이지 크기 (기본 20) |
 | `paginationPageSizeOptions` | array | 페이지 크기 선택지 |
@@ -126,7 +126,7 @@ python demo/server.py
 | `headerTooltip` | 헤더 셀 툴팁 (`title` 속성) |
 | `align` / `headerAlign` | `'left'` \| `'center'` \| `'right'` (헤더만 다른 정렬 가능) |
 | `pinned` | `'left'` \| `'right'` 고정 컬럼 |
-| `checkboxSelection` / `headerCheckboxSelection` | 선택 체크박스 / 헤더 전체 선택 |
+| `checkboxSelection` / `headerCheckboxSelection` | 선택 체크박스 / 헤더 전체 선택. 두면 그리드의 선택 진입점이 이 컬럼으로 한정된다. 체크박스를 정확히 누르지 않고 셀 여백을 클릭해도 토글 |
 | `resizable` (기본 true) | 드래그 크기 조절, 더블클릭 자동 맞춤 |
 | `hide` | 컬럼 숨김 |
 

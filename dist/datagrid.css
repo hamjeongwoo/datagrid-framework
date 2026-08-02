@@ -477,9 +477,15 @@
   border-radius: 2px;
 }
 
-/* I빔(cursor: text)은 "클릭하면 입력된다"는 신호인데 편집 진입은 더블클릭이다 —
-   약속을 지키지 못하는 커서라 기본 커서를 쓴다 (BUG-012). */
+/* I빔(cursor: text)은 "클릭하면 캐럿이 선다"는 신호다. 기본 편집 진입은 더블클릭이라
+   약속을 지킬 수 없으므로 기본 커서를 쓰고, editOnSingleClick일 때만 I빔을 준다 (BUG-012). */
 .dg-cell-editable { cursor: default; }
+.dg-root.dg-edit-single-click .dg-cell-editable { cursor: text; }
+
+/* 체크박스 셀은 여백을 클릭해도 토글된다 — 클릭 대상임을 커서로 알린다.
+   체크박스가 비활성이면 여백도 동작하지 않으므로 포인터를 주지 않는다. */
+.dg-checkbox-cell { cursor: pointer; }
+.dg-checkbox-cell:has(.dg-checkbox:disabled) { cursor: default; }
 
 /* Inline editor */
 .dg-cell-editor {

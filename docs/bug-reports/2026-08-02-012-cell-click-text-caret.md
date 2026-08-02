@@ -28,8 +28,8 @@ activeIsEditable  false         ← contenteditable 아님
 rootTabindex      0
 ```
 
-코드 전체에 `contenteditable`은 0건이고 `_onCellClick`은 편집을 시작하지 않는다
-(`singleClickEdit` 옵션 자체가 없고 편집은 `_onCellDblClick` 전용).
+코드 전체에 `contenteditable`은 0건이고, 기본 설정에서 `_onCellClick`은 편집을 시작하지 않는다
+(편집 진입은 `_onCellDblClick` 전용 — 단, `editOnSingleClick: true`면 클릭으로도 진입한다).
 즉 **그리드가 만든 캐럿이 아니라 브라우저가 그린 캐럿**이다.
 
 ## 원인 분석
@@ -48,7 +48,9 @@ rootTabindex      0
 (캐럿 브라우징이 켜져 있으면 깜빡임까지 보인다).
 
 여기에 `.dg-cell-editable { cursor: text }`가 I빔 포인터를 더해
-"클릭하면 입력된다"는 신호를 강화했지만, 실제 편집 진입은 더블클릭이다.
+"클릭하면 입력된다"는 신호를 강화했지만, 기본 편집 진입은 더블클릭이다.
+(최초 분석에서 "단일 클릭 편집이 없다"고 적었으나 `editOnSingleClick` 옵션이 실재한다 —
+켜져 있을 때는 I빔이 정확한 신호이므로 커서는 무조건 제거가 아니라 옵션에 따라 갈라야 한다.)
 
 **근본 원인은 텍스트 선택 억제가 그리드 정책이 아니라 `cellSelection` 기능의
 부수효과로 존재했던 것.** 옵션 하나로 같은 그리드가 "셀 UI"였다가
@@ -62,8 +64,10 @@ rootTabindex      0
    `.dg-root/.dg-menu/.dg-popup`의 `input`·`textarea`에 `user-select: text`.
    `.dg-menu`/`.dg-popup`은 루트 안에 append되므로(BUG-001) `none`을 상속받는다 —
    되살리는 규칙이 없으면 필터 입력·팝업 폼에서 텍스트를 선택할 수 없게 된다.
-3. `.dg-cell-editable`의 커서를 `text` → `default`.
-   지키지 못할 약속을 하는 커서를 없앴다.
+3. `.dg-cell-editable`의 커서를 `text` → `default`로 하고,
+   `editOnSingleClick`일 때만 루트에 `dg-edit-single-click` 클래스를 붙여 I빔을 되살린다
+   (`_buildDom` + `setOptions` 양쪽 — 이 카드는 런타임 토글로 검증한다).
+   지키지 못할 약속을 하는 커서만 없애고, 지킬 수 있는 곳에는 남긴다.
 
 `datagrid.js`의 mousedown `preventDefault()`는 그대로 뒀다 — 드래그 범위 선택의
 앵커 처리에 함께 걸려 있어 제거하면 포커스 동작이 바뀐다.
@@ -84,6 +88,9 @@ rootTabindex      0
 | 루트 밖 정적 `.dg-menu` 견본 | **text** | — |
 
 - 인라인 에디터에서 `setSelectionRange(1,4)` → 선택 길이 3 (선택 정상 동작)
+- 셀에 프로그래매틱 `Range`를 걸어도 `sel.toString().length === 0` — 선택 시스템에서 빠짐
+- `editOnSingleClick` 커서: 생성 시 `true`인 카드 → `text`,
+  런타임 `setOptions({editOnSingleClick:true/false})` 토글 → `text` ↔ `default`
 - 751 passed, 콘솔 에러 0
 
 ## 재발 방지
@@ -95,5 +102,10 @@ rootTabindex      0
   생각할 것. 특히 루트 안에 append되는 팝업류는 조용히 상속받는다(BUG-001의 이면 —
   토큰이 상속되는 것과 같은 경로로 이런 억제 속성도 상속된다).
 - 커서 모양은 상호작용 약속이다. `cursor: text`는 "클릭하면 캐럿이 선다"는 뜻이므로
-  단일 클릭 편집이 없으면 쓰지 말 것.
+  단일 클릭 편집이 없으면 쓰지 말 것. 다만 **옵션에 따라 약속이 달라지는 성질은
+  옵션을 따라가게** 만들 것(`editOnSingleClick` → `dg-edit-single-click`).
+  이때 생성 시점(`_buildDom`)만 처리하면 `setOptions` 런타임 토글에서 어긋난다 — 세트로 넣을 것.
+- "그런 옵션은 없다"는 결론을 내리기 전에 **이름을 바꿔 가며 검색할 것.**
+  최초 분석은 `singleClickEdit`으로만 찾아 없다고 판단했는데 실제 이름은
+  `editOnSingleClick`이었다. 옵션 부재를 근거로 삼는 설계 판단은 특히 위험하다.
 - CLAUDE.md "축적된 함정" 19번에 등재.
