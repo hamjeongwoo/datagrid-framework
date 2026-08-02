@@ -1886,10 +1886,12 @@
     (columns || []).forEach(col => {
       if (!col || col.field === undefined || col.field === null) return;
       if (col.__rowNumber || col.__rowStatus || col.__detailToggle) return;
-      if (col.checkboxSelection || col.hide) return;
+      if (col.checkboxSelection) return;
       if (col.popupEditor === false) return;
       const cfg = col.popupEditor && typeof col.popupEditor === 'object' ? col.popupEditor : {};
-      if (cfg.hide) return;
+      /* 기본은 그리드의 hide를 따르되 명시 지정이 이긴다 (readonly와 같은 층위) —
+       * `hide: false`로 "그리드에선 숨기고 폼에서만 편집"이 가능해야 한다. */
+      if (cfg.hide !== undefined ? cfg.hide : col.hide) return;
       if (explicit && explicit.indexOf(col.field) === -1) return;
 
       /* 팝업 전용 컬럼 오버라이드 — 셀은 좁아 select, 폼은 넓어 searchselect 같은 교체 */

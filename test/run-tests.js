@@ -1890,6 +1890,16 @@ suite('buildPopupFields', function () {
   assertEq(f.map(function (x) { return x.readonly; }), [false, true, false], 'editable → readonly 반전');
   assertEq(f[0].label, 'Name', '기본 라벨은 headerName');
 
+  /* hide는 그리드 설정을 따르되 popupEditor.hide 명시가 이긴다 (readonly와 같은 층위) */
+  var hideCases = build([
+    { field: 'shown', colId: 'shown', editable: true },
+    { field: 'gridHidden', colId: 'gridHidden', editable: true, hide: true },
+    { field: 'formOnly', colId: 'formOnly', editable: true, hide: true, popupEditor: { hide: false } },
+    { field: 'gridOnly', colId: 'gridOnly', editable: true, popupEditor: { hide: true } },
+  ], T.resolvePopupEditorConfig(true), true);
+  assertEq(hideCases.map(function (x) { return x.field; }), ['shown', 'formOnly'],
+    'hide: false는 그리드 hide를 이기고, hide: true는 보이는 컬럼을 폼에서 뺀다');
+
   /* 내장 컬럼과 체크박스는 폼에 넣지 않는다 */
   var builtins = build([
     { field: 'a', colId: 'a', editable: true },

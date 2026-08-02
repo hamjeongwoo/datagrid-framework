@@ -1512,7 +1512,11 @@ window.ApiDocs = {
             '폼은 넓어서 검색형처럼 <strong>맥락별로 다르게</strong> 쓰는 것이 주 용도입니다. ' +
             '<code>popupEditor: false</code>면 그 컬럼을 폼에서 제외합니다.<br>' +
             '<strong>폼 전용 표시</strong> — <code>label</code>(기본 <code>headerName</code>) · ' +
-            '<code>hint</code>(입력 아래 도움말) · <code>hide</code> · <code>readonly</code> · ' +
+            '<code>hint</code>(입력 아래 도움말) · ' +
+            '<code>hide</code>(기본은 컬럼의 <code>hide</code>를 따르지만 <strong>여기 지정한 값이 이깁니다</strong> — ' +
+            '<code>hide: false</code>로 "그리드에선 숨기고 폼에서만 편집"이 가능) · ' +
+            '<code>readonly</code>(마찬가지로 컬럼의 <code>editable</code>을 덮어씀. ' +
+            '단 <code>setEditable(false)</code> 그리드 잠금은 못 이깁니다) · ' +
             '<code>order</code>(작을수록 앞. 지정한 필드만 움직이고 나머지는 컬럼 순서 유지) · ' +
             '<code>span</code>(<code>columns: 2</code>에서 두 칸 차지).<br>' +
             '<strong>오버라이드</strong> — <code>editor</code> · <code>editorOptions</code> · ' +
