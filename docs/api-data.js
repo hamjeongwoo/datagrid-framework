@@ -2927,6 +2927,9 @@ window.ApiDocs = {
         { name: '--dg-background-color', default: '#ffffff', description: '그리드 배경.' },
         { name: '--dg-foreground-color', default: '#181d1f', description: '기본 글자색.' },
         { name: '--dg-secondary-foreground-color', default: 'rgba(24,29,31,.62)', description: '보조 텍스트(요약, 라벨).' },
+        { name: '--dg-disabled-foreground-color', default: 'rgba(24,29,31,.38)', description: '비활성 텍스트(빈 값, 잠긴 항목).' },
+        { name: '--dg-header-foreground-color', default: '#181d1f', description: '헤더 글자색.' },
+        { name: '--dg-accent-foreground-color', default: '#ffffff', description: '강조 배경 위의 글자색(주요 버튼 등).' },
         { name: '--dg-border-color', default: '#dde2eb', description: '외곽·헤더 경계선.' },
         { name: '--dg-row-border-color', default: '#eff1f6', description: '행 사이 경계선.' },
         { name: '--dg-header-background-color', default: '#f8f9fb', description: '헤더 배경.' },
@@ -2938,16 +2941,23 @@ window.ApiDocs = {
         { name: '--dg-input-background-color', default: '#ffffff', description: '에디터·필터 입력 배경.' },
         { name: '--dg-input-border-color', default: '#c2c8d0', description: '입력·체크박스 테두리.' },
         { name: '--dg-menu-background-color', default: '#ffffff', description: '필터 메뉴 팝업 배경.' },
-        { name: '--dg-invalid-color', default: '#e02525', description: '오류 표시용(예약).' },
+        { name: '--dg-menu-shadow', default: '0 4px 16px rgba(24,29,31,.16)', description: '필터 메뉴·에디터 패널 그림자.' },
+        { name: '--dg-invalid-color', default: '#e02525', description: '검증 실패 표시(테두리·메시지·팝업 폼 라벨).' },
+        { name: '--dg-dirty-color', default: '#e07c00', description: '변경 추적(trackChanges) dirty 셀 표시.', since: '1.2.0' },
+        { name: '--dg-added-row-background-color', default: 'rgba(13,138,68,.08)', description: '추가된 행 배경(trackChanges).', since: '1.2.0' },
+        { name: '--dg-range-background-color', default: 'rgba(33,150,243,.14)', description: '셀/블록 범위 선택 배경(cellSelection).', since: '1.2.0' },
         { name: '--dg-group-row-background-color', default: '#f3f6fa', description: '그룹 헤더 행 배경.', since: '1.1.0' },
         { name: '--dg-group-indent', default: '20px', description: '중첩 그룹 레벨당 들여쓰기 폭.', since: '1.1.0' },
         { name: '--dg-floating-filter-height', default: '36px', description: '헤더 필터 행(floatingFilter) 높이.', since: '1.1.0' },
+        { name: '--dg-group-header-height', default: '34px', description: '2단 컬럼 그룹 헤더(columnGroups) 행 높이.', since: '1.2.0' },
+        { name: '--dg-icon-size', default: '16px', description: '헤더 정렬·필터 아이콘 크기.' },
         { name: '--dg-header-height', default: '48px', description: '헤더 높이 — JS 옵션 headerHeight로 설정하세요.' },
         { name: '--dg-row-height', default: '42px', description: '행 높이 — JS 옵션 rowHeight로 설정하세요(가상 스크롤 계산에 사용).' },
         { name: '--dg-cell-horizontal-padding', default: '16px', description: '셀 좌우 패딩.' },
         { name: '--dg-wrapper-border-radius', default: '8px', description: '그리드 외곽 모서리.' },
         { name: '--dg-border-radius', default: '4px', description: '버튼·입력·체크박스 모서리.' },
         { name: '--dg-deleted-row-opacity', default: '0.55', description: 'softDelete 삭제 표시 행의 흐림 정도.', since: '2.6.0' },
+        { name: '--dg-popup-width', default: '420px', description: '팝업 에디터 기본 폭 — 보통은 JS 옵션 <code>popupEditor.width</code>로 설정합니다.', since: '2.16.0' },
         { name: '--dg-popup-backdrop-color', default: 'rgba(24,29,31,.32)', description: '팝업 에디터 뒷배경.', since: '2.16.0' },
         { name: '--dg-popup-shadow', default: '0 12px 40px rgba(24,29,31,.22)', description: '팝업 에디터 그림자.', since: '2.16.0' },
         { name: '--dg-popup-radius', default: '8px', description: '중앙 팝업 모서리(슬라이드 패널은 각짐).', since: '2.16.0' },
@@ -2976,6 +2986,19 @@ window.ApiDocs = {
         '<tr><td><kbd>Ctrl/⌘</kbd>+<kbd>V</kbd></td><td>포커스 셀부터 TSV 붙여넣기 — 편집 가능 + 검증 통과 셀만</td></tr>' +
         '<tr><td><kbd>Shift</kbd>+클릭</td><td>범위 선택(multiple) / 헤더에서 다중 정렬 추가</td></tr>' +
         '<tr><td><kbd>Ctrl/⌘</kbd>+클릭</td><td>개별 선택 토글(multiple)</td></tr>' +
+        '<tr><td><kbd>Ctrl/⌘</kbd>+<kbd>Z</kbd> / <kbd>Y</kbd></td><td>실행 취소 / 다시 실행 (<code>undoRedo: true</code>)</td></tr>' +
+        '</tbody></table>' +
+        '<p><strong><a href="#grid-options-popupEditor">팝업 편집 폼</a>(<code>popupEditor</code>) 안에서는</strong> ' +
+        '규칙이 조금 다릅니다 — 폼은 여러 필드가 동시에 열려 있고 저장이 한 번에 일어나기 때문입니다.</p>' +
+        '<table class="api-table"><thead><tr><th>키</th><th>동작</th></tr></thead><tbody>' +
+        '<tr><td><kbd>Tab</kbd></td><td>다음 필드로 이동 — 저장하지 않습니다(셀 편집의 "커밋 후 다음 셀"과 다름). ' +
+        '폼은 <strong>모달</strong>이라 마지막 요소에서 <kbd>Tab</kbd>하면 첫 요소로 순환하고, ' +
+        '뒤 페이지로 빠져나가지 않습니다</td></tr>' +
+        '<tr><td><kbd>Enter</kbd></td><td>단순 입력(text·number·date 등)에서 <strong>저장</strong>. ' +
+        '검색형 select·multiselect·radio 패널 안에서는 그 위젯의 동작(선택 확정)만 하고 저장하지 않습니다</td></tr>' +
+        '<tr><td><kbd>Esc</kbd></td><td>폼 취소(변경 폐기, <code>instantUpdate</code>면 연 시점으로 롤백). ' +
+        '단 검색형 select의 목록이 열려 있으면 <strong>목록만 닫습니다</strong> — 한 번 더 누르면 폼이 닫힙니다</td></tr>' +
+        '<tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>검색형 select 목록에서 옵션 이동</td></tr>' +
         '</tbody></table>',
       entries: [],
     },

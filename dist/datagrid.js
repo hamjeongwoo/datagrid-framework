@@ -5645,9 +5645,11 @@
           if (e.target === backdrop) this._popupCancel();
         });
       }
-      /* Esc는 취소, Enter는 단순 입력에서만 저장 (패널형 에디터는 자기 키를 쓴다) */
+      /* Esc는 취소, Enter는 단순 입력에서만 저장 (패널형 에디터는 자기 키를 쓴다),
+       * Tab은 폼 안에서 순환한다 */
       panel.addEventListener('keydown', e => {
         if (e.key === 'Escape') { e.stopPropagation(); this._popupCancel(); return; }
+        if (e.key === 'Tab') { this._popupTrapFocus(e, panel); return; }
         if (e.key !== 'Enter') return;
         const t = e.target;
         if (!t || t.tagName !== 'INPUT') return;
@@ -5660,6 +5662,31 @@
        * 트랜지션으로 처리하면 가시성이 프레임 생성에 묶여, 프레임이 안 나오는
        * 상황에서 패널이 화면 밖에 영구히 남는다. */
       this._popupSyncButtons();
+    }
+
+    /**
+     * Tab을 폼 안에서 순환시킨다. `aria-modal="true"`를 선언한 이상 키보드도
+     * 실제로 갇혀 있어야 한다 — 안 그러면 Tab으로 뒤 페이지까지 빠져나가면서
+     * 보조기술에는 "뒤는 비활성"이라고 말하는 셈이 된다.
+     */
+    _popupTrapFocus(e, panel) {
+      const focusables = Array.prototype.filter.call(
+        panel.querySelectorAll(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), ' +
+          'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        ),
+        el => el.tabIndex !== -1 && (el.offsetWidth > 0 || el.offsetHeight > 0 || el === document.activeElement)
+      );
+      if (!focusables.length) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      } else if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      }
     }
 
     _buildPopupField(f, body) {

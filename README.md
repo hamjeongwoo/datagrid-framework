@@ -44,7 +44,7 @@ python demo/server.py
 | 페이지 | 내용 |
 |---|---|
 | `index.html` | **Template** — 10,000행 실전 예제 (툴바 · 퀵 필터 · 선택 · 편집 · CSV · 다크 모드) |
-| `examples/features.html` | **Features** — 기능별 데모 (정렬 · 그룹핑/집계 · 필터 · 선택 · 편집 · 페이지네이션 · 고정 컬럼 · 10만 행 가상화 · 오버레이) |
+| `examples/features.html` | **Features** — 기능별 데모 59개 (정렬 · 필터 · 그룹핑/집계 · 선택 · 인라인 편집 · **팝업 폼 편집** · 트리 · 원격 데이터/CRUD 스테이징 · 클립보드 · 상태 저장 · Excel/CSV · 10만 행 가상화 · 컬럼 가상화 · 다국어) |
 | `examples/components.html` | **Components** — 디자인 시스템 갤러리 (토큰 · 헤더/행 상태 · 체크박스 · 태그 · 필터 메뉴 · 페이지네이션 바) |
 
 ## 그리드 옵션
