@@ -3062,6 +3062,85 @@
     </script>
   </div>
 
+  <!-- ======================================================== UI 문자열 다국어 -->
+  <h2 class="section" id="locale-text">UI Text Localization (localeText)</h2>
+  <p class="section-desc">
+    그리드가 직접 그리는 UI 문자열(필터 메뉴 · 페이지네이션 · 오버레이 · 그룹 요약 등)은
+    <code class="inline">localeText</code>로 통째로 바꿉니다. 내장 로케일
+    <code class="inline">DataGrid.locales.ko</code> / <code class="inline">.en</code>을 그대로 쓰거나,
+    그 위에 원하는 키만 덮어쓸 수 있습니다.
+    <code class="inline">setOptions({ localeText })</code>로 런타임 전환도 됩니다.
+    <code class="inline">&#123;from&#125;</code> 같은 <strong>토큰</strong>은 값으로 치환되며,
+    번역하지 않은 키는 영어 기본값이 그대로 쓰입니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn primary" id="locKoBtn" type="button">한국어</button>
+        <button class="tb-btn" id="locEnBtn" type="button">English</button>
+        <button class="tb-btn" id="locCustomBtn" type="button">한국어 + 일부 커스텀</button>
+        <button class="tb-btn" id="locEmptyBtn" type="button">빈 데이터 (오버레이)</button>
+      </div>
+      <div id="gridLocale" class="grid-wrap-md"></div>
+      <div class="status-line" id="localeStatus">
+        헤더의 필터 메뉴(≡)를 열어 연산자·버튼 라벨을, 아래 페이지네이션 바와 그룹 합계 행을 함께 확인하세요.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var status = document.getElementById('localeStatus');
+      var rows = DemoData.makeEmployees(90, 31);
+
+      var grid = new DataGrid(document.getElementById('gridLocale'), {
+        rowData: rows,
+        columnDefs: [
+          { field: 'name', headerName: '이름', flex: 1, filter: 'text' },
+          { field: 'department', headerName: '부서', width: 140, filter: 'set' },
+          { field: 'salary', headerName: '연봉', width: 120, align: 'right',
+            filter: 'number', dataType: 'number', format: '#,##0', aggFunc: 'sum' },
+        ],
+        localeText: DataGrid.locales.ko,   // 내장 한국어 로케일
+        groupBy: ['department'],
+        grandTotal: true,
+        floatingFilter: true,
+        pagination: true,
+        paginationPageSize: 20,
+      });
+
+      function apply(localeText, label) {
+        grid.setOptions({ localeText: localeText });   // 런타임 전환
+        status.textContent = label +
+          ' — 페이지 요약: "' + document.querySelector('#gridLocale .dg-paging-row-summary').textContent + '"';
+      }
+
+      document.getElementById('locKoBtn').addEventListener('click', function () {
+        apply(DataGrid.locales.ko, '내장 한국어');
+      });
+      document.getElementById('locEnBtn').addEventListener('click', function () {
+        apply(DataGrid.locales.en, '내장 영어');
+      });
+      document.getElementById('locCustomBtn').addEventListener('click', function () {
+        // 내장 로케일 위에 원하는 키만 덮어쓰기
+        var custom = Object.assign({}, DataGrid.locales.ko, {
+          pageSummary: '전체 {total}명 가운데 {from}번째 ~ {to}번째',
+          groupTotal: '총계',
+          rowCount: '({count}명)',
+          filterApply: '조회',
+          noRowsToShow: '조건에 맞는 직원이 없습니다',
+        });
+        apply(custom, '한국어 + 커스텀');
+      });
+      var emptied = false;
+      document.getElementById('locEmptyBtn').addEventListener('click', function () {
+        emptied = !emptied;
+        grid.setQuickFilter(emptied ? '###없는값###' : '');
+        var panel = document.querySelector('#gridLocale .dg-overlay-panel');
+        status.textContent = emptied
+          ? '빈 결과 — 오버레이 문구: "' + panel.textContent + '" (다시 눌러 복원)'
+          : '데이터 복원됨.';
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

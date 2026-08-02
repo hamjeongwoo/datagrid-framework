@@ -5,6 +5,7 @@ AG Grid Design System (Community) — Quartz 테마의 디자인 토큰과 컴�
 
 - **모듈 시스템 없음** — `<script>` 태그로 로드하면 전역 `DataGrid` 하나가 노출됩니다. 빌드 도구 불필요.
 - **CSS 토큰 테마** — 모든 색·크기는 `.dg-root`의 CSS 커스텀 프로퍼티. 라이트/다크 내장.
+- **UI 문자열 다국어** — `localeText` 한 곳으로 전체 교체. 한국어/영어 로케일 내장.
 - **가상 스크롤** — 보이는 행만 DOM 렌더링, 100,000행도 부드럽게 동작.
 
 ## 시작하기
@@ -59,6 +60,7 @@ python demo/server.py
 | `paginationPageSizeOptions` | array | 페이지 크기 선택지 |
 | `zebra` | boolean | 홀수 행 배경 |
 | `theme` | `'light'` \| `'dark'` | 초기 테마 |
+| `localeText` | object | 그리드가 그리는 UI 문자열(필터 메뉴·페이지네이션·오버레이·요약·aria-label) 교체. 내장 `DataGrid.locales.ko` / `.en`, 지정한 키만 덮어쓰고 나머지는 영어. `{from}`·`{total}`·`{column}`·`{count}` 토큰 치환, `setOptions`로 런타임 전환 |
 | `rowHeight` / `headerHeight` | number | px (기본 42 / 48) |
 | `sortModel` | array | 초기 정렬 `[{ field, dir }]` |
 | `getRowId` | function | 행 식별자 (기본: 자동) |
@@ -159,6 +161,28 @@ cellRenderer: DataGrid.renderers.checkbox()   // 값을 체크박스 모양으�
 `toggleNode(row, expanded?)` / `expandNode(row)` / `collapseNode(row)` / `isNodeExpanded(row)` / `expandAllNodes(level?)` / `collapseAllNodes()` ·
 `setPinnedTopRows(rows)` · `setEnabled(bool)` / `isEnabled()` · `once(event, fn)` · `destroy()`
 
+정적: `DataGrid.format(value, pattern)` · `DataGrid.locales.ko` / `.en` (localeText용 내장 로케일) · `DataGrid.renderers.*` · `DataGrid.version`
+
+### UI 문자열 다국어
+
+```js
+var grid = new DataGrid(el, {
+  columnDefs: cols,
+  rowData: rows,
+  localeText: DataGrid.locales.ko,   // 필터 메뉴·페이지네이션·오버레이가 한국어로
+});
+
+// 일부만 바꾸기 — 지정하지 않은 키는 기준 로케일 값 유지
+grid.setOptions({
+  localeText: Object.assign({}, DataGrid.locales.ko, {
+    pageSummary: '전체 {total}명 가운데 {from}번째 ~ {to}번째',
+    noRowsToShow: '조건에 맞는 직원이 없습니다',
+  }),
+});
+```
+
+전체 키 목록은 [API 문서의 UI 문자열 다국어 가이드](docs/api.html#locale-guide) 참고.
+
 ## 이벤트
 
 ```js
@@ -203,4 +227,4 @@ grid.on('beforeExport', function (e) { e.filename = 'report-' + Date.now() + '.'
 node test/run-tests.js
 ```
 
-정렬·필터·퀵 필터·페이지네이션·CSV 등 DOM 없는 데이터 로직 56개 단위 테스트.
+정렬·필터·퀵 필터·페이지네이션·CSV·로케일 등 DOM 없는 데이터 로직 67개 스위트 / 657개 단언.

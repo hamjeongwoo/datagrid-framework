@@ -54,6 +54,151 @@
     '<path d="M6 3.5L10.5 8L6 12.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
   /* ---------------------------------------------------------------------------
+   * i18n (localeText)
+   *
+   * 그리드가 직접 그리는 모든 UI 문자열은 여기 한 곳에 모인다. JS 안에 문자열을
+   * 다시 하드코딩하지 말 것 — 새 UI 텍스트가 생기면 이 표에 키를 추가하고
+   * `this._t(key, params)`로 읽는다.
+   *
+   * `{name}` 토큰은 `interpolate`가 치환한다. 값이 안 주어진 토큰은 그대로 남겨
+   * 커스텀 로케일의 오타가 화면에 드러나게 한다.
+   * ------------------------------------------------------------------------- */
+
+  const LOCALE_EN = {
+    /* 필터 메뉴 · 헤더 필터 행 */
+    filterPlaceholder: 'Filter…',
+    filterToPlaceholder: 'To…',
+    filterApply: 'Apply',
+    filterClear: 'Clear',
+    filterAll: '(All)',
+    blanks: '(Blanks)',
+    opContains: 'Contains',
+    opNotContains: 'Does not contain',
+    opEquals: 'Equals',
+    opNotEqual: 'Not equal',
+    opStartsWith: 'Starts with',
+    opEndsWith: 'Ends with',
+    opLessThan: 'Less than',
+    opLessThanOrEqual: 'Less than or equal',
+    opGreaterThan: 'Greater than',
+    opGreaterThanOrEqual: 'Greater than or equal',
+    opInRange: 'In range',
+
+    /* 헤더 (대부분 aria-label · title) */
+    selectAllRows: 'Select all rows',
+    selectRow: 'Select row',
+    selectSubtree: 'Select subtree',
+    editableColumn: 'Editable column',
+    filterMenuLabel: '{column} filter menu',
+    columnFilterLabel: '{column} filter',
+
+    /* 페이지네이션 */
+    pageSizeLabel: 'Page size:',
+    pageSummary: '{from} to {to} of {total}',
+    firstPage: 'First page',
+    previousPage: 'Previous page',
+    nextPage: 'Next page',
+    lastPage: 'Last page',
+
+    /* 오버레이 */
+    noRowsToShow: 'No rows to show',
+    loading: 'Loading…',
+
+    /* 그룹 헤더 · 전체 요약 행 */
+    groupTotal: 'Total',
+    rowCount: '({count})',
+
+    /* 검색형 select 에디터 (editorSearch) */
+    searchPlaceholder: 'Search…',
+    searchMinLength: 'Type {count}+ characters',
+    noResults: 'No results',
+    loadFailed: 'Load failed',
+
+    /* 상태 컬럼 (statusColumn) — statusColumn 설정이 있으면 그쪽이 우선 */
+    statusColumnHeader: 'Status',
+    statusAdded: 'New',
+    statusUpdated: 'Updated',
+    statusDeleted: 'Deleted',
+  };
+
+  const LOCALE_KO = {
+    filterPlaceholder: '필터…',
+    filterToPlaceholder: '끝값…',
+    filterApply: '적용',
+    filterClear: '지우기',
+    filterAll: '(전체)',
+    blanks: '(빈 값)',
+    opContains: '포함',
+    opNotContains: '포함하지 않음',
+    opEquals: '같음',
+    opNotEqual: '같지 않음',
+    opStartsWith: '시작 문자',
+    opEndsWith: '끝 문자',
+    opLessThan: '미만',
+    opLessThanOrEqual: '이하',
+    opGreaterThan: '초과',
+    opGreaterThanOrEqual: '이상',
+    opInRange: '범위',
+
+    selectAllRows: '전체 행 선택',
+    selectRow: '행 선택',
+    selectSubtree: '하위 트리 선택',
+    editableColumn: '편집 가능한 컬럼',
+    filterMenuLabel: '{column} 필터 메뉴',
+    columnFilterLabel: '{column} 필터',
+
+    pageSizeLabel: '페이지 크기:',
+    pageSummary: '{total}건 중 {from}–{to}',
+    firstPage: '첫 페이지',
+    previousPage: '이전 페이지',
+    nextPage: '다음 페이지',
+    lastPage: '마지막 페이지',
+
+    noRowsToShow: '표시할 데이터가 없습니다',
+    loading: '불러오는 중…',
+
+    groupTotal: '합계',
+    rowCount: '({count}건)',
+
+    searchPlaceholder: '검색…',
+    searchMinLength: '{count}자 이상 입력하세요',
+    noResults: '결과 없음',
+    loadFailed: '불러오기 실패',
+
+    statusColumnHeader: '상태',
+    statusAdded: '신규',
+    statusUpdated: '수정',
+    statusDeleted: '삭제',
+  };
+
+  /**
+   * `{name}` 토큰을 params 값으로 치환한다.
+   * params에 없는 토큰은 그대로 둔다 — 커스텀 로케일의 오타를 화면에서 발견할 수 있게.
+   */
+  function interpolate(template, params) {
+    const text = String(template === undefined || template === null ? '' : template);
+    if (!params) return text;
+    return text.replace(/\{(\w+)\}/g, (match, key) =>
+      Object.prototype.hasOwnProperty.call(params, key) ? String(params[key]) : match
+    );
+  }
+
+  /**
+   * localeText 옵션을 기본(영어) 위에 병합한 완전한 문자열 맵으로 정규화한다.
+   * 문자열이 아닌 값은 무시 — 실수로 넣은 객체/함수가 화면에 `[object Object]`로
+   * 새는 것을 막는다. 모르는 키는 남겨둔다(소비자가 자기 UI에 재사용 가능).
+   */
+  function resolveLocaleText(localeText) {
+    const out = Object.assign({}, LOCALE_EN);
+    if (localeText && typeof localeText === 'object') {
+      for (const key in localeText) {
+        if (typeof localeText[key] === 'string') out[key] = localeText[key];
+      }
+    }
+    return out;
+  }
+
+  /* ---------------------------------------------------------------------------
    * Pure data logic (DOM-free, unit-testable in Node)
    * ------------------------------------------------------------------------- */
 
@@ -1634,12 +1779,14 @@
   /**
    * statusColumn 옵션(true 또는 부분 설정 객체)을 완전한 설정으로 정규화한다.
    * labels/colors는 키 단위로 병합 — { labels: { deleted: '삭제' } }처럼 일부만 바꿀 수 있다.
+   * 기본 헤더명·라벨은 localeText에서 온다 (명시한 설정이 로케일보다 우선).
    */
-  function resolveStatusColumnConfig(option) {
+  function resolveStatusColumnConfig(option, localeText) {
+    const t = localeText || LOCALE_EN;
     const cfg = {
-      headerName: 'Status',
+      headerName: t.statusColumnHeader,
       width: 90,
-      labels: { added: 'New', updated: 'Updated', deleted: 'Deleted' },
+      labels: { added: t.statusAdded, updated: t.statusUpdated, deleted: t.statusDeleted },
       colors: { added: 'green', updated: 'yellow', deleted: 'red' },
     };
     if (option && typeof option === 'object') {
@@ -1846,6 +1993,9 @@
       this._container = container;
       this._destroyed = false;
 
+      /* i18n — _buildColumns가 statusColumn 라벨을 여기서 읽으므로 컬럼보다 먼저 */
+      this._localeText = resolveLocaleText(options.localeText);
+
       /* column state */
       this._columns = this._buildColumns();
       this._colWidths = {};
@@ -1972,7 +2122,7 @@
         });
       }
       if (this.options.statusColumn) {
-        const sc = resolveStatusColumnConfig(this.options.statusColumn);
+        const sc = resolveStatusColumnConfig(this.options.statusColumn, this._localeText);
         this._statusColConfig = sc;
         cols.unshift({
           colId: '__rowStatus', headerName: sc.headerName, width: sc.width, minWidth: 60,
@@ -1990,6 +2140,18 @@
         });
       }
       return cols;
+    }
+
+    /* ---- i18n ---- */
+
+    /**
+     * 로케일 문자열을 읽는다. 모르는 키는 키 자체를 돌려줘 화면에서 티가 나게 한다.
+     * @param {string} key LOCALE_EN의 키
+     * @param {object} [params] `{name}` 토큰 치환 값
+     */
+    _t(key, params) {
+      const text = this._localeText[key];
+      return interpolate(text === undefined ? key : text, params);
     }
 
     /* ---- events ---- */
@@ -2570,7 +2732,7 @@
     /* ---- runtime option changes (setOptions) ---- */
 
     /**
-     * 재생성 없이 옵션을 갱신한다. 지원: title, toolbar, theme, zebra,
+     * 재생성 없이 옵션을 갱신한다. 지원: title, toolbar, theme, zebra, localeText,
      * rowHeight, headerHeight, editable, sortModel, groupBy, quickFilter 계열,
      * columnDefs/defaultColDef/rowNumbers/rowDetail(컬럼 재구성),
      * pagination/paginationPageSize, floatingFilter, columnGroups,
@@ -2581,7 +2743,10 @@
       if (!patch) return;
       for (const k in patch) this.options[k] = patch[k];
 
-      if ('columnDefs' in patch || 'defaultColDef' in patch ||
+      /* 로케일은 statusColumn 헤더/라벨의 기본값이므로 컬럼 재구성보다 먼저 반영한다. */
+      if ('localeText' in patch) this._localeText = resolveLocaleText(patch.localeText);
+
+      if ('columnDefs' in patch || 'defaultColDef' in patch || 'localeText' in patch ||
           'rowNumbers' in patch || 'rowDetail' in patch || 'statusColumn' in patch) {
         this._columns = this._buildColumns();
         this._colWidths = {};
@@ -2670,7 +2835,7 @@
           cell.classList.add('dg-checkbox-header');
           const cb = el('input', 'dg-checkbox', cell);
           cb.type = 'checkbox';
-          cb.setAttribute('aria-label', 'Select all rows');
+          cb.setAttribute('aria-label', this._t('selectAllRows'));
           cb.addEventListener('click', e => { e.stopPropagation(); });
           cb.addEventListener('change', () => {
             if (this._hasTreeCheckbox()) {
@@ -2691,7 +2856,7 @@
         if (shouldShowEditableIcon(col, this._editable, this.options.editableIndicator)) {
           cell.classList.add('dg-editable-col');
           cell.insertAdjacentHTML('beforeend', EDIT_ICON_SVG);
-          cell.lastChild.setAttribute('title', 'Editable column');
+          cell.lastChild.setAttribute('title', this._t('editableColumn'));
         }
 
         cell.addEventListener('click', e => {
@@ -2721,7 +2886,7 @@
           const menuBtn = el('button', 'dg-header-menu-btn', cell);
           menuBtn.type = 'button';
           menuBtn.innerHTML = MENU_ICON_SVG;
-          menuBtn.setAttribute('aria-label', `${col.headerName} filter menu`);
+          menuBtn.setAttribute('aria-label', this._t('filterMenuLabel', { column: col.headerName }));
           menuBtn.addEventListener('click', e => {
             e.stopPropagation();
             /* 같은 컬럼 메뉴가 이미 열려 있으면 토글로 닫는다 */
@@ -2825,14 +2990,14 @@
 
         if (col.filter === 'set') {
           const select = el('select', 'dg-floating-input', cell);
-          select.setAttribute('aria-label', `${col.headerName} filter`);
+          select.setAttribute('aria-label', this._t('columnFilterLabel', { column: col.headerName }));
           const optAll = el('option', null, select);
           optAll.value = '';
-          optAll.textContent = '(All)';
+          optAll.textContent = this._t('filterAll');
           this._uniqueFieldValues(col.field).forEach(v => {
             const opt = el('option', null, select);
             opt.value = v === '' ? FLOATING_BLANK : v;
-            opt.textContent = v === '' ? '(Blanks)' : v;
+            opt.textContent = v === '' ? this._t('blanks') : v;
           });
           if (current && current.type === 'set' && current.values && current.values.length === 1) {
             const cv = String(current.values[0]);
@@ -2848,8 +3013,8 @@
 
         const input = el('input', 'dg-floating-input', cell);
         input.type = col.filter === 'number' ? 'number' : 'text';
-        input.placeholder = 'Filter…';
-        input.setAttribute('aria-label', `${col.headerName} filter`);
+        input.placeholder = this._t('filterPlaceholder');
+        input.setAttribute('aria-label', this._t('columnFilterLabel', { column: col.headerName }));
         if (current && current.value !== undefined) input.value = current.value;
         let timer = null;
         const apply = () => {
@@ -3208,14 +3373,14 @@
             cb.checked = tState === true;
             cb.indeterminate = tState === 'indeterminate';
             cb.disabled = this._treeCheckOpts().isDisabled(row);
-            cb.setAttribute('aria-label', 'Select subtree');
+            cb.setAttribute('aria-label', this._t('selectSubtree'));
             cb.addEventListener('click', e => { e.stopPropagation(); });
             cb.addEventListener('change', () => {
               this._treeCheckToggle(row, cb.checked);
             });
           } else {
             cb.checked = !!this._selection[id];
-            cb.setAttribute('aria-label', 'Select row');
+            cb.setAttribute('aria-label', this._t('selectRow'));
             cb.addEventListener('click', e => { e.stopPropagation(); });
             cb.addEventListener('change', () => {
               this._setRowSelected(row, cb.checked, true);
@@ -3304,10 +3469,10 @@
           const label = el('span', 'dg-group-label', cell);
           label.textContent =
             item.value === null || item.value === undefined || item.value === ''
-              ? '(Blanks)'
+              ? this._t('blanks')
               : String(item.value);
           const count = el('span', 'dg-group-count', cell);
-          count.textContent = `(${item.leafCount.toLocaleString()})`;
+          count.textContent = this._t('rowCount', { count: item.leafCount.toLocaleString() });
           return;
         }
 
@@ -3445,7 +3610,7 @@
           cb.dataset.value = v;
           itemCbs.push(cb);
           const span = el('span', null, item);
-          span.textContent = v === '' ? '(Blanks)' : v;
+          span.textContent = v === '' ? this._t('blanks') : v;
         });
         getModel = () => {
           const checked = itemCbs.filter(cb => cb.checked)
@@ -3456,22 +3621,22 @@
       } else if (col.filter === 'number') {
         const opSel = el('select', null, menu);
         [
-          ['equals', 'Equals'], ['notEqual', 'Not equal'],
-          ['lessThan', 'Less than'], ['lessThanOrEqual', 'Less than or equal'],
-          ['greaterThan', 'Greater than'], ['greaterThanOrEqual', 'Greater than or equal'],
-          ['inRange', 'In range'],
+          ['equals', 'opEquals'], ['notEqual', 'opNotEqual'],
+          ['lessThan', 'opLessThan'], ['lessThanOrEqual', 'opLessThanOrEqual'],
+          ['greaterThan', 'opGreaterThan'], ['greaterThanOrEqual', 'opGreaterThanOrEqual'],
+          ['inRange', 'opInRange'],
         ].forEach(o => {
           const opt = el('option', null, opSel);
-          opt.value = o[0]; opt.textContent = o[1];
+          opt.value = o[0]; opt.textContent = this._t(o[1]);
         });
         opSel.value = current.op || 'equals';
         const input = el('input', null, menu);
         input.type = 'number';
-        input.placeholder = 'Filter…';
+        input.placeholder = this._t('filterPlaceholder');
         input.value = current.value !== undefined ? current.value : '';
         const inputTo = el('input', null, menu);
         inputTo.type = 'number';
-        inputTo.placeholder = 'To…';
+        inputTo.placeholder = this._t('filterToPlaceholder');
         inputTo.value = current.valueTo !== undefined ? current.valueTo : '';
         const syncRange = () => { inputTo.style.display = opSel.value === 'inRange' ? '' : 'none'; };
         opSel.addEventListener('change', syncRange);
@@ -3483,17 +3648,17 @@
       } else {
         const opSel2 = el('select', null, menu);
         [
-          ['contains', 'Contains'], ['notContains', 'Does not contain'],
-          ['equals', 'Equals'], ['notEqual', 'Not equal'],
-          ['startsWith', 'Starts with'], ['endsWith', 'Ends with'],
+          ['contains', 'opContains'], ['notContains', 'opNotContains'],
+          ['equals', 'opEquals'], ['notEqual', 'opNotEqual'],
+          ['startsWith', 'opStartsWith'], ['endsWith', 'opEndsWith'],
         ].forEach(o => {
           const opt = el('option', null, opSel2);
-          opt.value = o[0]; opt.textContent = o[1];
+          opt.value = o[0]; opt.textContent = this._t(o[1]);
         });
         opSel2.value = current.op || 'contains';
         const input2 = el('input', null, menu);
         input2.type = 'text';
-        input2.placeholder = 'Filter…';
+        input2.placeholder = this._t('filterPlaceholder');
         input2.value = current.value !== undefined ? current.value : '';
         getModel = () => {
           if (input2.value === '') return null;
@@ -3504,14 +3669,14 @@
       const actions = el('div', 'dg-menu-actions', menu);
       const clearBtn = el('button', 'dg-btn', actions);
       clearBtn.type = 'button';
-      clearBtn.textContent = 'Clear';
+      clearBtn.textContent = this._t('filterClear');
       clearBtn.addEventListener('click', () => {
         this.applyColumnFilter(col.field, null);
         this._closeMenu();
       });
       const applyBtn = el('button', 'dg-btn dg-btn-primary', actions);
       applyBtn.type = 'button';
-      applyBtn.textContent = 'Apply';
+      applyBtn.textContent = this._t('filterApply');
       applyBtn.addEventListener('click', () => {
         this.applyColumnFilter(col.field, getModel());
         this._closeMenu();
@@ -3895,9 +4060,9 @@
 
         if (col.colId === labelColId) {
           const label = el('span', 'dg-footer-label', cell);
-          label.textContent = 'Total';
+          label.textContent = this._t('groupTotal');
           const count = el('span', 'dg-group-count', cell);
-          count.textContent = `(${rows.length.toLocaleString()})`;
+          count.textContent = this._t('rowCount', { count: rows.length.toLocaleString() });
           return;
         }
         if (col.aggFunc && col.field) {
@@ -4688,7 +4853,8 @@
         const ssInput = document.createElement('input');
         ssInput.type = 'text';
         ssInput.className = 'dg-searchselect-input';
-        ssInput.placeholder = ssCfg.placeholder !== undefined ? ssCfg.placeholder : 'Search…';
+        ssInput.placeholder = ssCfg.placeholder !== undefined
+          ? ssCfg.placeholder : this._t('searchPlaceholder');
         ssPanel.appendChild(ssInput);
         const ssList = el('div', 'dg-searchselect-list', ssPanel);
         /* 옵션 mousedown이 검색 입력의 포커스를 빼앗으면 focusout 커밋이
@@ -4726,7 +4892,7 @@
           ssShown = opts;
           ssActive = -1;
           ssList.innerHTML = '';
-          if (!opts.length) { ssRenderMsg('No results'); return; }
+          if (!opts.length) { ssRenderMsg(this._t('noResults')); return; }
           opts.forEach((o, i) => {
             const optEl = el('div', 'dg-searchselect-option', ssList);
             optEl.dataset.idx = i;
@@ -4745,11 +4911,11 @@
             return;
           }
           if (q.length < ssMinLength) {
-            ssRenderMsg(`Type ${ssMinLength}+ characters`);
+            ssRenderMsg(this._t('searchMinLength', { count: ssMinLength }));
             return;
           }
           const seq = ++ssSeq;
-          ssRenderMsg('Loading…', 'dg-loading');
+          ssRenderMsg(this._t('loading'), 'dg-loading');
           let promised;
           try { promised = ssFetch(q, row, col); }
           catch (e) { promised = Promise.reject(e); }
@@ -4759,7 +4925,7 @@
           }).catch(err => {
             if (finished || seq !== ssSeq) return;
             console.error(`[DataGrid] editorSearch.fetch failed for "${col.field}":`, err);
-            ssRenderMsg('Load failed', 'dg-error');
+            ssRenderMsg(this._t('loadFailed'), 'dg-error');
           });
         };
         ssList.addEventListener('click', e => {
@@ -5310,7 +5476,7 @@
 
       const sizeWrap = el('div', 'dg-paging-page-size', this._pagingEl);
       const sizeLabel = el('span', null, sizeWrap);
-      sizeLabel.textContent = 'Page size:';
+      sizeLabel.textContent = this._t('pageSizeLabel');
       const sizeSel = el('select', null, sizeWrap);
       this._pageSizeOptions.forEach(s => {
         const opt = el('option', null, sizeSel);
@@ -5321,8 +5487,17 @@
       sizeSel.addEventListener('change', () => { this.setPageSize(Number(sizeSel.value)); });
 
       const summary = el('span', 'dg-paging-row-summary', this._pagingEl);
-      summary.innerHTML =
-        `<strong>${info.firstRow.toLocaleString()}</strong> to <strong>${info.lastRow.toLocaleString()}</strong> of <strong>${info.total.toLocaleString()}</strong>`;
+      /* 로케일 문자열은 소비자가 준 값이므로 먼저 이스케이프하고, 그다음 토큰만
+       * <strong>으로 감싼 숫자로 치환한다 (토큰 표기 `{from}`은 이스케이프에 걸리지 않음). */
+      const summaryNums = {
+        from: info.firstRow.toLocaleString(),
+        to: info.lastRow.toLocaleString(),
+        total: info.total.toLocaleString(),
+      };
+      summary.innerHTML = escapeHtml(this._t('pageSummary')).replace(
+        /\{(from|to|total)\}/g,
+        (match, key) => `<strong>${escapeHtml(summaryNums[key])}</strong>`
+      );
 
       const btns = el('div', 'dg-paging-buttons', this._pagingEl);
       const mkBtn = (label, page, disabled, current, aria) => {
@@ -5335,14 +5510,14 @@
         return b;
       };
 
-      mkBtn('«', 0, info.page === 0, false, 'First page');
-      mkBtn('‹', info.page - 1, info.page === 0, false, 'Previous page');
+      mkBtn('«', 0, info.page === 0, false, this._t('firstPage'));
+      mkBtn('‹', info.page - 1, info.page === 0, false, this._t('previousPage'));
       pageButtonModel(info.pageCount, info.page).forEach(p => {
         if (p === '…') mkBtn('…', null, true);
         else mkBtn(String(p + 1), p, false, p === info.page);
       });
-      mkBtn('›', info.page + 1, info.page >= info.pageCount - 1, false, 'Next page');
-      mkBtn('»', info.pageCount - 1, info.page >= info.pageCount - 1, false, 'Last page');
+      mkBtn('›', info.page + 1, info.page >= info.pageCount - 1, false, this._t('nextPage'));
+      mkBtn('»', info.pageCount - 1, info.page >= info.pageCount - 1, false, this._t('lastPage'));
     }
 
     setPage(page) {
@@ -5370,7 +5545,8 @@
     _updateOverlay() {
       if (this._loading) return; /* keep loading overlay */
       if (this._viewRows.length === 0) {
-        this._overlayEl.innerHTML = '<div class="dg-overlay-panel">No rows to show</div>';
+        this._overlayEl.innerHTML =
+          `<div class="dg-overlay-panel">${escapeHtml(this._t('noRowsToShow'))}</div>`;
         this._overlayEl.hidden = false;
       } else {
         this._overlayEl.hidden = true;
@@ -5379,7 +5555,9 @@
 
     showLoadingOverlay() {
       this._loading = true;
-      this._overlayEl.innerHTML = '<div class="dg-overlay-panel"><span class="dg-spinner"></span>Loading…</div>';
+      this._overlayEl.innerHTML =
+        '<div class="dg-overlay-panel"><span class="dg-spinner"></span>' +
+        `${escapeHtml(this._t('loading'))}</div>`;
       this._overlayEl.hidden = false;
     }
 
@@ -6116,10 +6294,24 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.14.0';
+  DataGrid.version = '2.15.0';
+
+  /**
+   * 내장 로케일. `localeText: DataGrid.locales.ko`처럼 통째로 쓰거나,
+   * `{ ...DataGrid.locales.ko, noRowsToShow: '직원이 없습니다' }`로 일부만 덮어쓴다.
+   * 사본을 넘기므로 소비자가 수정해도 원본은 안전하다.
+   */
+  DataGrid.locales = {
+    get en() { return Object.assign({}, LOCALE_EN); },
+    get ko() { return Object.assign({}, LOCALE_KO); },
+  };
 
   /* Internals exposed for headless unit tests (not part of the public API). */
   DataGrid._test = {
+    LOCALE_EN,
+    LOCALE_KO,
+    interpolate,
+    resolveLocaleText,
     defaultComparator,
     typeComparator,
     parseLocalDate,

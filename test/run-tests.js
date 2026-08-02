@@ -1711,5 +1711,81 @@ suite('escapeHtml', function () {
   );
 });
 
+/* ---------------- interpolate ---------------- */
+suite('interpolate', function () {
+  var i = T.interpolate;
+  assertEq(i('{a} to {b}', { a: 1, b: 20 }), '1 to 20', 'both tokens replaced');
+  assertEq(i('{total}건 중 {from}–{to}', { total: 90, from: 1, to: 20 }),
+    '90건 중 1–20', 'korean template');
+  assertEq(i('no tokens', { a: 1 }), 'no tokens', 'template without tokens');
+  assertEq(i('{a}', null), '{a}', 'no params → token kept');
+  assertEq(i('{a} {b}', { a: 'x' }), 'x {b}', 'missing param keeps its token (오타를 화면에 드러냄)');
+  assertEq(i('{a}', { a: 0 }), '0', 'falsy value is still substituted');
+  assertEq(i('{a}', { a: null }), 'null', 'null stringified, not skipped');
+  assertEq(i('{a}-{a}', { a: 'z' }), 'z-z', 'repeated token');
+  assertEq(i('{ a }', { a: 1 }), '{ a }', 'spaces inside braces are not a token');
+  assertEq(i(undefined, { a: 1 }), '', 'undefined template → empty string');
+  assertEq(i(null), '', 'null template → empty string');
+  assertEq(i(42), '42', 'non-string template stringified');
+  /* 치환값이 토큰을 포함해도 2차 치환은 일어나지 않는다 (replace 콜백이라 안전) */
+  assertEq(i('{a}', { a: '{a}' }), '{a}', 'substituted value is not re-scanned');
+});
+
+/* ---------------- resolveLocaleText ---------------- */
+suite('resolveLocaleText', function () {
+  var r = T.resolveLocaleText;
+
+  var def = r();
+  assertEq(def.filterApply, 'Apply', 'no arg → english defaults');
+  assertEq(def.noRowsToShow, 'No rows to show', 'default overlay text');
+  assertEq(r(null).blanks, '(Blanks)', 'null → defaults');
+  assertEq(r('ko').filterApply, 'Apply', 'non-object ignored');
+
+  var partial = r({ filterApply: '적용' });
+  assertEq(partial.filterApply, '적용', 'override applied');
+  assertEq(partial.filterClear, 'Clear', 'unspecified keys keep english default');
+
+  var ko = r(T.LOCALE_KO);
+  assertEq(ko.noRowsToShow, '표시할 데이터가 없습니다', 'full korean locale');
+  assertEq(
+    Object.keys(T.LOCALE_KO).sort(),
+    Object.keys(T.LOCALE_EN).sort(),
+    'ko covers exactly the en keys (번역 누락/오타 키 방지)'
+  );
+
+  /* 문자열이 아닌 값은 화면에 [object Object]로 새지 않도록 무시한다 */
+  var bad = r({ filterApply: { text: '적용' }, filterClear: 123, blanks: null, loading: '로딩' });
+  assertEq(bad.filterApply, 'Apply', 'object value ignored');
+  assertEq(bad.filterClear, 'Clear', 'number value ignored');
+  assertEq(bad.blanks, '(Blanks)', 'null value ignored');
+  assertEq(bad.loading, '로딩', 'valid sibling still applied');
+
+  assertEq(r({ myOwnKey: 'x' }).myOwnKey, 'x', 'unknown keys kept (소비자 확장 허용)');
+  assertEq(r({ filterApply: '' }).filterApply, '', 'empty string is a valid override');
+
+  /* 원본을 오염시키지 않는다 — 다음 그리드가 앞 그리드의 로케일을 물려받으면 안 된다 */
+  r({ filterApply: '적용' });
+  assertEq(T.LOCALE_EN.filterApply, 'Apply', 'LOCALE_EN not mutated');
+  assertEq(r().filterApply, 'Apply', 'later resolve unaffected');
+});
+
+/* ---------------- resolveStatusColumnConfig × localeText ---------------- */
+suite('resolveStatusColumnConfig (localeText)', function () {
+  var ko = T.resolveStatusColumnConfig(true, T.resolveLocaleText(T.LOCALE_KO));
+  assertEq(ko.headerName, '상태', 'header from locale');
+  assertEq(ko.labels, { added: '신규', updated: '수정', deleted: '삭제' }, 'labels from locale');
+
+  /* 명시 설정이 로케일보다 우선 */
+  var mixed = T.resolveStatusColumnConfig(
+    { headerName: '변경', labels: { deleted: '폐기' } },
+    T.resolveLocaleText(T.LOCALE_KO)
+  );
+  assertEq(mixed.headerName, '변경', 'explicit headerName wins over locale');
+  assertEq(mixed.labels.deleted, '폐기', 'explicit label wins over locale');
+  assertEq(mixed.labels.added, '신규', 'unspecified label still from locale');
+
+  assertEq(T.resolveStatusColumnConfig(true).headerName, 'Status', 'no locale arg → english');
+});
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed === 0 ? 0 : 1);

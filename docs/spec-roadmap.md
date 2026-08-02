@@ -138,6 +138,7 @@
 | [x] | `toolbar / showToolbar / refreshToolbar` | `toolbar: HTMLElement \| (grid) => HTMLElement` 슬롯 — 소비자 DOM 주입 방식 — v1.2.0 | **P2** |
 | [x] | `filterModel`의 **헤더 필터 행** (`header: true`, 컬럼 아래 인라인 필터 입력) | `floatingFilter: true` — 헤더 아래 필터 행, 메뉴와 필터 모델 공유 (text/number 입력 + set 드롭다운) — v1.1.0 | **P1** |
 | [x] | `showHeader / showTop / showBottom` | `showHeader: false` — 헤더 영역 숨김 — v2.0.0 | P3 |
+| [x] | (없음 — 자체 개선) UI 문자열 다국어 | `localeText: object` + 내장 `DataGrid.locales.en/.ko` — 그리드가 그리는 모든 문자열(필터 메뉴·페이지네이션·오버레이·요약·검색형 select·상태 컬럼·aria-label) 교체, 부분 번역 시 나머지는 영어, `{token}` 치환 — v2.15.0 | **P2** (사용자 요청) |
 
 ---
 
@@ -176,6 +177,18 @@
 
 ### v2.1 — "TreeGrid" (§6 T1~T4)
 - treeData 코어(계층 표시·펼침/접힘·계층 정렬/필터), 체크박스 캐스케이드, 부모 요약, 지연 로딩
+
+### v2.15 — UI 문자열 다국어 localeText (사용자 선택)
+- 배경: 한국어 프로젝트인데 그리드가 그리는 문자열은 전부 영어 하드코딩이었다(`'Filter…'`, `'(Blanks)'`, `'In range'`, `'No rows to show'`, `'Total'`, aria-label 등 41개). 소비자가 바꿀 방법이 없었다.
+- `localeText: object` 옵션 + 내장 `DataGrid.locales.en` / `.ko`. 접근할 때마다 **사본**을 반환하는 getter라 여러 그리드가 같은 로케일을 써도 서로 오염시키지 않는다.
+- **부분 번역이 기본 동작.** `resolveLocaleText`가 영어 기본값 위에 병합하므로, 몇 개만 지정해도 나머지는 영어로 정상 동작한다. 번역을 다 채워야 쓸 수 있는 all-or-nothing 설계를 피한 것 — 그래야 새 키가 추가돼도 기존 소비자 로케일이 깨지지 않는다.
+- **문자열이 아닌 값은 무시**한다. 실수로 객체/숫자를 넣으면 화면에 `[object Object]`가 새는 대신 기본값이 유지된다(BUG-009의 "값이 원시값이 아닐 수 있는 자리" 교훈의 예방적 적용).
+- `{token}` 치환은 순수 함수 `interpolate`. **params에 없는 토큰은 그대로 남긴다** — 커스텀 로케일의 오타(`{tota}`)가 화면에 드러나야 발견되기 때문. 치환값은 재스캔하지 않는다(replace 콜백).
+- 로케일 문자열은 **소비자 입력**이므로 innerHTML 경로(`pageSummary`·오버레이)는 반드시 `escapeHtml`을 거친다. `pageSummary`는 템플릿을 먼저 이스케이프한 뒤 토큰만 `<strong>숫자</strong>`로 치환 — 토큰 표기 `{from}`은 이스케이프에 걸리지 않으므로 순서가 성립한다.
+- `statusColumn`의 헤더·라벨 기본값을 로케일로 이관(`resolveStatusColumnConfig(option, localeText)`). **명시 설정이 로케일보다 우선** — 레이어는 기본값(영어) → 로케일 → 명시 설정.
+- `setOptions({ localeText })` 런타임 전환. 로케일이 `statusColumn` 컬럼 정의의 입력이므로 **컬럼 재구성 축에 추가하고, 재구성보다 먼저 반영**해야 한다.
+- 순수 함수 `interpolate`, `resolveLocaleText` — `_test` 노출. `LOCALE_EN`/`LOCALE_KO`도 노출해 **ko가 en의 키를 정확히 덮는지**를 테스트로 강제(번역 누락·오타 키 방지).
+- 데모: features.html `#locale-text` — ko/en/커스텀 3-way 런타임 전환 + 빈 결과 오버레이 문구. api.html에 전용 가이드 섹션(kind: guide, 41개 키 전수 표 + 토큰 표).
 
 ### v2.14 — reloadData()가 1페이지로 리셋 (사용자 제보)
 - 증상: `reloadData()`를 호출해도 현재 페이지가 그대로라, 조회 조건이 좁혀져 결과가 줄면 범위 밖 페이지(빈 화면)에 머문다. 서버는 범위 밖 페이지에 빈 배열을 주므로 에러도 안 난다.

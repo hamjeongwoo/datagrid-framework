@@ -22,8 +22,8 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.14.0',
-  updated: '2026-08-01',
+  version: '2.15.0',
+  updated: '2026-08-02',
 
   sections: [
 
@@ -145,6 +145,28 @@ window.ApiDocs = {
           default: "'light'",
           description:
             '초기 테마. 런타임에는 <a href="#api-methods-setTheme"><code>setTheme()</code></a>으로 변경합니다.',
+        },
+        {
+          name: 'localeText',
+          demo: 'locale-text',
+          type: 'object',
+          default: '영어 (DataGrid.locales.en)',
+          since: '2.15.0',
+          description:
+            '그리드가 직접 그리는 UI 문자열(필터 메뉴 · 헤더 필터 행 · 페이지네이션 · 오버레이 · ' +
+            '그룹/전체 요약 · 검색형 select · 상태 컬럼 · aria-label)을 교체합니다. ' +
+            '<strong>지정한 키만 덮어쓰고 나머지는 영어 기본값</strong>이므로 일부만 번역해도 됩니다. ' +
+            '내장 로케일은 <a href="#api-methods-locales"><code>DataGrid.locales.ko</code></a> / ' +
+            '<code>.en</code>. 문자열이 아닌 값은 무시되고, ' +
+            '<code>{from}</code>·<code>{total}</code>·<code>{column}</code>·<code>{count}</code> ' +
+            '토큰은 값으로 치환됩니다. 값은 항상 HTML 이스케이프되어 삽입됩니다. ' +
+            '런타임 전환은 <a href="#api-methods-setOptions"><code>setOptions({ localeText })</code></a>. ' +
+            '전체 키 목록과 규칙은 <a href="#locale-guide">UI 문자열 다국어 가이드</a> 참고. ' +
+            '<em>셀 값·컬럼 <code>headerName</code>·<code>title</code>은 소비자 데이터이므로 대상이 아닙니다.</em>',
+          example:
+            "localeText: DataGrid.locales.ko\n\n" +
+            "// 또는 필요한 키만\n" +
+            "localeText: { noRowsToShow: '데이터가 없습니다', filterApply: '조회' }",
         },
         {
           name: 'rowHeight',
@@ -642,6 +664,138 @@ window.ApiDocs = {
             '그리드 전체 편집 스위치. <code>false</code>면 컬럼의 <code>editable</code> 설정을 무시하고 ' +
             '더블클릭·<kbd>Enter</kbd>·<code>startEdit()</code>·붙여넣기를 모두 잠급니다. ' +
             '런타임에는 <a href="#api-methods-setEditable"><code>setEditable()</code></a>로 전환합니다.',
+        },
+      ],
+    },
+
+    /* =========================================================================
+     * UI 문자열 다국어 가이드 (localeText)
+     * ======================================================================= */
+    {
+      id: 'locale-guide',
+      title: 'UI 문자열 다국어 가이드',
+      kind: 'guide',
+      intro:
+        '<p>그리드가 <strong>직접 그리는</strong> 문자열은 전부 ' +
+        '<a href="#grid-options-localeText"><code>localeText</code></a> 한 곳에서 나옵니다 — ' +
+        '필터 메뉴, 헤더 필터 행, 페이지네이션 바, 오버레이, 그룹/전체 요약, 검색형 select, ' +
+        '상태 컬럼, 그리고 각종 <code>aria-label</code>. ' +
+        '셀 값, 컬럼 <code>headerName</code>, <code>title</code> 옵션처럼 ' +
+        '<strong>소비자가 넘긴 데이터는 대상이 아닙니다</strong>(그건 이미 여러분의 언어입니다).</p>' +
+        '<p><strong>부분 번역이 기본 동작입니다.</strong> 지정하지 않은 키는 영어 기본값이 그대로 쓰이므로, ' +
+        '필요한 키만 골라 덮어써도 됩니다. 값은 삽입 전에 항상 HTML 이스케이프되고, ' +
+        '문자열이 아닌 값(객체·숫자·<code>null</code>)은 무시되어 기본값이 유지됩니다.</p>' +
+        '<p><strong>토큰</strong> — 중괄호 표기는 그리드가 값으로 치환합니다. ' +
+        '번역문에서 순서를 바꾸거나 빼도 되지만, <em>없는 토큰을 쓰면 치환되지 않고 화면에 그대로 남습니다</em> ' +
+        '— 오타를 바로 발견하도록 한 의도적인 동작입니다.</p>' +
+        '<table class="api-table"><thead><tr><th>토큰</th><th>쓰이는 키</th><th>값</th></tr></thead><tbody>' +
+        '<tr><td><code>{from}</code> <code>{to}</code> <code>{total}</code></td><td><code>pageSummary</code></td>' +
+        '<td>현재 페이지의 시작·끝 행 번호와 전체 건수 (각각 <code>&lt;strong&gt;</code>으로 강조됨)</td></tr>' +
+        '<tr><td><code>{column}</code></td><td><code>filterMenuLabel</code> · <code>columnFilterLabel</code></td>' +
+        '<td>컬럼의 <code>headerName</code></td></tr>' +
+        '<tr><td><code>{count}</code></td><td><code>rowCount</code> · <code>searchMinLength</code></td>' +
+        '<td>행 수 / 최소 입력 글자 수</td></tr>' +
+        '</tbody></table>' +
+        '<p><strong>전체 키 목록</strong> (내장 로케일: ' +
+        '<a href="#api-methods-locales"><code>DataGrid.locales.en</code> · <code>.ko</code></a>)</p>' +
+        '<table class="api-table"><thead><tr><th>키</th><th>영어 기본값</th><th>내장 한국어</th><th>쓰이는 곳</th></tr></thead><tbody>' +
+        [
+          ['filterPlaceholder', 'Filter…', '필터…', '필터 메뉴 · 헤더 필터 행 입력'],
+          ['filterToPlaceholder', 'To…', '끝값…', '숫자 필터 In range의 끝값 입력'],
+          ['filterApply', 'Apply', '적용', '필터 메뉴 버튼'],
+          ['filterClear', 'Clear', '지우기', '필터 메뉴 버튼'],
+          ['filterAll', '(All)', '(전체)', '헤더 필터 행의 set 드롭다운 첫 항목'],
+          ['blanks', '(Blanks)', '(빈 값)', 'set 필터 목록 · 그룹 헤더의 빈 값'],
+          ['opContains', 'Contains', '포함', '텍스트 필터 연산자'],
+          ['opNotContains', 'Does not contain', '포함하지 않음', '텍스트 필터 연산자'],
+          ['opEquals', 'Equals', '같음', '텍스트 · 숫자 필터 연산자'],
+          ['opNotEqual', 'Not equal', '같지 않음', '텍스트 · 숫자 필터 연산자'],
+          ['opStartsWith', 'Starts with', '시작 문자', '텍스트 필터 연산자'],
+          ['opEndsWith', 'Ends with', '끝 문자', '텍스트 필터 연산자'],
+          ['opLessThan', 'Less than', '미만', '숫자 필터 연산자'],
+          ['opLessThanOrEqual', 'Less than or equal', '이하', '숫자 필터 연산자'],
+          ['opGreaterThan', 'Greater than', '초과', '숫자 필터 연산자'],
+          ['opGreaterThanOrEqual', 'Greater than or equal', '이상', '숫자 필터 연산자'],
+          ['opInRange', 'In range', '범위', '숫자 필터 연산자'],
+          ['selectAllRows', 'Select all rows', '전체 행 선택', '헤더 체크박스 aria-label'],
+          ['selectRow', 'Select row', '행 선택', '행 체크박스 aria-label (트리)'],
+          ['selectSubtree', 'Select subtree', '하위 트리 선택', '부모 노드 체크박스 aria-label'],
+          ['editableColumn', 'Editable column', '편집 가능한 컬럼', 'editableIndicator 연필 아이콘 title'],
+          ['filterMenuLabel', '{column} filter menu', '{column} 필터 메뉴', '헤더 필터 메뉴 버튼 aria-label'],
+          ['columnFilterLabel', '{column} filter', '{column} 필터', '헤더 필터 행 입력 aria-label'],
+          ['pageSizeLabel', 'Page size:', '페이지 크기:', '페이지네이션 바'],
+          ['pageSummary', '{from} to {to} of {total}', '{total}건 중 {from}–{to}', '페이지네이션 바 행 범위'],
+          ['firstPage', 'First page', '첫 페이지', '« 버튼 aria-label'],
+          ['previousPage', 'Previous page', '이전 페이지', '‹ 버튼 aria-label'],
+          ['nextPage', 'Next page', '다음 페이지', '› 버튼 aria-label'],
+          ['lastPage', 'Last page', '마지막 페이지', '» 버튼 aria-label'],
+          ['noRowsToShow', 'No rows to show', '표시할 데이터가 없습니다', '빈 데이터 오버레이'],
+          ['loading', 'Loading…', '불러오는 중…', '로딩 오버레이 · 검색형 select 로딩'],
+          ['groupTotal', 'Total', '합계', 'grandTotal 요약 행 라벨'],
+          ['rowCount', '({count})', '({count}건)', '그룹 헤더 · 전체 요약 행의 건수'],
+          ['searchPlaceholder', 'Search…', '검색…', 'editorSearch 검색 입력 (컬럼 placeholder가 우선)'],
+          ['searchMinLength', 'Type {count}+ characters', '{count}자 이상 입력하세요', 'editorSearch minLength 안내'],
+          ['noResults', 'No results', '결과 없음', 'editorSearch 결과 없음'],
+          ['loadFailed', 'Load failed', '불러오기 실패', 'editorSearch fetch 실패'],
+          ['statusColumnHeader', 'Status', '상태', 'statusColumn 헤더 기본값'],
+          ['statusAdded', 'New', '신규', 'statusColumn 신규 행 태그'],
+          ['statusUpdated', 'Updated', '수정', 'statusColumn 수정 행 태그'],
+          ['statusDeleted', 'Deleted', '삭제', 'statusColumn 삭제 표시 행 태그'],
+        ].map(r =>
+          `<tr><td><code>${r[0]}</code></td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`
+        ).join('') +
+        '</tbody></table>' +
+        '<p><a href="../examples/features.html#locale-text" target="_blank" rel="noopener">' +
+        'UI Text Localization 데모 ↗</a>에서 세 로케일을 런타임으로 전환해 볼 수 있습니다.</p>',
+      entries: [
+        {
+          name: 'Step 1. 내장 로케일 쓰기',
+          demo: 'locale-text',
+          since: '2.15.0',
+          description:
+            '<code>DataGrid.locales.ko</code>를 <code>localeText</code>에 그대로 넘기면 끝입니다. ' +
+            '접근할 때마다 <strong>사본</strong>이 반환되므로 여러 그리드가 같은 로케일을 써도 서로 간섭하지 않습니다.',
+          example:
+            'var grid = new DataGrid(el, {\n' +
+            '  columnDefs: cols,\n' +
+            '  rowData: rows,\n' +
+            '  localeText: DataGrid.locales.ko,   // 내장 한국어\n' +
+            '});',
+        },
+        {
+          name: 'Step 2. 일부만 덮어쓰기',
+          demo: 'locale-text',
+          since: '2.15.0',
+          description:
+            '내장 로케일 위에 얹으면 그 로케일이 기준이 되고, 겹치는 키만 교체됩니다. ' +
+            '내장 로케일 없이 몇 개만 지정하면 나머지는 영어 기본값입니다 — ' +
+            '<strong>번역을 다 채우지 않아도 화면이 깨지지 않습니다.</strong>',
+          example:
+            '// 한국어 기준 + 도메인 용어만 교체\n' +
+            'localeText: Object.assign({}, DataGrid.locales.ko, {\n' +
+            "  pageSummary: '전체 {total}명 가운데 {from}번째 ~ {to}번째',\n" +
+            "  groupTotal: '총계',\n" +
+            "  rowCount: '({count}명)',\n" +
+            '})\n\n' +
+            '// 영어 기준 + 필요한 키만\n' +
+            "localeText: { noRowsToShow: '데이터가 없습니다', filterApply: '조회' }",
+        },
+        {
+          name: 'Step 3. 런타임 전환',
+          demo: 'locale-text',
+          since: '2.15.0',
+          description:
+            '<a href="#api-methods-setOptions"><code>setOptions({ localeText })</code></a>로 언제든 바꿉니다. ' +
+            '헤더·필터 행·페이지네이션·오버레이가 한 번의 <code>refresh()</code>로 함께 갱신됩니다. ' +
+            '<code>statusColumn</code>의 헤더·라벨 기본값도 로케일에서 오므로 같이 바뀌지만, ' +
+            '<code>statusColumn: { headerName, labels }</code>로 <strong>명시한 값이 로케일보다 우선</strong>합니다.',
+          example:
+            "grid.setOptions({ localeText: DataGrid.locales.en });\n\n" +
+            '// statusColumn: 로케일 기본값 위에 일부만 명시\n' +
+            'new DataGrid(el, {\n' +
+            '  localeText: DataGrid.locales.ko,   // 헤더 \'상태\', 라벨 신규/수정/삭제\n' +
+            "  statusColumn: { labels: { deleted: '폐기' } },   // 이 키만 우선\n" +
+            '});',
         },
       ],
     },
@@ -2071,6 +2225,26 @@ window.ApiDocs = {
         },
 
         /* ---- 유틸리티 (정적) ---- */
+        {
+          name: 'locales',
+          demo: 'locale-text',
+          group: 'Utility',
+          signature: 'DataGrid.locales.en | DataGrid.locales.ko : object',
+          since: '2.15.0',
+          description:
+            '내장 로케일 문자열 맵입니다(<strong>정적</strong>). ' +
+            '<a href="#grid-options-localeText"><code>localeText</code></a> 옵션에 그대로 넘기거나, ' +
+            '전개 후 원하는 키만 덮어써서 부분 커스터마이즈합니다. ' +
+            '접근할 때마다 <strong>사본</strong>을 돌려주므로 반환값을 수정해도 원본과 다른 그리드에 영향이 없습니다. ' +
+            '전체 키 목록은 <a href="#locale-guide">UI 문자열 다국어 가이드</a> 참고.',
+          example:
+            "localeText: DataGrid.locales.ko\n\n" +
+            "// 일부만 바꾸기\n" +
+            "localeText: Object.assign({}, DataGrid.locales.ko, {\n" +
+            "  noRowsToShow: '조건에 맞는 직원이 없습니다',\n" +
+            "  pageSummary: '전체 {total}명 중 {from}–{to}',\n" +
+            "})",
+        },
         {
           name: 'format',
           demo: 'data-type-format',
