@@ -22,7 +22,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.15.0',
+  version: '2.16.0',
   updated: '2026-08-02',
 
   sections: [
@@ -167,6 +167,49 @@ window.ApiDocs = {
             "localeText: DataGrid.locales.ko\n\n" +
             "// 또는 필요한 키만\n" +
             "localeText: { noRowsToShow: '데이터가 없습니다', filterApply: '조회' }",
+        },
+        {
+          name: 'popupEditor',
+          demo: 'popup-editor',
+          type: 'boolean | object',
+          default: 'false',
+          since: '2.16.0',
+          description:
+            '행 전체를 <strong>폼에서</strong> 편집합니다. 인라인 셀 편집을 대체하는 것이 아니라 ' +
+            '켜면 편집 트리거가 폼을 여는 방식이며, 폼의 각 필드는 <strong>컬럼 정의를 그대로 ' +
+            '재사용</strong>합니다(<code>editor</code> · <code>editorOptions</code> · ' +
+            '<code>editorSearch</code> · <code>dataType</code> · <code>validator</code> · ' +
+            '라벨은 <code>headerName</code>). 편집 불가 컬럼은 읽기 전용으로 표시되고, ' +
+            '내장 컬럼(행 번호 · 상태 · 디테일 토글 · 체크박스)은 제외됩니다.<br>' +
+            '<code>position</code>: <code>\'center\'</code>(기본) | <code>\'left\'</code> | ' +
+            '<code>\'right\'</code>(슬라이드 패널) · <code>width</code>(기본 420) · ' +
+            '<code>columns</code>: 1 | 2 · <code>title</code>: string | (row) => string · ' +
+            '<code>trigger</code>: <code>\'dblclick\'</code>(기본) | <code>\'none\'</code>(API로만) · ' +
+            '<code>fields</code>: 표시할 field 목록(순서도 결정) · ' +
+            '<code>instantUpdate</code> · <code>closeOnBackdrop</code> · ' +
+            '<code>buttons</code>(<a href="#grid-options-popupEditor">아래 참고</a>).<br>' +
+            '<strong>커밋 규약:</strong> 기본은 폼에 모았다가 Save에서 <strong>변경된 필드만 일괄 ' +
+            '커밋</strong>하고 Cancel/Esc/바깥클릭은 전부 폐기합니다. ' +
+            '<code>instantUpdate: true</code>면 필드를 확정할 때마다 즉시 행에 반영되고, ' +
+            '<strong>Cancel은 팝업을 연 시점으로 롤백</strong>합니다. 어느 쪽이든 실제 커밋 시 ' +
+            '<code>cellValueChanged</code> · <code>rowValueChanged</code>가 그대로 발생하므로 ' +
+            '기존 핸들러가 계속 동작합니다.<br>' +
+            '컬럼마다 다르게 꾸미려면 ' +
+            '<a href="#column-defs-popupEditor"><code>column.popupEditor</code></a>를 쓰세요. ' +
+            '<code>setOptions({ popupEditor })</code>로 런타임 변경 가능합니다.',
+          example:
+            'popupEditor: {\n' +
+            "  position: 'right',        // 오른쪽에서 슬라이드\n" +
+            '  width: 460,\n' +
+            "  title: function (row) { return row.name + ' 편집'; },\n" +
+            '  buttons: [\n' +
+            "    { key: 'reset', text: '초기화', onClick: function (ctx) { ctx.reset(); } },\n" +
+            "    { key: 'del', text: '삭제', variant: 'danger',\n" +
+            '      disabled: function (ctx) { return ctx.values.locked; },\n' +
+            '      onClick: function (ctx) { ctx.grid.removeRows([ctx.data]); ctx.close(); } },\n' +
+            "    'save', 'cancel',      // 문자열 = 내장 버튼, 배열 순서가 배치 순서\n" +
+            '  ],\n' +
+            '}',
         },
         {
           name: 'rowHeight',
@@ -695,6 +738,8 @@ window.ApiDocs = {
         '<td>컬럼의 <code>headerName</code></td></tr>' +
         '<tr><td><code>{count}</code></td><td><code>rowCount</code> · <code>searchMinLength</code></td>' +
         '<td>행 수 / 최소 입력 글자 수</td></tr>' +
+        '<tr><td><code>{value}</code></td><td><code>popupEditTitle</code></td>' +
+        '<td>팝업 편집 중인 행의 첫 필드 값</td></tr>' +
         '</tbody></table>' +
         '<p><strong>전체 키 목록</strong> (내장 로케일: ' +
         '<a href="#api-methods-locales"><code>DataGrid.locales.en</code> · <code>.ko</code></a>)</p>' +
@@ -741,6 +786,11 @@ window.ApiDocs = {
           ['statusAdded', 'New', '신규', 'statusColumn 신규 행 태그'],
           ['statusUpdated', 'Updated', '수정', 'statusColumn 수정 행 태그'],
           ['statusDeleted', 'Deleted', '삭제', 'statusColumn 삭제 표시 행 태그'],
+          ['popupEditTitle', 'Editing {value}', '{value} 편집', 'popupEditor 헤더 (title 미지정 시)'],
+          ['popupSave', 'Save', '저장', 'popupEditor 내장 save 버튼'],
+          ['popupCancel', 'Cancel', '취소', 'popupEditor 내장 cancel/close 버튼'],
+          ['popupCloseLabel', 'Close editor', '편집 창 닫기', 'popupEditor 헤더 닫기 버튼 aria-label'],
+          ['popupReadonlySuffix', ' (readonly)', ' (읽기 전용)', 'popupEditor 읽기 전용 필드 라벨 접미사'],
         ].map(r =>
           `<tr><td><code>${r[0]}</code></td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`
         ).join('') +
@@ -1447,6 +1497,43 @@ window.ApiDocs = {
             "  validator: function (v) { return v >= 0 || '급여는 0 이상이어야 합니다'; } }",
         },
         {
+          name: 'popupEditor',
+          demo: 'popup-editor-custom',
+          type: 'false | object',
+          since: '2.16.0',
+          description:
+            '<a href="#grid-options-popupEditor">팝업 폼</a> 안에서만 적용되는 <strong>컬럼 오버레이</strong>입니다. ' +
+            '그리드 셀의 표시·동작은 전혀 바뀌지 않습니다 — 셀은 좁아서 <code>select</code>, ' +
+            '폼은 넓어서 검색형처럼 <strong>맥락별로 다르게</strong> 쓰는 것이 주 용도입니다. ' +
+            '<code>popupEditor: false</code>면 그 컬럼을 폼에서 제외합니다.<br>' +
+            '<strong>폼 전용 표시</strong> — <code>label</code>(기본 <code>headerName</code>) · ' +
+            '<code>hint</code>(입력 아래 도움말) · <code>hide</code> · <code>readonly</code> · ' +
+            '<code>order</code>(작을수록 앞. 지정한 필드만 움직이고 나머지는 컬럼 순서 유지) · ' +
+            '<code>span</code>(<code>columns: 2</code>에서 두 칸 차지).<br>' +
+            '<strong>오버라이드</strong> — <code>editor</code> · <code>editorOptions</code> · ' +
+            '<code>editorSearch</code> · <code>validator</code>. 원본 컬럼 정의는 변경되지 않습니다.<br>' +
+            '<strong>커스텀 콘텐츠</strong> — <code>buttons</code>(입력 오른쪽에 붙는 버튼 배열, ' +
+            '그리드 레벨 <code>buttons</code>와 같은 형식이되 내장 <code>\'save\'</code>/' +
+            '<code>\'cancel\'</code>은 무시) · <code>before(ctx)</code> / <code>after(ctx)</code>' +
+            '(필드 위/아래에 임의 HTML 문자열 또는 Element 반환).<br>' +
+            '<code>ctx</code>는 <code>{ grid, data, colDef, field, fieldEl, value, values, ' +
+            'getValue(field), setValue(field, v), isValid(), reset(), save(), cancel(), close() }</code>입니다. ' +
+            '<strong>주의:</strong> <code>before</code>/<code>after</code>가 반환한 문자열은 ' +
+            'HTML로 삽입되며 이스케이프되지 않습니다(<code>cellRenderer</code>와 동일). ' +
+            '입력 자체를 대체하려면 이 슬롯이 아니라 <a href="#column-defs-editor"><code>editor</code></a>의 ' +
+            '커스텀 객체(<code>{ init, getValue, destroy }</code>)를 쓰세요 — 팝업에서도 그대로 동작합니다.',
+          example:
+            "{ field: 'city', headerName: 'City', editor: 'select', editorOptions: cities,\n" +
+            '  popupEditor: {\n' +
+            "    label: '근무 도시',\n" +
+            '    order: 0,                 // 폼에서는 맨 위로\n' +
+            '    editorSearch: true,       // 폼에서만 검색형 select로 교체\n' +
+            "    buttons: [{ key: 'hq', text: '본사',\n" +
+            "      onClick: function (ctx) { ctx.setValue('city', 'Seoul'); } }],\n" +
+            "    after: function (ctx) { return '<span>저장된 값: ' + ctx.data.city + '</span>'; },\n" +
+            '  } }',
+        },
+        {
           name: 'valueFormatter',
           type: '(value, row) => string',
           description:
@@ -1757,6 +1844,52 @@ window.ApiDocs = {
           signature: 'isEditing(): boolean',
           since: '1.1.0',
           description: '인라인 편집이 진행 중인지 반환합니다.',
+        },
+        {
+          name: 'openEditPopup',
+          demo: 'popup-editor',
+          group: 'Editing',
+          signature: 'openEditPopup(row: object, field?: string): boolean',
+          since: '2.16.0',
+          description:
+            '<a href="#grid-options-popupEditor">팝업 편집 폼</a>을 엽니다. <code>field</code>를 주면 ' +
+            '그 필드에 포커스하고, 없으면 첫 편집 가능 필드에 포커스합니다. ' +
+            '<code>popupEditor</code>가 꺼져 있거나, 그리드가 잠겨 있거나(<code>setEditable(false)</code>), ' +
+            '<code>softDelete</code>로 삭제 표시된 행이거나, 행이 그리드에 없으면 <code>false</code>를 반환합니다. ' +
+            '<a href="#events-beforePopupEdit"><code>beforePopupEdit</code></a>에서 취소해도 <code>false</code>입니다. ' +
+            '<code>trigger: \'none\'</code>이어도 이 메서드는 동작하므로 툴바 버튼에서 열 수 있습니다.',
+          example:
+            "grid.openEditPopup(grid.getSelectedRows()[0], 'city');",
+        },
+        {
+          name: 'closeEditPopup',
+          demo: 'popup-editor',
+          group: 'Editing',
+          signature: 'closeEditPopup(commit?: boolean): void',
+          since: '2.16.0',
+          description:
+            '열린 팝업을 닫습니다. <code>commit === true</code>면 Save와 같은 경로를 타므로 ' +
+            '검증에 실패하면 닫히지 않습니다. 그 밖에는 변경을 폐기하고 닫습니다 ' +
+            '(<code>instantUpdate</code>면 연 시점으로 롤백).',
+        },
+        {
+          name: 'isPopupEditing',
+          demo: 'popup-editor',
+          group: 'Editing',
+          signature: 'isPopupEditing(): boolean',
+          since: '2.16.0',
+          description: '팝업 편집 폼이 열려 있는지 반환합니다.',
+        },
+        {
+          name: 'getPopupValues',
+          demo: 'popup-editor',
+          group: 'Editing',
+          signature: 'getPopupValues(): object | null',
+          since: '2.16.0',
+          description:
+            '팝업 폼의 <strong>현재 입력 값</strong> 스냅샷을 반환합니다(아직 행에 반영되지 않은 값 포함). ' +
+            '열려 있지 않으면 <code>null</code>. 사본이므로 수정해도 폼에 영향이 없습니다 — ' +
+            '값을 바꾸려면 버튼 콜백의 <code>ctx.setValue(field, value)</code>를 쓰세요.',
         },
         {
           name: 'setEditable',
@@ -2358,6 +2491,76 @@ window.ApiDocs = {
           example:
             "grid.on('beforeCellSave', function (e) {\n" +
             "  if (e.colDef.field === 'salary' && e.newValue > 900000) e.cancel = true;\n" +
+            '});',
+        },
+        {
+          name: 'beforePopupEdit',
+          demo: 'popup-editor',
+          payload: '{ data, field, cancel }',
+          since: '2.16.0',
+          description:
+            '<strong>취소 가능 이벤트</strong> — <a href="#grid-options-popupEditor">팝업 폼</a>이 ' +
+            '열리기 직전에 발생합니다. <code>e.cancel = true</code>면 열리지 않고 ' +
+            '<code>openEditPopup()</code>은 <code>false</code>를 반환합니다. ' +
+            '<code>e.field</code>는 트리거된 컬럼(API 호출 시 인자, 없으면 <code>null</code>).',
+          example:
+            "grid.on('beforePopupEdit', function (e) {\n" +
+            "  if (e.data.locked) e.cancel = true;   // 잠긴 행은 폼을 열지 않는다\n" +
+            '});',
+        },
+        {
+          name: 'popupEditStarted',
+          demo: 'popup-editor',
+          payload: '{ data, field }',
+          since: '2.16.0',
+          description: '팝업 폼이 열려 필드가 모두 생성된 뒤 발생합니다.',
+        },
+        {
+          name: 'popupFieldChanged',
+          demo: 'popup-editor-custom',
+          payload: '{ data, colDef, oldValue, newValue }',
+          since: '2.16.0',
+          description:
+            '팝업 폼 <strong>안에서</strong> 값이 바뀔 때마다 발생합니다. ' +
+            '<code>instantUpdate</code>가 아니면 이 시점에는 <strong>아직 행에 반영되지 않았습니다</strong> ' +
+            '(행에 실제로 쓰이는 시점은 <code>cellValueChanged</code>). ' +
+            '실시간 미리보기나 다른 필드 연동에 씁니다.',
+          example:
+            "grid.on('popupFieldChanged', function (e) {\n" +
+            "  status.textContent = e.colDef.headerName + ': ' + e.oldValue + ' → ' + e.newValue;\n" +
+            '});',
+        },
+        {
+          name: 'beforePopupSave',
+          demo: 'popup-editor',
+          payload: '{ data, values, cancel }',
+          since: '2.16.0',
+          description:
+            '<strong>취소 가능 이벤트</strong> — 검증을 통과하고 값이 행에 쓰이기 직전에 한 번 발생합니다. ' +
+            '<code>e.cancel = true</code>면 저장이 멈추고 폼이 유지됩니다. ' +
+            '<code>e.values</code>(전체 필드 값 사본)를 수정하면 그 값으로 저장됩니다 — 일괄 정규화 훅입니다. ' +
+            '이후 변경된 필드마다 <a href="#events-beforeCellSave"><code>beforeCellSave</code></a>가 ' +
+            '한 번 더 발생하고, 그중 하나라도 거부하면 <strong>아무것도 저장되지 않습니다</strong>' +
+            '(반쯤 저장되는 상태를 만들지 않기 위해). ' +
+            '<code>instantUpdate</code> 모드에서는 이미 필드 단위로 커밋되었으므로 발생하지 않습니다.',
+          example:
+            "grid.on('beforePopupSave', function (e) {\n" +
+            "  e.values.name = e.values.name.trim();   // 저장 전 일괄 정규화\n" +
+            '});',
+        },
+        {
+          name: 'popupEditStopped',
+          demo: 'popup-editor',
+          payload: '{ data, committed, changes }',
+          since: '2.16.0',
+          description:
+            '팝업 폼이 닫힐 때 발생합니다. <code>committed</code>는 저장 여부, ' +
+            '<code>changes</code>는 <code>{ field: { oldValue, newValue } }</code> 형태의 변경 묶음입니다 ' +
+            '(취소면 빈 객체). 실제 값 저장은 표준 <code>cellValueChanged</code>·' +
+            '<code>rowValueChanged</code>로도 발생하므로 기존 핸들러가 그대로 동작합니다.',
+          example:
+            "grid.on('popupEditStopped', function (e) {\n" +
+            "  if (e.committed) save(e.data, Object.keys(e.changes));\n" +
             '});',
         },
         {

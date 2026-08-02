@@ -130,6 +130,12 @@ class DemoHandler(SimpleHTTPRequestHandler):
         "": "application/octet-stream",
     }
 
+    def end_headers(self):
+        # 개발 서버 — 브라우저 휴리스틱 캐시가 옛 dist/datagrid.js를 붙들면
+        # 코드를 고쳐도 화면이 안 바뀌어 디버깅이 헛돈다. (server.js와 동일)
+        self.send_header("Cache-Control", "no-store, must-revalidate")
+        super().end_headers()
+
     def do_GET(self):
         parsed = urlparse(self.path)
         if parsed.path == "/api/employees":

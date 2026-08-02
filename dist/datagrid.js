@@ -49,6 +49,9 @@
     '<svg class="dg-editable-icon" viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true">' +
     '<path d="M11.9 1.3a1.1 1.1 0 0 1 1.6 0l1.2 1.2a1.1 1.1 0 0 1 0 1.6l-1.1 1.1-2.8-2.8 1.1-1.1z"/>' +
     '<path d="M10.1 3.1l2.8 2.8-7.2 7.2-3.5.7.7-3.5 7.2-7.2z"/></svg>';
+  const CLOSE_SVG =
+    '<svg viewBox="0 0 16 16" width="15" height="15" fill="none" aria-hidden="true">' +
+    '<path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
   const CHEVRON_SVG =
     '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" aria-hidden="true">' +
     '<path d="M6 3.5L10.5 8L6 12.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -119,6 +122,13 @@
     statusAdded: 'New',
     statusUpdated: 'Updated',
     statusDeleted: 'Deleted',
+
+    /* 팝업 에디터 (popupEditor) */
+    popupEditTitle: 'Editing {value}',
+    popupSave: 'Save',
+    popupCancel: 'Cancel',
+    popupCloseLabel: 'Close editor',
+    popupReadonlySuffix: ' (readonly)',
   };
 
   const LOCALE_KO = {
@@ -169,6 +179,12 @@
     statusAdded: '신규',
     statusUpdated: '수정',
     statusDeleted: '삭제',
+
+    popupEditTitle: '{value} 편집',
+    popupSave: '저장',
+    popupCancel: '취소',
+    popupCloseLabel: '편집 창 닫기',
+    popupReadonlySuffix: ' (읽기 전용)',
   };
 
   /**
@@ -1803,6 +1819,159 @@
     return cfg;
   }
 
+  /* ---- popupEditor (행 단위 폼 편집) ---- */
+
+  /** `column.popupEditor`가 팝업 안에서만 덮어쓸 수 있는 컬럼 속성. */
+  const POPUP_COLUMN_OVERRIDES = ['editor', 'editorOptions', 'editorSearch', 'validator'];
+
+  /**
+   * popupEditor 옵션(true 또는 부분 설정 객체)을 완전한 설정으로 정규화한다.
+   * 끈 상태(falsy)면 null. 모르는 position은 'center'로 떨어뜨린다 —
+   * 오타가 레이아웃을 통째로 바꾸지 않게 (resolveDomLayout과 같은 방침).
+   */
+  function resolvePopupEditorConfig(option) {
+    if (!option) return null;
+    const o = option === true || typeof option !== 'object' ? {} : option;
+    return {
+      position: o.position === 'left' || o.position === 'right' ? o.position : 'center',
+      width: typeof o.width === 'number' && o.width > 0 ? o.width : 420,
+      columns: o.columns === 2 ? 2 : 1,
+      title: typeof o.title === 'string' || typeof o.title === 'function' ? o.title : null,
+      trigger: o.trigger === 'none' ? 'none' : 'dblclick',
+      fields: Array.isArray(o.fields) ? o.fields.slice() : null,
+      instantUpdate: !!o.instantUpdate,
+      closeOnBackdrop: o.closeOnBackdrop !== false,
+      buttons: resolvePopupButtons(o.buttons),
+    };
+  }
+
+  /**
+   * 버튼 목록을 정규화한다. 문자열 'save'/'cancel'/'close'는 내장 버튼,
+   * 객체는 커스텀 버튼. 배열 순서가 곧 배치 순서다.
+   * 생략(undefined)하면 기본 ['save', 'cancel'], 빈 배열은 "버튼 없음"으로
+   * 존중한다 (헤더 닫기 버튼과 Esc는 항상 남으므로 갇히지 않는다).
+   */
+  function resolvePopupButtons(buttons) {
+    const list = Array.isArray(buttons) ? buttons : ['save', 'cancel'];
+    const out = [];
+    list.forEach(b => {
+      if (b === 'save' || b === 'cancel' || b === 'close') {
+        out.push({ key: b, builtin: b, variant: b === 'save' ? 'primary' : 'default' });
+        return;
+      }
+      if (!b || typeof b !== 'object' || typeof b.text !== 'string') return; /* 잘못된 항목은 건너뜀 */
+      out.push({
+        key: typeof b.key === 'string' ? b.key : b.text,
+        builtin: null,
+        text: b.text,
+        variant: b.variant === 'primary' || b.variant === 'danger' ? b.variant : 'default',
+        title: typeof b.title === 'string' ? b.title : null,
+        disabled: b.disabled,
+        onClick: typeof b.onClick === 'function' ? b.onClick : null,
+      });
+    });
+    return out;
+  }
+
+  /**
+   * 팝업 폼에 그릴 필드 목록을 만든다. 컬럼 정의를 그대로 재사용하고,
+   * `column.popupEditor`가 있으면 팝업 안에서만 그 위에 덮어쓴다.
+   *
+   * 순서 규칙: 기본은 컬럼 순서(`config.fields`를 주면 그 순서), 그 위에
+   * `popupEditor.order`를 지정한 필드만 그 값으로 끌어올린다(안정 정렬).
+   */
+  function buildPopupFields(columns, config, gridEditable) {
+    const explicit = config && config.fields;
+    const out = [];
+    (columns || []).forEach(col => {
+      if (!col || col.field === undefined || col.field === null) return;
+      if (col.__rowNumber || col.__rowStatus || col.__detailToggle) return;
+      if (col.checkboxSelection || col.hide) return;
+      if (col.popupEditor === false) return;
+      const cfg = col.popupEditor && typeof col.popupEditor === 'object' ? col.popupEditor : {};
+      if (cfg.hide) return;
+      if (explicit && explicit.indexOf(col.field) === -1) return;
+
+      /* 팝업 전용 컬럼 오버라이드 — 셀은 좁아 select, 폼은 넓어 searchselect 같은 교체 */
+      let editCol = col;
+      const over = {};
+      let hasOver = false;
+      POPUP_COLUMN_OVERRIDES.forEach(k => {
+        if (cfg[k] !== undefined) { over[k] = cfg[k]; hasOver = true; }
+      });
+      if (hasOver) editCol = Object.assign({}, col, over);
+
+      /* 그리드 잠금(setEditable(false))은 절대적 — popupEditor.readonly: false로도 못 푼다 */
+      let readonly;
+      if (!gridEditable) readonly = true;
+      else if (cfg.readonly !== undefined) readonly = !!cfg.readonly;
+      else readonly = !col.editable;
+
+      out.push({
+        field: col.field,
+        col,
+        editCol,
+        cfg,
+        label: typeof cfg.label === 'string' ? cfg.label : (col.headerName || col.field),
+        hint: typeof cfg.hint === 'string' ? cfg.hint : null,
+        span: cfg.span === 2 ? 2 : 1,
+        readonly,
+        order: typeof cfg.order === 'number' ? cfg.order : null,
+      });
+    });
+
+    if (explicit) out.sort((a, b) => explicit.indexOf(a.field) - explicit.indexOf(b.field));
+    /* 미지정 필드는 자기 위치를 정렬 키로 삼아 제자리에 남고, order를 준 필드만
+     * 그 값으로 움직인다. 값이 같으면 **명시한 쪽이 이긴다** — 안 그러면
+     * `order: 0`이 맨 앞 필드의 자연 인덱스 0과 동점이 돼 아무 일도 일어나지 않는다. */
+    out.forEach((f, i) => {
+      f._sort = f.order === null ? i : f.order;
+      f._explicit = f.order === null ? 1 : 0;
+    });
+    out.sort((a, b) => a._sort - b._sort || a._explicit - b._explicit); /* Array#sort는 안정 정렬 */
+    out.forEach(f => { delete f._sort; delete f._explicit; });
+    return out;
+  }
+
+  /**
+   * 폼 값과 원본 행을 비교해 바뀐 필드만 `{ field: { oldValue, newValue } }`로 뽑는다.
+   * 배열 값(multiselect)은 참조가 아니라 내용으로 비교한다.
+   */
+  function diffPopupValues(original, values, fields) {
+    const changes = {};
+    (fields || []).forEach(f => {
+      if (f.readonly) return;
+      const oldValue = original ? original[f.field] : undefined;
+      const newValue = values ? values[f.field] : undefined;
+      const same = Array.isArray(newValue) || Array.isArray(oldValue)
+        ? shallowArrayEquals(normalizeMultiValue(newValue), normalizeMultiValue(oldValue))
+        : editValueEquals(newValue, oldValue);
+      if (!same) changes[f.field] = { oldValue, newValue };
+    });
+    return changes;
+  }
+
+  /**
+   * 모든 필드의 validator를 돌려 `{ errors, failures }`를 반환한다.
+   * validator 자체가 던진 예외는 편집을 막지 않고(인라인과 동일 규약) `failures`로
+   * 올려보내 호출자가 로깅한다 — 순수 함수가 콘솔을 오염시키지 않게.
+   */
+  function validatePopupValues(fields, values, row) {
+    const errors = {};
+    const failures = [];
+    (fields || []).forEach(f => {
+      if (f.readonly) return;
+      const validator = (f.editCol || f.col || {}).validator;
+      if (typeof validator !== 'function') return;
+      let result;
+      try { result = validator(values ? values[f.field] : undefined, row); }
+      catch (e) { failures.push({ field: f.field, error: e }); return; }
+      const message = validationMessage(result);
+      if (message) errors[f.field] = message;
+    });
+    return { errors, failures };
+  }
+
   /**
    * softDelete용 삭제 분류: 추가(신규) 행은 hard(로우 자체 제거),
    * 기준선 행은 soft(삭제 표시). 그리드에 없는 행과 이미 삭제 표시된 행은 무시.
@@ -2023,6 +2192,8 @@
       this._lastClickedViewIndex = -1;
       this._focusedCell = null; /* { r, c } page-view coordinates */
       this._editing = null;
+      this._popupConfig = resolvePopupEditorConfig(options.popupEditor);
+      this._popup = null; /* 열려 있는 팝업 폼 상태 */
       this._cellSelection = !!options.cellSelection;
       this._cellRange = null; /* { anchor: {r,c}, focus: {r,c} } page-view coordinates */
       this._rangeDragging = false;
@@ -2641,6 +2812,9 @@
     refresh() {
       if (this._destroyed) return;
       this._cancelEdit();
+      /* 팝업은 행 참조를 붙들고 있으므로 refresh를 견딘다(본문 DOM과 형제).
+       * 단 그 행이 데이터에서 사라졌다면 더 저장할 곳이 없으니 닫는다. */
+      if (this._popup && this._rows.indexOf(this._popup.row) === -1) this._popupTeardown(false);
       this._recomputeView();
       this._renderHeader();
       this._layoutColumns();
@@ -2732,7 +2906,7 @@
     /* ---- runtime option changes (setOptions) ---- */
 
     /**
-     * 재생성 없이 옵션을 갱신한다. 지원: title, toolbar, theme, zebra, localeText,
+     * 재생성 없이 옵션을 갱신한다. 지원: title, toolbar, theme, zebra, localeText, popupEditor,
      * rowHeight, headerHeight, editable, sortModel, groupBy, quickFilter 계열,
      * columnDefs/defaultColDef/rowNumbers/rowDetail(컬럼 재구성),
      * pagination/paginationPageSize, floatingFilter, columnGroups,
@@ -2765,6 +2939,10 @@
       if ('headerHeight' in patch) {
         this._headerHeight = patch.headerHeight || 48;
         this._rootEl.style.setProperty('--dg-header-height', `${this._headerHeight}px`);
+      }
+      if ('popupEditor' in patch) {
+        this.closeEditPopup(false); /* 설정이 바뀌면 열려 있던 폼은 폐기 */
+        this._popupConfig = resolvePopupEditorConfig(patch.popupEditor);
       }
       if ('zebra' in patch) this._rootEl.classList.toggle('dg-zebra', !!patch.zebra);
       if ('theme' in patch) this.setTheme(patch.theme);
@@ -4460,13 +4638,25 @@
       this._emitter.emit('rowClicked', { data: hit.row, rowIndex: hit.r });
 
       /* editOnSingleClick: 클릭 한 번으로 편집 시작 (체크박스 클릭 제외) */
-      if (
-        this.options.editOnSingleClick &&
-        hit.col && hit.col.editable && this._editable &&
-        !e.target.closest('.dg-checkbox')
-      ) {
-        this._startEdit(hit);
+      if (this.options.editOnSingleClick && !e.target.closest('.dg-checkbox')) {
+        if (this._popupTriggerActive()) this._openPopupFromCell(hit);
+        else if (hit.col && hit.col.editable && this._editable) this._startEdit(hit);
       }
+    }
+
+    /** 더블클릭/Enter/단일클릭이 인라인 대신 팝업을 열어야 하는가. */
+    _popupTriggerActive() {
+      return !!(this._popupConfig && this._popupConfig.trigger === 'dblclick');
+    }
+
+    /**
+     * 셀 히트로 팝업을 연다. 그 컬럼이 편집 불가여도 폼에는 다른 편집 가능 필드가
+     * 있으므로 컬럼 단위 editable로 막지 않는다 (그리드 잠금은 openEditPopup이 본다).
+     */
+    _openPopupFromCell(hit) {
+      if (!hit || !hit.row || hit.row.__group || hit.row.__detail) return false;
+      const field = hit.col && hit.col.field !== undefined ? hit.col.field : null;
+      return this.openEditPopup(hit.row, field);
     }
 
     _onCellDblClick(e) {
@@ -4481,6 +4671,7 @@
         rowIndex: hit.r,
       });
       this._emitter.emit('rowDoubleClicked', { data: hit.row, rowIndex: hit.r });
+      if (this._popupTriggerActive()) { this._openPopupFromCell(hit); return; }
       if (hit.col && hit.col.editable && this._editable) this._startEdit(hit);
     }
 
@@ -4586,7 +4777,9 @@
           const row = this._pageRows[r];
           if (row && row.__group) { this._toggleGroup(row); break; }
           const col = this._visibleColumns()[c];
-          if (col && col.editable && this._editable && row) {
+          if (this._popupTriggerActive()) {
+            this._openPopupFromCell({ row, col, r, c });
+          } else if (col && col.editable && this._editable && row) {
             const rowEl = this._renderedRows[r];
             const cellEl = rowEl && rowEl.querySelector(`[data-col-index="${c}"]`);
             if (cellEl) this._startEdit({ cellEl, r, c, row, col });
@@ -4699,16 +4892,38 @@
 
     /* ---- editing ---- */
 
-    _startEdit(hit) {
-      if (this._isRowDeleted(hit.row)) return; /* softDelete 삭제 표시 행은 편집 불가 */
-      this._cancelEdit();
-      const col = hit.col;
-      const row = hit.row;
-      const value = row[col.field];
-      const cellEl = hit.cellEl;
-      cellEl.innerHTML = '';
+    /**
+     * 에디터 위젯을 container 안에 만든다. **인라인 셀 편집과 팝업 폼이 공유하는
+     * 유일한 위젯 생성 경로** — 새 에디터 종류는 여기에만 추가한다.
+     *
+     * 라이프사이클(언제 커밋할지, blur를 어떻게 볼지)은 호출자 몫이다. 인라인은
+     * blur=커밋 + Enter/Tab 인접 셀 이동인 반면, 팝업 폼은 필드가 동시에 여러 개
+     * 살아 있고 Save에서 일괄 커밋하므로 규칙이 다르다.
+     *
+     * @param {HTMLElement} container 위젯을 담을 요소 (내용은 호출자가 비워둔다)
+     * @param {object} col 정규화된 컬럼 정의 (editor/editorOptions/editorSearch를 읽는다)
+     * @param {*} value 현재 값
+     * @param {object} row 행 객체 (커스텀 에디터·editorSearch.fetch에 전달)
+     * @param {object} [hooks]
+     *   `editingClass` container에 붙일 편집 상태 클래스 ·
+     *   `flipPanel(panel)` 셀 앵커 패널 위치 결정(팝업은 no-op) ·
+     *   `onInput()` 사용자 입력 발생 · `onPick()` 옵션 확정 선택 ·
+     *   `isClosed()` 늦게 도착한 비동기 콜백 판별 · `autoFocus` (기본 true)
+     * @returns {object|null} `{ editorType, input, getValue, invalidEl, destroy }`.
+     *   커스텀 에디터 init이 실패하면 null (호출자가 폴백을 결정).
+     */
+    _createEditorWidget(container, col, value, row, hooks) {
+      const h = hooks || {};
+      const flipPanelUp = h.flipPanel || (() => {});
+      const onInput = h.onInput || (() => {});
+      const onPick = h.onPick || (() => {});
+      const isClosed = h.isClosed || (() => false);
+      const autoFocus = h.autoFocus !== false;
+      const editingClass = h.editingClass;
+      const markEditing = () => { if (editingClass) container.classList.add(editingClass); };
+      const unmarkEditing = () => { if (editingClass) container.classList.remove(editingClass); };
+      const cellEl = container; /* 아래 위젯 코드가 쓰는 이름 (인라인 시절 그대로) */
 
-      /* 에디터 준비 — 내장(input/select) 또는 커스텀 객체({ init, getValue, destroy }) */
       const isCustom = col.editor && typeof col.editor === 'object';
       const editorType = isCustom ? 'custom' : col.editor || defaultEditorType(col);
       let input = null;
@@ -4716,30 +4931,14 @@
       let getValue;
       let cleanup = null;
 
-      /* 셀 앵커 패널(multiselect/radio/searchselect 공용) — 아래 공간이 부족하고
-       * 위가 더 넉넉하면 위로 펼침. 내용이 바뀌어 다시 불러도 안전하게 양방향 설정. */
-      const flipPanelUp = panel => {
-        const bodyRect = this._bodyEl.getBoundingClientRect();
-        const cellRect = cellEl.getBoundingClientRect();
-        if (cellRect.bottom + panel.offsetHeight + 4 > bodyRect.bottom &&
-            cellRect.top - panel.offsetHeight - 4 > bodyRect.top) {
-          panel.style.top = 'auto';
-          panel.style.bottom = 'calc(100% + 2px)';
-        } else {
-          panel.style.top = 'calc(100% + 2px)';
-          panel.style.bottom = 'auto';
-        }
-      };
-
       if (isCustom) {
         try {
           col.editor.init(cellEl, value, row, col);
         } catch (e) {
           console.error(`[DataGrid] custom editor init failed for "${col.field}":`, e);
-          this._renderCellValue(cellEl, col, row);
-          return;
+          return null;
         }
-        cellEl.classList.add('dg-cell-editing');
+        markEditing();
         getValue = () => {
           try { return col.editor.getValue(); }
           catch (e) {
@@ -4748,7 +4947,7 @@
           }
         };
         cleanup = () => {
-          cellEl.classList.remove('dg-cell-editing');
+          unmarkEditing();
           if (col.editor.destroy) {
             try { col.editor.destroy(); }
             catch (e) { console.error('[DataGrid] custom editor destroy failed:', e); }
@@ -4756,7 +4955,7 @@
         };
         invalidEl = cellEl;
         const focusable = cellEl.querySelector('input, select, textarea, [tabindex]');
-        if (focusable) focusable.focus();
+        if (focusable && autoFocus) focusable.focus();
       } else if (editorType === 'checkbox') {
         /* 인라인 체크박스 — 셀 자체가 편집 프레임(dg-cell-editing).
          * editorOptions: { checked, unchecked }로 'Y'/'N', 0/1 같은 표기 매핑 지원. */
@@ -4766,10 +4965,10 @@
         input.type = 'checkbox';
         input.className = 'dg-checkbox';
         input.checked = isCheckedValue(value, cbOpts);
-        cellEl.classList.add('dg-cell-editing');
-        cleanup = () => { cellEl.classList.remove('dg-cell-editing'); };
+        markEditing();
+        cleanup = unmarkEditing;
         cellEl.appendChild(input);
-        input.focus();
+        if (autoFocus) input.focus();
         getValue = () => {
           if (cbOpts && 'checked' in cbOpts) {
             return input.checked ? cbOpts.checked : cbOpts.unchecked;
@@ -4795,11 +4994,11 @@
           lab.appendChild(rb);
           lab.appendChild(document.createTextNode(o.label));
         });
-        cellEl.classList.add('dg-cell-editing');
+        markEditing();
         flipPanelUp(radioWrap);
-        cleanup = () => { cellEl.classList.remove('dg-cell-editing'); };
+        cleanup = unmarkEditing;
         const checkedRadio = radioWrap.querySelector('input:checked') || radioWrap.querySelector('input');
-        if (checkedRadio) checkedRadio.focus();
+        if (checkedRadio && autoFocus) checkedRadio.focus();
         getValue = () => {
           const picked = radioWrap.querySelector('input:checked');
           return picked ? picked.__dgValue : value; /* 아무것도 안 고르면 이전 값 유지 */
@@ -4822,11 +5021,11 @@
           lab.appendChild(cb);
           lab.appendChild(document.createTextNode(o.label));
         });
-        cellEl.classList.add('dg-cell-editing');
+        markEditing();
         flipPanelUp(panel);
-        cleanup = () => { cellEl.classList.remove('dg-cell-editing'); };
+        cleanup = unmarkEditing;
         const firstCb = panel.querySelector('input');
-        (firstCb || panel).focus();
+        if (autoFocus) (firstCb || panel).focus();
         getValue = () => {
           const out = [];
           panel.querySelectorAll('input').forEach(cb => {
@@ -4920,10 +5119,10 @@
           try { promised = ssFetch(q, row, col); }
           catch (e) { promised = Promise.reject(e); }
           Promise.resolve(promised).then(opts => {
-            if (finished || seq !== ssSeq) return; /* 닫혔거나 더 새 질의가 있음 */
+            if (isClosed() || seq !== ssSeq) return; /* 닫혔거나 더 새 질의가 있음 */
             ssRenderList(normalizeEditorOptions(opts), q.trim() !== '');
           }).catch(err => {
-            if (finished || seq !== ssSeq) return;
+            if (isClosed() || seq !== ssSeq) return;
             console.error(`[DataGrid] editorSearch.fetch failed for "${col.field}":`, err);
             ssRenderMsg(this._t('loadFailed'), 'dg-error');
           });
@@ -4938,10 +5137,10 @@
           if (!o) return;
           ssPicked = o.value;
           ssCacheLabel(o);
-          finish(true);
+          onPick();
         });
         ssInput.addEventListener('input', () => {
-          clearInvalid();
+          onInput();
           const q = ssInput.value;
           if (ssTimer) clearTimeout(ssTimer);
           if (!ssFetch) { ssRunQuery(q); return; }
@@ -4956,14 +5155,14 @@
             ssCacheLabel(ssShown[ssActive]);
           }
         });
-        cellEl.classList.add('dg-cell-editing');
+        markEditing();
         ssRunQuery('');
         flipPanelUp(ssPanel);
         cleanup = () => {
           if (ssTimer) clearTimeout(ssTimer);
-          cellEl.classList.remove('dg-cell-editing');
+          unmarkEditing();
         };
-        ssInput.focus();
+        if (autoFocus) ssInput.focus();
         getValue = () => ssPicked;
         invalidEl = cellEl;
       } else {
@@ -5011,14 +5210,61 @@
         }
         input.className = 'dg-cell-editor';
         cellEl.appendChild(input);
-        input.focus();
-        /* 전체 선택은 텍스트 계열에만 — date/datetime-local 등은 선택 API를
-         * 지원하지 않아 select()가 InvalidStateError를 던진다 */
-        if (input.select && (input.type === 'text' || input.type === 'number')) input.select();
+        if (autoFocus) {
+          input.focus();
+          /* 전체 선택은 텍스트 계열에만 — date/datetime-local 등은 선택 API를
+           * 지원하지 않아 select()가 InvalidStateError를 던진다 */
+          if (input.select && (input.type === 'text' || input.type === 'number')) input.select();
+        }
         invalidEl = input;
       }
 
+      return {
+        editorType,
+        input,
+        getValue,
+        invalidEl,
+        focus: () => {
+          const target = input || cellEl.querySelector('input, select, textarea, [tabindex]');
+          if (target && target.focus) target.focus();
+        },
+        destroy: () => { if (cleanup) cleanup(); },
+      };
+    }
+
+    _startEdit(hit) {
+      if (this._isRowDeleted(hit.row)) return; /* softDelete 삭제 표시 행은 편집 불가 */
+      this._cancelEdit();
+      const col = hit.col;
+      const row = hit.row;
+      const value = row[col.field];
+      const cellEl = hit.cellEl;
+      cellEl.innerHTML = '';
+
       let finished = false;
+
+      const widget = this._createEditorWidget(cellEl, col, value, row, {
+        editingClass: 'dg-cell-editing',
+        /* 셀 앵커 패널 — 아래 공간이 부족하고 위가 더 넉넉하면 위로 펼침 */
+        flipPanel: panel => {
+          const bodyRect = this._bodyEl.getBoundingClientRect();
+          const cellRect = cellEl.getBoundingClientRect();
+          if (cellRect.bottom + panel.offsetHeight + 4 > bodyRect.bottom &&
+              cellRect.top - panel.offsetHeight - 4 > bodyRect.top) {
+            panel.style.top = 'auto';
+            panel.style.bottom = 'calc(100% + 2px)';
+          } else {
+            panel.style.top = 'calc(100% + 2px)';
+            panel.style.bottom = 'auto';
+          }
+        },
+        onInput: () => { clearInvalid(); },
+        onPick: () => { finish(true); },   /* 인라인: 옵션 선택 = 즉시 커밋 */
+        isClosed: () => finished,
+      });
+      if (!widget) { this._renderCellValue(cellEl, col, row); return; }
+      const { editorType, input, getValue, invalidEl } = widget;
+      const cleanup = widget.destroy;
       const markInvalid = message => {
         invalidEl.classList.add('dg-invalid');
         invalidEl.setAttribute('aria-invalid', 'true');
@@ -5224,6 +5470,596 @@
     }
 
     isEditable() { return this._editable; }
+
+    /* ---- popup editor (행 단위 폼 편집) ----
+     *
+     * 인라인 셀 편집과 위젯 생성(_createEditorWidget)은 공유하지만 라이프사이클은
+     * 완전히 다르다: 필드가 동시에 여러 개 살아 있고, blur는 커밋이 아니며,
+     * 커밋은 Save에서 일괄로 일어난다(instantUpdate면 필드 확정 시점).
+     */
+
+    /** 팝업 폼을 연다. field를 주면 그 필드에 포커스. 열지 못하면 false. */
+    openEditPopup(row, field) {
+      if (!this._popupConfig || !row || this._destroyed) return false;
+      if (!this._editable) return false;
+      if (this._isRowDeleted(row)) return false; /* softDelete 삭제 표시 행 (인라인과 동일) */
+      if (this._rows.indexOf(row) === -1) return false;
+
+      const evt = { data: row, field: field || null, cancel: false };
+      this._emitter.emit('beforePopupEdit', evt);
+      if (evt.cancel) return false;
+
+      this._cancelEdit();     /* 인라인 편집이 열려 있으면 정리 */
+      this.closeEditPopup(false);
+
+      const cfg = this._popupConfig;
+      const fields = buildPopupFields(this._columns, cfg, this._editable);
+      if (!fields.length) return false;
+
+      /* 원본 스냅샷 — Cancel 롤백(instantUpdate)과 변경 감지의 기준선.
+       * 배열 값은 얕게 복사해야 위젯이 같은 배열을 만져도 기준선이 안 흔들린다. */
+      const original = {};
+      fields.forEach(f => {
+        const v = row[f.field];
+        original[f.field] = Array.isArray(v) ? v.slice() : v;
+      });
+
+      this._popup = {
+        row, cfg, fields, original,
+        values: Object.assign({}, original),
+        widgets: {},   /* field -> widget */
+        fieldEls: {},  /* field -> { fieldEl, controlEl, errorEl, labelEl } */
+        errors: {},
+        closed: false,
+      };
+
+      this._buildPopupDom();
+      this._popupFocus(field);
+      this._emitter.emit('popupEditStarted', { data: row, field: field || null });
+      return true;
+    }
+
+    /** 열려 있는 팝업을 닫는다. commit=true면 Save와 같은 경로. */
+    closeEditPopup(commit) {
+      if (!this._popup) return;
+      if (commit === true) { this._popupSave(); return; }
+      this._popupTeardown(false);
+    }
+
+    isPopupEditing() { return !!this._popup; }
+
+    /** 팝업 폼의 현재 값 스냅샷 (열려 있지 않으면 null). */
+    getPopupValues() {
+      if (!this._popup) return null;
+      this._popupReadValues();
+      return Object.assign({}, this._popup.values);
+    }
+
+    /* --- DOM --- */
+
+    _buildPopupDom() {
+      const p = this._popup;
+      const cfg = p.cfg;
+
+      /* BUG-001: 팝업은 .dg-root 안에 넣어야 --dg-* 토큰과 다크 테마를 상속받는다 */
+      const backdrop = el('div', `dg-popup-backdrop dg-popup-${cfg.position}`, this._rootEl);
+      const panel = el('div', 'dg-popup', backdrop);
+      panel.setAttribute('role', 'dialog');
+      panel.setAttribute('aria-modal', 'true');
+      if (cfg.position === 'center') panel.style.width = `${cfg.width}px`;
+      else panel.style.width = `${cfg.width}px`;
+      p.backdropEl = backdrop;
+      p.panelEl = panel;
+
+      /* 헤더 */
+      const header = el('div', 'dg-popup-header', panel);
+      const titleEl = el('div', 'dg-popup-title', header);
+      titleEl.textContent = this._popupTitle();
+      panel.setAttribute('aria-label', titleEl.textContent);
+      const closeBtn = el('button', 'dg-popup-close', header);
+      closeBtn.type = 'button';
+      closeBtn.setAttribute('aria-label', this._t('popupCloseLabel'));
+      /* 슬라이드 패널은 "접기"라 방향 화살표, 중앙 모달은 관례대로 X */
+      closeBtn.innerHTML = cfg.position === 'center' ? CLOSE_SVG : CHEVRON_SVG;
+      closeBtn.addEventListener('click', () => { this._popupCancel(); });
+
+      /* 본문 */
+      const body = el('div', `dg-popup-body${cfg.columns === 2 ? ' dg-popup-cols-2' : ''}`, panel);
+      p.bodyEl = body;
+      p.fields.forEach(f => { this._buildPopupField(f, body); });
+
+      /* 푸터 */
+      if (cfg.buttons.length) {
+        const footer = el('div', 'dg-popup-footer', panel);
+        p.footerEl = footer;
+        cfg.buttons.forEach(b => { this._buildPopupButton(b, footer, null); });
+      }
+
+      /* 바깥 클릭 — mousedown 기준(BUG-002 계열: click은 내부에서 올라온 것과 섞인다) */
+      if (cfg.closeOnBackdrop) {
+        backdrop.addEventListener('mousedown', e => {
+          if (e.target === backdrop) this._popupCancel();
+        });
+      }
+      /* Esc는 취소, Enter는 단순 입력에서만 저장 (패널형 에디터는 자기 키를 쓴다) */
+      panel.addEventListener('keydown', e => {
+        if (e.key === 'Escape') { e.stopPropagation(); this._popupCancel(); return; }
+        if (e.key !== 'Enter') return;
+        const t = e.target;
+        if (!t || t.tagName !== 'INPUT') return;
+        if (t.closest('.dg-editor-searchselect, .dg-editor-multiselect, .dg-editor-radio')) return;
+        e.preventDefault();
+        this._popupSave();
+      });
+
+      /* 진입 효과는 CSS @keyframes가 전담한다 — JS가 클래스를 나중에 붙이거나
+       * 트랜지션으로 처리하면 가시성이 프레임 생성에 묶여, 프레임이 안 나오는
+       * 상황에서 패널이 화면 밖에 영구히 남는다. */
+      this._popupSyncButtons();
+    }
+
+    _buildPopupField(f, body) {
+      const p = this._popup;
+      const fieldEl = el('div', 'dg-popup-field', body);
+      fieldEl.dataset.field = f.field;
+      if (f.span === 2) fieldEl.dataset.span = '2';
+
+      /* before(ctx) — 값이 없는 표시 전용 HTML */
+      this._popupMountSlot(f, f.cfg.before, fieldEl, 'dg-popup-before');
+
+      const labelEl = el('label', 'dg-popup-label', fieldEl);
+      labelEl.textContent = f.label + (f.readonly ? this._t('popupReadonlySuffix') : '');
+
+      const controlEl = el('div', 'dg-popup-control', fieldEl);
+      const inputWrap = el('div', 'dg-popup-input', controlEl);
+
+      if (f.readonly) {
+        this._buildPopupReadonly(f, inputWrap);
+      } else {
+        const widget = this._createEditorWidget(inputWrap, f.editCol, p.values[f.field], p.row, {
+          flipPanel: () => {},          /* 폼 안에서는 패널이 흐름대로 펼쳐진다 (CSS) */
+          autoFocus: false,             /* 포커스는 _popupFocus가 한 곳에만 준다 */
+          onInput: () => { this._popupClearError(f.field); },
+          onPick: () => { this._popupFieldChanged(f); },
+          isClosed: () => !this._popup || this._popup.closed,
+        });
+        if (widget) {
+          p.widgets[f.field] = widget;
+          /* 위젯 종류마다 발화 이벤트가 달라 둘 다 잡는다 (버블 기준) */
+          fieldEl.addEventListener('change', () => { this._popupFieldChanged(f); });
+          fieldEl.addEventListener('input', () => { this._popupFieldChanged(f); });
+        } else {
+          /* 커스텀 에디터 init 실패 — 읽기 전용으로 폴백 (폼이 통째로 죽지 않게) */
+          this._buildPopupReadonly(f, inputWrap);
+        }
+      }
+
+      /* 컬럼 단위 버튼 — 입력 오른쪽 */
+      (Array.isArray(f.cfg.buttons) ? resolvePopupButtons(f.cfg.buttons) : []).forEach(b => {
+        if (b.builtin) return; /* 필드 옆에는 내장 Save/Cancel을 두지 않는다 */
+        this._buildPopupButton(b, controlEl, f);
+      });
+
+      if (f.hint) el('div', 'dg-popup-hint', fieldEl).textContent = f.hint;
+      const errorEl = el('div', 'dg-popup-error', fieldEl);
+      errorEl.hidden = true;
+
+      /* after(ctx) */
+      this._popupMountSlot(f, f.cfg.after, fieldEl, 'dg-popup-after');
+
+      p.fieldEls[f.field] = { fieldEl, controlEl, labelEl, errorEl };
+    }
+
+    /** 표시 전용 입력. BUG-006에 따라 disabled 대신 readOnly + pointer-events 차단. */
+    _buildPopupReadonly(f, wrap) {
+      const input = el('input', 'dg-cell-editor dg-popup-readonly', wrap);
+      input.type = 'text';
+      input.readOnly = true;
+      input.tabIndex = -1;
+      const v = this._popup.values[f.field];
+      input.value = this._displayText(f.col, v, this._popup.row);
+    }
+
+    /** cellRenderer 없이 값의 표시 문자열만 뽑는다 (readonly 필드·타이틀용). */
+    _displayText(col, value, row) {
+      if (value === null || value === undefined) return '';
+      if (Array.isArray(value)) return value.join(', ');
+      if (col && typeof col.valueFormatter === 'function') {
+        try { return String(col.valueFormatter(value, row)); }
+        catch (e) { console.error(`[DataGrid] valueFormatter failed for "${col.field}":`, e); }
+      }
+      return String(value);
+    }
+
+    /** before/after 슬롯 — 문자열은 HTML로, Element는 그대로 붙인다. */
+    _popupMountSlot(f, slot, parent, cls) {
+      if (typeof slot !== 'function') return;
+      let content;
+      try { content = slot(this._popupContext(f)); }
+      catch (e) {
+        console.error(`[DataGrid] popupEditor.${cls.includes('before') ? 'before' : 'after'} failed for "${f.field}":`, e);
+        return;
+      }
+      if (content === null || content === undefined || content === '') return;
+      const holder = el('div', cls, parent);
+      if (content instanceof HTMLElement) holder.appendChild(content);
+      else holder.innerHTML = String(content); /* cellRenderer와 동일 — 이스케이프하지 않음 */
+    }
+
+    _buildPopupButton(b, parent, f) {
+      const variantCls = b.variant === 'primary' ? ' dg-btn-primary'
+        : b.variant === 'danger' ? ' dg-btn-danger' : '';
+      const btn = el('button', `dg-btn${variantCls}`, parent);
+      btn.type = 'button';
+      btn.dataset.popupBtn = b.key;
+      btn.textContent = b.builtin === 'save' ? this._t('popupSave')
+        : b.builtin === 'cancel' ? this._t('popupCancel')
+        : b.builtin === 'close' ? this._t('popupCancel')
+        : b.text;
+      if (b.title) btn.title = b.title;
+      btn.addEventListener('click', () => {
+        if (btn.disabled) return;
+        if (b.builtin === 'save') { this._popupSave(); return; }
+        if (b.builtin === 'cancel') { this._popupCancel(); return; }
+        if (b.builtin === 'close') { this._popupTeardown(false); return; }
+        if (!b.onClick) return;
+        try { b.onClick(this._popupContext(f)); }
+        catch (e) { console.error(`[DataGrid] popup button "${b.key}" onClick failed:`, e); }
+        if (this._popup) this._popupSyncButtons();
+      });
+      const p = this._popup;
+      (p._buttons || (p._buttons = [])).push({ def: b, el: btn, field: f });
+    }
+
+    /** disabled가 함수인 버튼들을 현재 상태로 다시 평가한다. */
+    _popupSyncButtons() {
+      const p = this._popup;
+      if (!p || !p._buttons) return;
+      p._buttons.forEach(({ def, el: btn, field }) => {
+        if (def.disabled === undefined) return;
+        let off = def.disabled;
+        if (typeof def.disabled === 'function') {
+          try { off = def.disabled(this._popupContext(field)); }
+          catch (e) {
+            console.error(`[DataGrid] popup button "${def.key}" disabled failed:`, e);
+            off = false;
+          }
+        }
+        btn.disabled = !!off;
+      });
+    }
+
+    /* --- 값 --- */
+
+    /** 살아 있는 위젯들의 값을 읽어 values에 반영한다. */
+    _popupReadValues() {
+      const p = this._popup;
+      if (!p) return;
+      p.fields.forEach(f => {
+        const w = p.widgets[f.field];
+        if (!w) return;
+        let v = w.getValue();
+        if (w.editorType === 'number') {
+          const n = Number(v);
+          v = v === '' || isNaN(n) ? p.original[f.field] : n;
+        }
+        p.values[f.field] = v;
+      });
+    }
+
+    /** 한 필드의 값이 바뀌었는지 확인하고 검증·이벤트·instantUpdate를 처리한다. */
+    _popupFieldChanged(f) {
+      const p = this._popup;
+      if (!p || p.closed) return;
+      const w = p.widgets[f.field];
+      if (!w) return;
+      let newValue = w.getValue();
+      if (w.editorType === 'number') {
+        const n = Number(newValue);
+        newValue = newValue === '' || isNaN(n) ? p.original[f.field] : n;
+      }
+      const oldValue = p.values[f.field];
+      const same = Array.isArray(newValue) || Array.isArray(oldValue)
+        ? shallowArrayEquals(normalizeMultiValue(newValue), normalizeMultiValue(oldValue))
+        : editValueEquals(newValue, oldValue);
+      if (same) return;
+
+      p.values[f.field] = newValue;
+      this._popupValidateField(f);
+      this._emitter.emit('popupFieldChanged', {
+        data: p.row, colDef: f.col, oldValue, newValue,
+      });
+      if (p.cfg.instantUpdate) this._popupCommitField(f, oldValue, newValue);
+      this._popupSyncButtons();
+    }
+
+    /** 폼에서 값을 프로그래매틱하게 바꾼다 (ctx.setValue). 위젯을 재생성해 UI를 맞춘다. */
+    _popupSetValue(field, value) {
+      const p = this._popup;
+      if (!p || p.closed) return false;
+      const f = p.fields.find(x => x.field === field);
+      if (!f || f.readonly) return false;
+      const oldValue = p.values[field];
+      p.values[field] = value;
+
+      const holder = p.fieldEls[field];
+      const w = p.widgets[field];
+      if (holder && w) {
+        /* 위젯 종류마다 값 주입 방식이 달라, 새 값으로 다시 만드는 쪽이 안전하다 */
+        w.destroy();
+        const wrap = holder.controlEl.querySelector('.dg-popup-input');
+        wrap.innerHTML = '';
+        const next = this._createEditorWidget(wrap, f.editCol, value, p.row, {
+          flipPanel: () => {},
+          autoFocus: false,
+          onInput: () => { this._popupClearError(field); },
+          onPick: () => { this._popupFieldChanged(f); },
+          isClosed: () => !this._popup || this._popup.closed,
+        });
+        if (next) p.widgets[field] = next;
+        else delete p.widgets[field];
+      }
+      this._popupValidateField(f);
+      this._emitter.emit('popupFieldChanged', {
+        data: p.row, colDef: f.col, oldValue, newValue: value,
+      });
+      if (p.cfg.instantUpdate) this._popupCommitField(f, oldValue, value);
+      this._popupSyncButtons();
+      return true;
+    }
+
+    /* --- 검증 --- */
+
+    _popupValidateField(f) {
+      const p = this._popup;
+      if (!p) return true;
+      const { errors, failures } = validatePopupValues([f], p.values, p.row);
+      failures.forEach(({ field, error }) => {
+        console.error(`[DataGrid] validator failed for "${field}":`, error);
+      });
+      if (errors[f.field]) this._popupShowError(f.field, errors[f.field]);
+      else this._popupClearError(f.field);
+      return !errors[f.field];
+    }
+
+    _popupValidateAll() {
+      const p = this._popup;
+      const { errors, failures } = validatePopupValues(p.fields, p.values, p.row);
+      failures.forEach(({ field, error }) => {
+        console.error(`[DataGrid] validator failed for "${field}":`, error);
+      });
+      p.fields.forEach(f => {
+        if (errors[f.field]) this._popupShowError(f.field, errors[f.field]);
+        else this._popupClearError(f.field);
+      });
+      return errors;
+    }
+
+    _popupShowError(field, message) {
+      const p = this._popup;
+      const holder = p && p.fieldEls[field];
+      if (!holder) return;
+      p.errors[field] = message;
+      holder.fieldEl.classList.add('dg-popup-invalid');
+      holder.errorEl.textContent = message;
+      holder.errorEl.hidden = false;
+      const w = p.widgets[field];
+      if (w && w.invalidEl) w.invalidEl.setAttribute('aria-invalid', 'true');
+    }
+
+    _popupClearError(field) {
+      const p = this._popup;
+      const holder = p && p.fieldEls[field];
+      if (!holder) return;
+      delete p.errors[field];
+      holder.fieldEl.classList.remove('dg-popup-invalid');
+      holder.errorEl.textContent = '';
+      holder.errorEl.hidden = true;
+      const w = p.widgets[field];
+      if (w && w.invalidEl) w.invalidEl.removeAttribute('aria-invalid');
+    }
+
+    /* --- 커밋 --- */
+
+    /** instantUpdate 경로: 한 필드를 즉시 행에 반영한다 (인라인 커밋과 같은 규약). */
+    _popupCommitField(f, oldValue, newValue) {
+      const p = this._popup;
+      if (this._popup && this._popup.errors[f.field]) return false;
+      const evt = { data: p.row, colDef: f.col, oldValue, newValue, cancel: false };
+      this._emitter.emit('beforeCellSave', evt);
+      if (evt.cancel) { this._popupShowError(f.field, this._popup.errors[f.field] || ' '); return false; }
+      p.row[f.field] = evt.newValue;
+      p.values[f.field] = evt.newValue;
+      this._recordUpdate(p.row, f.field, oldValue, evt.newValue);
+      this._emitter.emit('cellValueChanged', {
+        data: p.row, colDef: f.col, oldValue, newValue: evt.newValue,
+      });
+      const changes = {};
+      changes[f.field] = { oldValue, newValue: evt.newValue };
+      this._emitter.emit('rowValueChanged', { data: p.row, changes });
+      this.refreshRow(p.row);
+      return true;
+    }
+
+    _popupSave() {
+      const p = this._popup;
+      if (!p || p.closed) return false;
+      this._popupReadValues();
+
+      const errors = this._popupValidateAll();
+      if (Object.keys(errors).length) {
+        const first = p.fields.find(f => errors[f.field]);
+        if (first && p.widgets[first.field]) p.widgets[first.field].focus();
+        return false;
+      }
+
+      /* instantUpdate면 이미 행에 반영돼 있다 — 남은 건 닫기뿐 */
+      if (p.cfg.instantUpdate) {
+        const changes = diffPopupValues(p.original, p.values, p.fields);
+        this._popupTeardown(true, changes);
+        return true;
+      }
+
+      const changes = diffPopupValues(p.original, p.values, p.fields);
+      const saveEvt = { data: p.row, values: Object.assign({}, p.values), cancel: false };
+      this._emitter.emit('beforePopupSave', saveEvt);
+      if (saveEvt.cancel) return false;
+
+      /* beforePopupSave에서 values를 가공했을 수 있다 — 다시 diff */
+      const finalValues = saveEvt.values || p.values;
+      const finalChanges = diffPopupValues(p.original, finalValues, p.fields);
+
+      /* 필드별 beforeCellSave — 하나라도 거부하면 Save 전체를 멈춘다 */
+      const accepted = {};
+      const fieldsByName = {};
+      p.fields.forEach(f => { fieldsByName[f.field] = f; });
+      for (const field in finalChanges) {
+        const f = fieldsByName[field];
+        const { oldValue, newValue } = finalChanges[field];
+        const evt = { data: p.row, colDef: f.col, oldValue, newValue, cancel: false };
+        this._emitter.emit('beforeCellSave', evt);
+        if (evt.cancel) {
+          this._popupShowError(field, this._popup.errors[field] || ' ');
+          return false;
+        }
+        accepted[field] = { oldValue, newValue: evt.newValue };
+      }
+
+      /* 전부 통과한 뒤에야 행에 쓴다 — 중간 거부로 반쯤 저장되는 일이 없게 */
+      const changedFields = Object.keys(accepted);
+      changedFields.forEach(field => {
+        p.row[field] = accepted[field].newValue;
+        this._recordUpdate(p.row, field, accepted[field].oldValue, accepted[field].newValue);
+      });
+
+      /* 전이(닫기)를 먼저 끝내고 이벤트를 발사한다 (BUG-007과 같은 이유 —
+       * 핸들러의 refreshRow가 폼 DOM을 건드려도 재진입할 상태가 남지 않게) */
+      this._popupTeardown(true, accepted, () => {
+        changedFields.forEach(field => {
+          this._emitter.emit('cellValueChanged', {
+            data: p.row,
+            colDef: fieldsByName[field].col,
+            oldValue: accepted[field].oldValue,
+            newValue: accepted[field].newValue,
+          });
+        });
+        if (changedFields.length) {
+          this._emitter.emit('rowValueChanged', { data: p.row, changes: accepted });
+        }
+      });
+      return true;
+    }
+
+    _popupCancel() {
+      const p = this._popup;
+      if (!p || p.closed) return;
+      /* instantUpdate는 이미 행에 썼으므로 연 시점 스냅샷으로 되돌린다.
+       * 되돌림도 정식 커밋 경로를 타서 변경 추적·이벤트가 정합을 유지한다. */
+      if (p.cfg.instantUpdate) {
+        const drift = diffPopupValues(p.original, p.row, p.fields);
+        const rolled = {};
+        Object.keys(drift).forEach(field => {
+          const current = p.row[field];
+          const restored = p.original[field];
+          p.row[field] = restored;
+          this._recordUpdate(p.row, field, current, restored);
+          rolled[field] = { oldValue: current, newValue: restored };
+        });
+        if (Object.keys(rolled).length) {
+          this._popupTeardown(false, null, () => {
+            Object.keys(rolled).forEach(field => {
+              const f = p.fields.find(x => x.field === field);
+              this._emitter.emit('cellValueChanged', {
+                data: p.row, colDef: f.col,
+                oldValue: rolled[field].oldValue, newValue: rolled[field].newValue,
+              });
+            });
+            this._emitter.emit('rowValueChanged', { data: p.row, changes: rolled });
+            this.refreshRow(p.row);
+          });
+          return;
+        }
+      }
+      this._popupTeardown(false);
+    }
+
+    /**
+     * 팝업을 완전히 닫고 정리한다. after는 상태가 전부 정리된 뒤 실행되므로
+     * 리스너가 무엇을 하든 팝업 코드로 재진입하지 않는다 (BUG-007 교훈).
+     */
+    _popupTeardown(committed, changes, after) {
+      const p = this._popup;
+      if (!p || p.closed) return;
+      p.closed = true;
+      Object.keys(p.widgets).forEach(field => {
+        try { p.widgets[field].destroy(); }
+        catch (e) { console.error(`[DataGrid] popup widget destroy failed for "${field}":`, e); }
+      });
+      if (p.backdropEl && p.backdropEl.parentNode) {
+        p.backdropEl.parentNode.removeChild(p.backdropEl);
+      }
+      this._popup = null;
+      if (committed) this.refreshRow(p.row);
+      if (after) after();
+      this._emitter.emit('popupEditStopped', {
+        data: p.row,
+        committed: !!committed,
+        changes: changes || {},
+      });
+      if (this._rootEl) this._rootEl.focus();
+    }
+
+    /* --- 부수 --- */
+
+    _popupTitle() {
+      const p = this._popup;
+      const custom = p.cfg.title;
+      if (typeof custom === 'function') {
+        try { return String(custom(p.row)); }
+        catch (e) { console.error('[DataGrid] popupEditor.title failed:', e); }
+      } else if (typeof custom === 'string') {
+        return custom;
+      }
+      /* 기본: 첫 필드 값으로 행을 식별 (스샷의 "Editing James D Davis") */
+      const first = p.fields[0];
+      const value = first ? this._displayText(first.col, p.row[first.field], p.row) : '';
+      return this._t('popupEditTitle', { value });
+    }
+
+    _popupFocus(field) {
+      const p = this._popup;
+      if (!p) return;
+      const target = (field && p.widgets[field]) ? p.widgets[field]
+        : p.widgets[(p.fields.find(f => !f.readonly) || {}).field];
+      if (target) target.focus();
+      else if (p.panelEl) p.panelEl.focus();
+    }
+
+    /** 버튼·before/after 콜백에 넘기는 컨텍스트. */
+    _popupContext(f) {
+      const p = this._popup;
+      if (!p) return null;
+      return {
+        grid: this,
+        data: p.row,
+        colDef: f ? f.col : null,
+        field: f ? f.field : null,
+        fieldEl: f && p.fieldEls[f.field] ? p.fieldEls[f.field].fieldEl : null,
+        get value() { return p.values[f ? f.field : null]; },
+        get values() { return Object.assign({}, p.values); },
+        getValue: name => p.values[name],
+        setValue: (name, v) => this._popupSetValue(name, v),
+        isValid: () => Object.keys(this._popupValidateAll()).length === 0,
+        reset: () => {
+          p.fields.forEach(x => {
+            if (!x.readonly) this._popupSetValue(x.field, p.original[x.field]);
+          });
+        },
+        save: () => this._popupSave(),
+        cancel: () => { this._popupCancel(); },
+        close: () => { this._popupTeardown(false); },
+      };
+    }
 
     /* ---- clipboard (엑셀 호환 TSV) ---- */
 
@@ -6183,6 +7019,7 @@
 
     destroy() {
       if (this._destroyed) return;
+      this._popupTeardown(false);
       this._destroyed = true;
       this._closeMenu();
       if (this._resizeObserver) this._resizeObserver.disconnect();
@@ -6294,7 +7131,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.15.0';
+  DataGrid.version = '2.16.0';
 
   /**
    * 내장 로케일. `localeText: DataGrid.locales.ko`처럼 통째로 쓰거나,
@@ -6379,6 +7216,11 @@
     normalizeColumns,
     resolveHeaderClass,
     resolveStatusColumnConfig,
+    resolvePopupEditorConfig,
+    resolvePopupButtons,
+    buildPopupFields,
+    diffPopupValues,
+    validatePopupValues,
     partitionStagedRemoval,
     applyColumnState,
     computeColumnWidths,

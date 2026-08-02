@@ -74,6 +74,7 @@ python demo/server.py
 | `getRowClass(row, index)` | function | 행별 CSS 클래스 |
 | `editable` | boolean | 그리드 전체 편집 잠금 (`false`면 컬럼 설정 무시, `setEditable`로 전환) |
 | `editOnSingleClick` / `enterMovesDown` / `tabMovesRight` | boolean | 클릭 한 번 편집 / Enter·Tab 연속 편집 |
+| `popupEditor` | boolean 또는 object | 행 전체를 폼에서 편집 — `{ position: 'center'\|'left'\|'right', width, columns, title, trigger, fields, instantUpdate, closeOnBackdrop, buttons }`. 폼 필드는 컬럼 정의(`editor`/`editorOptions`/`validator`)를 그대로 재사용, 편집 불가 컬럼은 읽기 전용 표시. 컬럼별 커스터마이즈는 `column.popupEditor` |
 | `trackChanges` | boolean | 변경 추적 — dirty 셀 표시 + `getChanges`/`commitChanges`/`rollbackChanges` (`softDelete`/`statusColumn`이 자동 활성화) |
 | `softDelete` | boolean | CRUD 스테이징 삭제 — 서버(기준선) 행은 삭제 표시(취소선, 편집 차단, `restoreRows`로 복원), 신규 행은 로우 제거. `commitChanges`가 표시 행을 물리 제거 |
 | `statusColumn` | boolean 또는 object | 변경 상태(신규/수정/삭제) 태그 컬럼 자동 표시 — `{ headerName, width, labels, colors }` 부분 지정 가능 |
@@ -111,6 +112,7 @@ python demo/server.py
 | `editorOptions` | select/multiselect/radio 선택지 — `['a', 'b']` 또는 `[{ label: '한국', value: 'kr' }]` (label 표시, value 저장·타입 보존). checkbox는 `{ checked: 'Y', unchecked: 'N' }` 매핑. date/datetime은 `{ min, max, step, valueType }` |
 | `editorSearch` | select를 검색 패널로 — `true`(정적 목록 로컬 필터) 또는 `{ fetch(query) => Promise<options>, debounce, minLength, placeholder }` (lazy 검색) |
 | `validator(value, row)` | `true` 또는 오류 메시지 반환 — 거부 시 커밋 차단 + 빨간 표시 |
+| `popupEditor` | 팝업 폼 안에서만 적용되는 컬럼 오버레이 — `false`(폼에서 제외) 또는 `{ label, hint, hide, readonly, order, span, editor, editorOptions, editorSearch, validator, buttons, before(ctx), after(ctx) }`. 그리드 셀 표시는 그대로 |
 | `suppressCopy` | 클립보드 복사에서 제외 (CSV에는 영향 없음) |
 | `exportFormatter(value, row)` | CSV/Excel 내보내기 전용 포맷 (화면과 분리) |
 | `wrapText` | 셀 줄바꿈 (`autoRowHeight`와 함께 행 높이 자동) |
@@ -146,6 +148,7 @@ cellRenderer: DataGrid.renderers.checkbox()   // 값을 체크박스 모양으�
 `setRowData(rows)` · `getRowData()` · `addRow(row, index?)` / `addRows(rows, index?)` (index 0 = 맨 앞 삽입) · `updateRow(row, changes)` ·
 `removeRows(rows)` / `removeSelectedRows()` / `restoreRows(rows)` / `getRowStatus(row)` · `getSelectedRows()` · `selectAll()` / `deselectAll()` · `getCellRange()` / `clearCellRange()` · `findNext(text)` ·
 `startEdit(row, field)` / `stopEdit(commit)` / `isEditing()` · `setEditable(bool)` / `isEditable()` ·
+`openEditPopup(row, field?)` / `closeEditPopup(commit?)` / `isPopupEditing()` / `getPopupValues()` ·
 `copy()` / `pasteTsv(text)` (Ctrl+C/V 엑셀 호환 TSV) ·
 `getChanges()` / `isDirty()` / `commitChanges()` / `rollbackChanges()` · `undo()` / `redo()` / `canUndo()` / `canRedo()` ·
 `setQuickFilter(text)` · `applyColumnFilter(field, model)` · `getFilterModel()` · `clearFilters()` ·
@@ -194,7 +197,8 @@ grid.on('sortChanged' | 'filterChanged' | 'paginationChanged' | 'groupChanged' |
         'rowDoubleClicked' | 'cellClicked' | 'cellDoubleClicked' | 'columnResized' |
         'columnMoved' | 'stateChanged' | 'gridReady' | 'dataChanged' | 'viewRendered' |
         'cellRangeChanged' | 'cellContextMenu' | 'headerClicked' | 'cellKeyDown' |
-        'nodeExpanded' | 'nodeCollapsed', fn);
+        'nodeExpanded' | 'nodeCollapsed' | 'popupEditStarted' | 'popupFieldChanged' |
+        'popupEditStopped', fn);
 
 // 취소 가능 이벤트: e.cancel = true로 동작 거부
 grid.on('beforeCellSave', function (e) { if (e.newValue < 0) e.cancel = true; });
@@ -202,7 +206,36 @@ grid.on('beforeNodeToggle', function (e) { if (e.data.locked) e.cancel = true; }
 grid.on('beforeSort', function (e) { if (locked) e.cancel = true; });
 grid.on('beforeSelectionChange', function (e) { if (frozen) e.cancel = true; });
 grid.on('beforeExport', function (e) { e.filename = 'report-' + Date.now() + '.' + e.format; });
+grid.on('beforePopupEdit', function (e) { if (e.data.locked) e.cancel = true; });
+grid.on('beforePopupSave', function (e) { e.values.name = e.values.name.trim(); });
 ```
+
+### 팝업 에디터
+
+```js
+var grid = new DataGrid(el, {
+  columnDefs: [
+    { field: 'name', headerName: 'Name', editable: true },
+    { field: 'city', headerName: 'City', editor: 'select', editorOptions: cities,
+      validator: function (v) { return v ? true : '도시를 선택하세요'; },
+      // 팝업 안에서만 적용되는 오버레이 — 셀 표시는 그대로
+      popupEditor: { label: '근무 도시', order: 0, editorSearch: true,
+        buttons: [{ text: '본사', onClick: function (ctx) { ctx.setValue('city', 'Seoul'); } }] } },
+    { field: 'age', headerName: 'Age' },   // editable 아님 → 폼에서 읽기 전용
+  ],
+  popupEditor: {
+    position: 'right',                     // 'center'(기본) | 'left' | 'right'
+    title: function (row) { return row.name + ' 편집'; },
+    buttons: [
+      { key: 'reset', text: '초기화', onClick: function (ctx) { ctx.reset(); } },
+      'save', 'cancel',                    // 배열 순서가 곧 배치 순서
+    ],
+  },
+});
+```
+
+행을 더블클릭하면 폼이 열립니다(`trigger: 'none'`이면 `openEditPopup()`으로만).
+기본은 Save에서 변경된 필드만 일괄 커밋하고, `instantUpdate: true`면 즉시 반영 + Cancel이 연 시점으로 롤백합니다.
 
 ## 테마 커스터마이징
 
@@ -227,4 +260,4 @@ grid.on('beforeExport', function (e) { e.filename = 'report-' + Date.now() + '.'
 node test/run-tests.js
 ```
 
-정렬·필터·퀵 필터·페이지네이션·CSV·로케일 등 DOM 없는 데이터 로직 67개 스위트 / 657개 단언.
+정렬·필터·퀵 필터·페이지네이션·CSV·로케일·팝업 에디터 등 DOM 없는 데이터 로직 72개 스위트 / 750개 단언.

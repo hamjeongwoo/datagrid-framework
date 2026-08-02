@@ -222,7 +222,12 @@ http.createServer(function (req, res) {
   if (file.indexOf(ROOT) !== 0) { res.writeHead(403); res.end('Forbidden'); return; }
   fs.readFile(file, function (err, data) {
     if (err) { res.writeHead(404); res.end('Not found: ' + urlPath); return; }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' });
+    res.writeHead(200, {
+      'Content-Type': MIME[path.extname(file)] || 'application/octet-stream',
+      /* 개발 서버 — 브라우저 휴리스틱 캐시가 옛 dist/datagrid.js를 붙들면
+         코드를 고쳐도 화면이 안 바뀌어 디버깅이 헛돈다. */
+      'Cache-Control': 'no-store, must-revalidate',
+    });
     res.end(data);
   });
 }).listen(PORT, function () {

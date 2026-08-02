@@ -4,10 +4,11 @@
    re-theme without touching JavaScript.
    ========================================================================== */
 
-/* 토큰은 .dg-root 밖에 렌더링될 수 있는 팝업(.dg-menu)에도 직접 선언한다 —
-   메뉴가 그리드 밖(예: 정적 갤러리)에 있어도 스타일이 깨지지 않도록. */
+/* 토큰은 .dg-root 밖에 렌더링될 수 있는 팝업(.dg-menu, .dg-popup)에도 직접
+   선언한다 — 팝업이 그리드 밖(예: 정적 갤러리)에 있어도 스타일이 깨지지 않도록. */
 .dg-root,
-.dg-menu {
+.dg-menu,
+.dg-popup {
   /* ---- Design tokens (Quartz light) ---- */
   --dg-font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
     Roboto, "Helvetica Neue", Arial, "Noto Sans KR", sans-serif;
@@ -30,6 +31,12 @@
   --dg-input-border-color: #c2c8d0;
   --dg-menu-background-color: #ffffff;
   --dg-menu-shadow: 0 4px 16px rgba(24, 29, 31, 0.16);
+  --dg-popup-width: 420px;
+  --dg-popup-backdrop-color: rgba(24, 29, 31, 0.32);
+  --dg-popup-shadow: 0 12px 40px rgba(24, 29, 31, 0.22);
+  --dg-popup-radius: 8px;
+  --dg-popup-label-width: 120px;
+  --dg-slide-duration: 180ms;
   --dg-invalid-color: #e02525;
   --dg-dirty-color: #e07c00;
   --dg-added-row-background-color: rgba(13, 138, 68, 0.08);
@@ -69,10 +76,11 @@
 .dg-root *::after { box-sizing: border-box; }
 
 /* ---- Dark theme (Quartz dark) ----
-   .dg-menu는 토큰을 직접 선언받으므로(위 블록) 다크 오버라이드도
+   .dg-menu / .dg-popup은 토큰을 직접 선언받으므로(위 블록) 다크 오버라이드도
    후손 셀렉터로 직접 걸어야 상속보다 우선순위가 유지된다. */
 .dg-theme-dark,
-.dg-theme-dark .dg-menu {
+.dg-theme-dark .dg-menu,
+.dg-theme-dark .dg-popup {
   --dg-background-color: #181d1f;
   --dg-foreground-color: #ffffff;
   --dg-secondary-foreground-color: rgba(255, 255, 255, 0.62);
@@ -89,6 +97,8 @@
   --dg-input-border-color: rgba(255, 255, 255, 0.28);
   --dg-menu-background-color: #24292b;
   --dg-menu-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
+  --dg-popup-backdrop-color: rgba(0, 0, 0, 0.5);
+  --dg-popup-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
   --dg-dirty-color: #ffa940;
   --dg-added-row-background-color: rgba(52, 199, 119, 0.12);
   --dg-deleted-row-opacity: 0.5;
@@ -1117,6 +1127,200 @@
 .dg-theme-dark .dg-row:hover .dg-cell.dg-pinned-right { background: #223442; }
 .dg-theme-dark .dg-row.dg-row-selected .dg-cell.dg-pinned-left,
 .dg-theme-dark .dg-row.dg-row-selected .dg-cell.dg-pinned-right { background: #274257; }
+
+/* ==========================================================================
+   Popup editor (popupEditor) — 행 단위 폼 편집
+   .dg-popup은 토큰을 직접 선언받는다 (파일 상단 토큰 블록 + 다크 오버라이드).
+   ========================================================================== */
+
+.dg-popup-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  background: var(--dg-popup-backdrop-color);
+}
+.dg-popup-center { align-items: center; justify-content: center; }
+.dg-popup-left { align-items: stretch; justify-content: flex-start; }
+.dg-popup-right { align-items: stretch; justify-content: flex-end; }
+
+.dg-popup {
+  display: flex;
+  flex-direction: column;
+  max-width: 100%;
+  background: var(--dg-background-color);
+  color: var(--dg-foreground-color);
+  font-family: var(--dg-font-family);
+  font-size: var(--dg-font-size);
+  box-shadow: var(--dg-popup-shadow);
+}
+.dg-popup-center .dg-popup {
+  max-height: calc(100% - 32px);
+  border-radius: var(--dg-popup-radius);
+}
+/* 슬라이드 패널은 전체 높이를 채우고 바깥쪽 모서리는 각지게 둔다 */
+.dg-popup-left .dg-popup,
+.dg-popup-right .dg-popup { height: 100%; }
+
+/* 진입 효과 — 의도적으로 "작은" 오프셋에서만 움직인다.
+   화면 밖(translateX(±100%))이나 opacity:0에서 시작하면, 프레임이 생성되지 않는
+   상황(백그라운드 탭, display:none 조상, 숨겨진 프리뷰 팬)에서 애니메이션이
+   from 상태에 멈춰 팝업이 보이지 않는다 — 트랜지션도, rAF로 클래스를 붙이는
+   방식도 같은 실패 모드다. 여기서는 멈춰도 24px 어긋난 정도라 완전히 보이고
+   조작 가능하다. 가시성은 절대 애니메이션에 의존하지 않는다. */
+@keyframes dg-popup-slide-in-left { from { transform: translateX(-24px); } }
+@keyframes dg-popup-slide-in-right { from { transform: translateX(24px); } }
+@keyframes dg-popup-zoom-in { from { transform: scale(0.98); } }
+
+.dg-popup-left .dg-popup { animation: dg-popup-slide-in-left var(--dg-slide-duration) ease-out; }
+.dg-popup-right .dg-popup { animation: dg-popup-slide-in-right var(--dg-slide-duration) ease-out; }
+.dg-popup-center .dg-popup { animation: dg-popup-zoom-in var(--dg-slide-duration) ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dg-popup-backdrop .dg-popup { animation: none; }
+}
+
+.dg-popup-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--dg-border-color);
+}
+.dg-popup-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dg-popup-close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--dg-secondary-foreground-color);
+  cursor: pointer;
+}
+.dg-popup-close:hover {
+  background: var(--dg-header-background-color);
+  color: var(--dg-foreground-color);
+}
+/* 왼쪽 패널의 접기 화살표는 왼쪽을 향해야 한다 */
+.dg-popup-left .dg-popup-close svg { transform: rotate(180deg); }
+
+.dg-popup-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  padding: 18px;
+  align-content: start;
+}
+.dg-popup-body.dg-popup-cols-2 { grid-template-columns: 1fr 1fr; }
+.dg-popup-body.dg-popup-cols-2 .dg-popup-field[data-span="2"] { grid-column: span 2; }
+
+.dg-popup-field {
+  display: grid;
+  grid-template-columns: var(--dg-popup-label-width) 1fr;
+  align-items: center;
+  gap: 4px 12px;
+}
+.dg-popup-label {
+  grid-column: 1;
+  color: var(--dg-secondary-foreground-color);
+  overflow-wrap: anywhere;
+}
+.dg-popup-control {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.dg-popup-input { flex: 1; min-width: 0; position: relative; }
+.dg-popup-before,
+.dg-popup-after { grid-column: 1 / -1; }
+.dg-popup-hint,
+.dg-popup-error { grid-column: 2; font-size: 12px; }
+.dg-popup-hint { color: var(--dg-secondary-foreground-color); }
+.dg-popup-error { color: var(--dg-invalid-color); }
+.dg-popup-invalid .dg-popup-label { color: var(--dg-invalid-color); }
+
+/* 폼 안의 입력은 셀보다 넉넉하게 */
+.dg-popup .dg-cell-editor {
+  width: 100%;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--dg-border-color);
+  border-radius: 4px;
+  background: var(--dg-background-color);
+  color: var(--dg-foreground-color);
+  font: inherit;
+  box-sizing: border-box;
+}
+.dg-popup .dg-cell-editor:focus {
+  outline: none;
+  border-color: var(--dg-accent-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dg-accent-color) 18%, transparent);
+}
+.dg-popup-invalid .dg-cell-editor { border-color: var(--dg-invalid-color); }
+/* 표시 전용 — disabled를 쓰지 않는다 (BUG-006) */
+.dg-popup .dg-popup-readonly {
+  background: var(--dg-header-background-color);
+  color: var(--dg-secondary-foreground-color);
+  pointer-events: none;
+}
+
+/* 셀 앵커 패널(multiselect/radio/searchselect)은 폼 안에서 흐름대로 펼친다 —
+   절대 위치로 두면 아래 필드를 덮는다. */
+.dg-popup .dg-editor-multiselect,
+.dg-popup .dg-editor-radio,
+.dg-popup .dg-editor-searchselect {
+  position: static;
+  top: auto;
+  bottom: auto;
+  width: 100%;
+  min-width: 0;
+  max-height: 220px;
+}
+
+.dg-popup-footer {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--dg-border-color);
+}
+.dg-popup-footer .dg-btn { min-width: 84px; height: 36px; }
+.dg-popup-control .dg-btn { flex: none; height: 36px; }
+
+.dg-btn-danger {
+  border-color: var(--dg-invalid-color);
+  color: var(--dg-invalid-color);
+}
+.dg-btn-danger:hover {
+  background: var(--dg-invalid-color);
+  border-color: var(--dg-invalid-color);
+  color: #ffffff;
+}
+.dg-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+  pointer-events: none;
+}
 
 /* ==========================================================================
    Icons (inline SVG via mask would need external refs; use borders/chars)

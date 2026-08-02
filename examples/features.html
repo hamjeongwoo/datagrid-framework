@@ -3141,6 +3141,169 @@
     </script>
   </div>
 
+  <!-- ======================================================== 팝업 에디터 -->
+  <h2 class="section" id="popup-editor">Popup Editor (popupEditor)</h2>
+  <p class="section-desc">
+    <code class="inline">popupEditor</code>는 인라인 셀 편집 대신 <strong>행 전체를 폼에서</strong> 편집합니다.
+    폼의 각 필드는 <strong>컬럼 정의를 그대로 재사용</strong>하므로
+    <code class="inline">editor</code> · <code class="inline">editorOptions</code> ·
+    <code class="inline">validator</code>가 인라인과 똑같이 동작합니다.
+    편집 불가 컬럼은 읽기 전용으로 표시되고, 검증에 실패하면 라벨이 빨갛게 바뀌며 저장이 막힙니다.
+    위치는 <code class="inline">'center'</code>(기본) · <code class="inline">'left'</code> ·
+    <code class="inline">'right'</code>(슬라이드 패널) 중에 고릅니다.
+    행을 더블클릭하거나 아래 버튼을 눌러 보세요.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn primary" id="peCenterBtn" type="button">중앙 팝업</button>
+        <button class="tb-btn" id="peRightBtn" type="button">오른쪽 슬라이드</button>
+        <button class="tb-btn" id="peLeftBtn" type="button">왼쪽 슬라이드</button>
+        <label class="tb-check"><input type="checkbox" id="peInstant"> Instant Update</label>
+        <button class="tb-btn" id="peOpenBtn" type="button">선택 행 편집</button>
+      </div>
+      <div id="gridPopup" class="grid-wrap-md"></div>
+      <div class="status-line" id="popupStatus">행을 더블클릭하면 편집 폼이 열립니다.</div>
+    </div>
+    <script type="text/x-example">
+      var status = document.getElementById('popupStatus');
+      var cities = ['Montreal', 'Paris', 'Stockholm', 'Barcelona', 'Seoul'];
+
+      var grid = new DataGrid(document.getElementById('gridPopup'), {
+        rowData: DemoData.makeEmployees(40, 11),
+        rowSelection: 'single',
+        columnDefs: [
+          { field: 'name', headerName: 'Name', flex: 1, editable: true },
+          { field: 'city', headerName: 'City', width: 150,
+            editor: 'select', editorOptions: cities,
+            // 빈 값이면 저장을 막는다 — 폼에서 라벨이 빨갛게 바뀐다
+            validator: function (v) { return v ? true : '도시를 선택하세요'; } },
+          { field: 'salary', headerName: 'Score', width: 120, align: 'right',
+            editable: true, dataType: 'number', format: '#,##0',
+            validator: function (v) { return Number(v) >= 0 || '0 이상이어야 합니다'; } },
+          // editable이 없으니 폼에서 읽기 전용으로 표시된다
+          { field: 'age', headerName: 'Age', width: 100, align: 'right', dataType: 'number' },
+        ],
+        popupEditor: {
+          position: 'center',
+          title: function (row) { return 'Editing ' + row.name; },
+        },
+      });
+
+      function setPosition(pos, label) {
+        grid.setOptions({
+          popupEditor: {
+            position: pos,
+            instantUpdate: document.getElementById('peInstant').checked,
+            title: function (row) { return 'Editing ' + row.name; },
+          },
+        });
+        status.textContent = label + ' — 행을 더블클릭해 보세요.' +
+          (document.getElementById('peInstant').checked
+            ? ' (Instant Update: 입력하는 즉시 그리드에 반영되고, 취소하면 되돌립니다)'
+            : ' (저장을 눌러야 반영됩니다)');
+      }
+
+      document.getElementById('peCenterBtn').addEventListener('click', function () { setPosition('center', '중앙 팝업'); });
+      document.getElementById('peRightBtn').addEventListener('click', function () { setPosition('right', '오른쪽 슬라이드'); });
+      document.getElementById('peLeftBtn').addEventListener('click', function () { setPosition('left', '왼쪽 슬라이드'); });
+      document.getElementById('peInstant').addEventListener('change', function () { setPosition(grid.options.popupEditor.position, '설정 변경'); });
+
+      // API로 열기 — 선택된 행이 없으면 첫 행
+      document.getElementById('peOpenBtn').addEventListener('click', function () {
+        var row = grid.getSelectedRows()[0] || grid.getDisplayedRows()[0];
+        grid.openEditPopup(row, 'city');
+      });
+
+      grid.on('popupEditStopped', function (e) {
+        var fields = Object.keys(e.changes);
+        status.textContent = e.committed
+          ? (fields.length ? '저장됨 — 변경 필드: ' + fields.join(', ') : '저장됨 (변경 없음)')
+          : '취소됨 — 변경사항이 폐기되었습니다.';
+      });
+    </script>
+  </div>
+
+  <!-- ================================================ 팝업 에디터 커스터마이즈 -->
+  <h2 class="section" id="popup-editor-custom">Popup Editor — 버튼 · 컬럼 단위 커스터마이즈</h2>
+  <p class="section-desc">
+    폼 하단 버튼은 <code class="inline">buttons</code> 배열로 구성합니다 —
+    문자열 <code class="inline">'save'</code>/<code class="inline">'cancel'</code>은 내장 버튼이고,
+    객체를 섞어 <strong>배열 순서대로</strong> 배치합니다.
+    컬럼마다 <code class="inline">column.popupEditor</code>로 <strong>팝업 안에서만</strong>
+    라벨 · 도움말 · 순서 · 읽기 전용을 바꾸거나, 에디터를 교체하고
+    (셀은 좁으니 <code class="inline">select</code>, 폼은 넓으니 검색형),
+    필드 옆 버튼과 임의 HTML(<code class="inline">before</code>/<code class="inline">after</code>)을 넣을 수 있습니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div id="gridPopupCustom" class="grid-wrap-md"></div>
+      <div class="status-line" id="popupCustomStatus">행을 더블클릭하면 커스터마이즈된 폼이 열립니다.</div>
+    </div>
+    <script type="text/x-example">
+      var status = document.getElementById('popupCustomStatus');
+      var cities = ['Montreal', 'Paris', 'Stockholm', 'Barcelona', 'Seoul', 'Tokyo', 'Berlin'];
+
+      var grid = new DataGrid(document.getElementById('gridPopupCustom'), {
+        rowData: DemoData.makeEmployees(40, 13),
+        columnDefs: [
+          { field: 'name', headerName: 'Name', flex: 1, editable: true,
+            popupEditor: { label: '이름', hint: '실명을 입력하세요' } },
+
+          { field: 'city', headerName: 'City', width: 150,
+            editor: 'select', editorOptions: cities,
+            popupEditor: {
+              label: '근무 도시',
+              order: 0,                    // 폼에서는 맨 위로
+              editorSearch: true,          // 폼에서만 검색형 select로 교체
+              buttons: [{
+                key: 'seoul', text: '본사',
+                onClick: function (ctx) { ctx.setValue('city', 'Seoul'); },
+              }],
+              after: function (ctx) {
+                return '<span style="font-size:12px;opacity:.7">현재 저장된 값: ' + ctx.data.city + '</span>';
+              },
+            } },
+
+          { field: 'salary', headerName: 'Salary', width: 130, align: 'right',
+            editable: true, dataType: 'number', format: '$#,##0',
+            popupEditor: { label: '연봉', hint: '단위: USD' } },
+
+          // 그리드에서는 편집 가능하지만 폼에서는 잠근다
+          { field: 'department', headerName: 'Dept', width: 130, editable: true,
+            popupEditor: { label: '부서', readonly: true, hint: '부서 이동은 인사팀에 문의' } },
+
+          { field: 'email', headerName: 'Email', width: 200, editable: true,
+            popupEditor: { hide: true } },   // 폼에서 제외
+        ],
+        popupEditor: {
+          position: 'right',
+          width: 460,
+          title: function (row) { return row.name + ' 편집'; },
+          buttons: [
+            { key: 'reset', text: '초기화', onClick: function (ctx) { ctx.reset(); } },
+            { key: 'raise', text: '연봉 +10%', variant: 'danger',
+              // 값에 따라 활성/비활성이 바뀐다 (매 변경마다 재평가)
+              disabled: function (ctx) { return ctx.values.salary >= 150000; },
+              onClick: function (ctx) {
+                ctx.setValue('salary', Math.round(ctx.values.salary * 1.1));
+              } },
+            'save', 'cancel',
+          ],
+        },
+      });
+
+      grid.on('popupFieldChanged', function (e) {
+        status.textContent = e.colDef.headerName + ': ' + e.oldValue + ' → ' + e.newValue + ' (아직 미저장)';
+      });
+      grid.on('popupEditStopped', function (e) {
+        status.textContent = e.committed
+          ? '저장됨 — ' + (Object.keys(e.changes).join(', ') || '변경 없음')
+          : '취소됨.';
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

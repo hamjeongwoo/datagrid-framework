@@ -1787,5 +1787,246 @@ suite('resolveStatusColumnConfig (localeText)', function () {
   assertEq(T.resolveStatusColumnConfig(true).headerName, 'Status', 'no locale arg → english');
 });
 
+/* ---------------- resolvePopupEditorConfig ---------------- */
+suite('resolvePopupEditorConfig', function () {
+  var r = T.resolvePopupEditorConfig;
+
+  assertEq(r(false), null, 'falsy → null (기능 꺼짐)');
+  assertEq(r(undefined), null, 'undefined → null');
+  assertEq(r(0), null, '0 → null');
+
+  var d = r(true);
+  assertEq(d.position, 'center', 'true → 중앙 팝업 기본');
+  assertEq(d.width, 420, 'default width');
+  assertEq(d.columns, 1, 'default columns');
+  assertEq(d.trigger, 'dblclick', 'default trigger');
+  assertEq(d.instantUpdate, false, 'default instantUpdate');
+  assertEq(d.closeOnBackdrop, true, 'default closeOnBackdrop');
+  assertEq(d.fields, null, 'default fields = 전체');
+  assertEq(d.buttons.map(function (b) { return b.key; }), ['save', 'cancel'], 'default buttons');
+
+  assertEq(r({ position: 'left' }).position, 'left', 'left');
+  assertEq(r({ position: 'right' }).position, 'right', 'right');
+  /* 오타가 레이아웃을 통째로 바꾸지 않게 (resolveDomLayout과 같은 방침) */
+  assertEq(r({ position: 'top' }).position, 'center', '모르는 position → center');
+  assertEq(r({ position: null }).position, 'center', 'null position → center');
+
+  assertEq(r({ width: 0 }).width, 420, 'width 0은 무시');
+  assertEq(r({ width: -10 }).width, 420, '음수 width 무시');
+  assertEq(r({ width: '500' }).width, 420, '문자열 width 무시');
+  assertEq(r({ width: 500 }).width, 500, '유효한 width 적용');
+  assertEq(r({ columns: 2 }).columns, 2, 'columns 2');
+  assertEq(r({ columns: 3 }).columns, 1, '지원하지 않는 columns → 1');
+
+  assertEq(r({ trigger: 'none' }).trigger, 'none', 'trigger none');
+  assertEq(r({ trigger: 'click' }).trigger, 'dblclick', '모르는 trigger → dblclick');
+  assertEq(r({ closeOnBackdrop: false }).closeOnBackdrop, false, 'closeOnBackdrop 끄기');
+  assertEq(r({ instantUpdate: 1 }).instantUpdate, true, 'truthy instantUpdate');
+  assertEq(r({ title: 'X' }).title, 'X', '문자열 title');
+  assertEq(typeof r({ title: function () {} }).title, 'function', '함수 title');
+  assertEq(r({ title: 42 }).title, null, '문자열/함수가 아닌 title은 무시');
+  assertEq(r({ fields: ['a', 'b'] }).fields, ['a', 'b'], 'fields 목록');
+  assertEq(r({ fields: 'a' }).fields, null, '배열 아닌 fields 무시');
+
+  /* fields 배열은 사본이어야 한다 — 소비자가 나중에 바꿔도 설정이 안 흔들리게 */
+  var src = ['a'];
+  var cfg = r({ fields: src });
+  src.push('b');
+  assertEq(cfg.fields, ['a'], 'fields는 사본');
+});
+
+/* ---------------- resolvePopupButtons ---------------- */
+suite('resolvePopupButtons', function () {
+  var r = T.resolvePopupButtons;
+
+  assertEq(r(undefined).map(function (b) { return b.key; }), ['save', 'cancel'], '생략 → 기본 버튼');
+  assertEq(r('save').map(function (b) { return b.key; }), ['save', 'cancel'], '배열 아니면 기본');
+  /* 빈 배열은 "버튼 없음"으로 존중 — 헤더 닫기와 Esc가 남으므로 갇히지 않는다 */
+  assertEq(r([]), [], '빈 배열 = 버튼 없음');
+
+  var b = r(['save']);
+  assertEq(b.length, 1, 'save 하나만');
+  assertEq(b[0].builtin, 'save', 'builtin 표시');
+  assertEq(b[0].variant, 'primary', 'save는 primary');
+  assertEq(r(['cancel'])[0].variant, 'default', 'cancel은 default');
+  assertEq(r(['close'])[0].builtin, 'close', 'close 내장 버튼');
+
+  /* 배열 순서 = 배치 순서 (기본 버튼을 앞뒤로 옮기거나 뺄 수 있다) */
+  assertEq(
+    r(['cancel', 'save']).map(function (x) { return x.key; }),
+    ['cancel', 'save'],
+    '순서 존중'
+  );
+
+  var custom = r([{ key: 'del', text: '삭제', variant: 'danger', title: '행 삭제' }]);
+  assertEq(custom[0].key, 'del', 'custom key');
+  assertEq(custom[0].text, '삭제', 'custom text');
+  assertEq(custom[0].variant, 'danger', 'danger variant');
+  assertEq(custom[0].title, '행 삭제', 'custom title');
+  assertEq(custom[0].builtin, null, 'custom은 builtin 아님');
+
+  assertEq(r([{ text: 'X' }])[0].key, 'X', 'key 생략 시 text가 key');
+  assertEq(r([{ text: 'X', variant: 'weird' }])[0].variant, 'default', '모르는 variant → default');
+  assertEq(typeof r([{ text: 'X', onClick: function () {} }])[0].onClick, 'function', 'onClick 보존');
+  assertEq(r([{ text: 'X', onClick: 'nope' }])[0].onClick, null, '함수 아닌 onClick 무시');
+
+  /* text 없는 객체는 그릴 수 없으니 조용히 건너뛴다 (팝업 전체가 죽지 않게) */
+  assertEq(r([{ key: 'a' }, 'save']).map(function (x) { return x.key; }), ['save'], 'text 없는 객체 건너뜀');
+  assertEq(r([null, undefined, 'save']).map(function (x) { return x.key; }), ['save'], 'null 항목 건너뜀');
+  assertEq(r(['bogus', 'save']).map(function (x) { return x.key; }), ['save'], '모르는 문자열 건너뜀');
+});
+
+/* ---------------- buildPopupFields ---------------- */
+suite('buildPopupFields', function () {
+  var build = T.buildPopupFields;
+  var cols = [
+    { field: 'name', colId: 'name', headerName: 'Name', editable: true },
+    { field: 'age', colId: 'age', headerName: 'Age' },                      /* 편집 불가 */
+    { field: 'city', colId: 'city', headerName: 'City', editable: true },
+  ];
+
+  var f = build(cols, T.resolvePopupEditorConfig(true), true);
+  assertEq(f.map(function (x) { return x.field; }), ['name', 'age', 'city'], '컬럼 순서 유지');
+  assertEq(f.map(function (x) { return x.readonly; }), [false, true, false], 'editable → readonly 반전');
+  assertEq(f[0].label, 'Name', '기본 라벨은 headerName');
+
+  /* 내장 컬럼과 체크박스는 폼에 넣지 않는다 */
+  var builtins = build([
+    { field: 'a', colId: 'a', editable: true },
+    { colId: '__rowNum', __rowNumber: true, field: undefined },
+    { colId: '__rowStatus', __rowStatus: true, field: '__rowStatus' },
+    { colId: '__detailToggle', __detailToggle: true, field: '__d' },
+    { colId: 'sel', field: 'sel', checkboxSelection: true },
+    { field: 'hidden', colId: 'hidden', hide: true },
+  ], T.resolvePopupEditorConfig(true), true);
+  assertEq(builtins.map(function (x) { return x.field; }), ['a'], '내장·체크박스·숨김 컬럼 제외');
+
+  /* 그리드 잠금은 절대적 — popupEditor.readonly: false로도 못 푼다 */
+  var locked = build([{ field: 'a', colId: 'a', editable: true, popupEditor: { readonly: false } }],
+    T.resolvePopupEditorConfig(true), false);
+  assertEq(locked[0].readonly, true, 'setEditable(false)가 readonly:false를 이긴다');
+
+  /* 컬럼 단위 커스터마이즈 */
+  var custom = build([
+    { field: 'a', colId: 'a', headerName: 'A', editable: true,
+      popupEditor: { label: '가', hint: '도움말', span: 2, order: 1 } },
+    { field: 'b', colId: 'b', headerName: 'B', editable: true, popupEditor: { order: 0 } },
+    { field: 'c', colId: 'c', headerName: 'C', editable: true, popupEditor: false },
+    { field: 'd', colId: 'd', headerName: 'D', editable: true, popupEditor: { hide: true } },
+    { field: 'e', colId: 'e', headerName: 'E', popupEditor: { readonly: false } },
+    { field: 'f', colId: 'f', headerName: 'F', editable: true, popupEditor: { readonly: true } },
+  ], T.resolvePopupEditorConfig(true), true);
+  assertEq(custom.map(function (x) { return x.field; }), ['b', 'a', 'e', 'f'], 'order 반영 + 제외');
+  var a = custom.find(function (x) { return x.field === 'a'; });
+  assertEq(a.label, '가', 'label 오버라이드');
+  assertEq(a.hint, '도움말', 'hint');
+  assertEq(a.span, 2, 'span 2');
+  assertEq(custom.find(function (x) { return x.field === 'e'; }).readonly, false,
+    'readonly:false로 폼에서만 편집 허용');
+  assertEq(custom.find(function (x) { return x.field === 'f'; }).readonly, true,
+    'readonly:true로 폼에서만 잠금');
+
+  /* order: 0은 "맨 앞으로"여야 한다 — 첫 필드의 자연 인덱스 0과 동점이지만
+   * 명시 지정이 이기지 않으면 아무 일도 일어나지 않는다 */
+  var tie = build([
+    { field: 'first', colId: 'first', editable: true },
+    { field: 'lifted', colId: 'lifted', editable: true, popupEditor: { order: 0 } },
+    { field: 'third', colId: 'third', editable: true },
+  ], T.resolvePopupEditorConfig(true), true);
+  assertEq(tie.map(function (x) { return x.field; }), ['lifted', 'first', 'third'],
+    'order: 0이 자연 인덱스 0을 이긴다');
+
+  /* order 미지정끼리는 컬럼 순서 그대로 */
+  var noOrder = build([
+    { field: 'x', colId: 'x', editable: true },
+    { field: 'y', colId: 'y', editable: true },
+  ], T.resolvePopupEditorConfig(true), true);
+  assertEq(noOrder.map(function (x) { return x.field; }), ['x', 'y'], 'order 없으면 컬럼 순서');
+
+  /* 에디터 오버라이드는 editCol에만 반영되고 원본 컬럼은 안 건드린다 */
+  var srcCol = { field: 'x', colId: 'x', headerName: 'X', editable: true,
+    editor: 'select', editorOptions: ['a'],
+    popupEditor: { editor: 'text', editorSearch: true } };
+  var ov = build([srcCol], T.resolvePopupEditorConfig(true), true)[0];
+  assertEq(ov.editCol.editor, 'text', 'editor 오버라이드');
+  assertEq(ov.editCol.editorSearch, true, 'editorSearch 오버라이드');
+  assertEq(ov.editCol.editorOptions, ['a'], '오버라이드 안 한 값은 원본 승계');
+  assertEq(srcCol.editor, 'select', '원본 컬럼은 불변 (그리드 셀 표시는 그대로)');
+  assert(ov.col === srcCol, 'col은 원본 참조 유지');
+
+  /* 오버라이드가 없으면 사본을 만들지 않는다 */
+  var plain = build([{ field: 'y', colId: 'y', editable: true }], T.resolvePopupEditorConfig(true), true)[0];
+  assert(plain.editCol === plain.col, '오버라이드 없으면 editCol === col');
+
+  /* config.fields는 목록이자 순서 */
+  var picked = build(cols, T.resolvePopupEditorConfig({ fields: ['city', 'name'] }), true);
+  assertEq(picked.map(function (x) { return x.field; }), ['city', 'name'], 'fields 순서대로');
+
+  assertEq(build(null, T.resolvePopupEditorConfig(true), true), [], 'null 컬럼 → 빈 배열');
+  assertEq(build([{ colId: 'x' }], T.resolvePopupEditorConfig(true), true), [],
+    'field 없는 컬럼 제외');
+});
+
+/* ---------------- diffPopupValues ---------------- */
+suite('diffPopupValues', function () {
+  var diff = T.diffPopupValues;
+  var fields = [
+    { field: 'a', readonly: false },
+    { field: 'b', readonly: false },
+    { field: 'ro', readonly: true },
+  ];
+
+  assertEq(diff({ a: 1, b: 2 }, { a: 1, b: 2 }, fields), {}, '변경 없음');
+  assertEq(diff({ a: 1, b: 2 }, { a: 9, b: 2 }, fields),
+    { a: { oldValue: 1, newValue: 9 } }, '바뀐 필드만');
+  /* readonly 필드는 저장 대상이 아니다 */
+  assertEq(diff({ ro: 1 }, { ro: 2 }, fields), {}, 'readonly는 diff에서 제외');
+
+  /* 배열은 참조가 아니라 내용으로 비교 (multiselect) */
+  assertEq(diff({ a: ['x'] }, { a: ['x'] }, fields), {}, '같은 내용 배열 = 무변경');
+  assertEq(Object.keys(diff({ a: ['x'] }, { a: ['x', 'y'] }, fields)), ['a'], '내용 다른 배열 = 변경');
+  assertEq(diff({ a: null }, { a: [] }, fields), {}, 'null → 빈 배열은 스퓨리어스 변경이 아니다');
+
+  /* Date는 시각으로 비교 (참조 비교면 열었다 닫을 때마다 변경으로 잡힌다) */
+  assertEq(diff({ a: new Date(2024, 0, 1) }, { a: new Date(2024, 0, 1) }, fields), {},
+    '같은 시각 Date = 무변경');
+  assertEq(Object.keys(diff({ a: new Date(2024, 0, 1) }, { a: new Date(2024, 0, 2) }, fields)), ['a'],
+    '다른 시각 Date = 변경');
+
+  assertEq(diff({ a: 1 }, { a: 1 }, []), {}, '필드 없음');
+  assertEq(diff(null, null, fields), {}, 'null 안전');
+});
+
+/* ---------------- validatePopupValues ---------------- */
+suite('validatePopupValues', function () {
+  var v = T.validatePopupValues;
+  var row = { n: 5 };
+  var fields = [
+    { field: 'n', readonly: false, col: {}, editCol: { validator: function (val) { return val > 0 || '양수'; } } },
+    { field: 'plain', readonly: false, col: {}, editCol: {} },
+    { field: 'ro', readonly: true, col: {}, editCol: { validator: function () { return '항상 실패'; } } },
+  ];
+
+  assertEq(v(fields, { n: 5 }, row).errors, {}, '통과하면 오류 없음');
+  assertEq(v(fields, { n: -1 }, row).errors, { n: '양수' }, '실패 메시지');
+  /* readonly 필드는 검증하지 않는다 — 사용자가 바꿀 수 없는 값으로 Save를 막으면 갇힌다 */
+  assert(v(fields, { n: 5 }, row).errors.ro === undefined, 'readonly는 검증 제외');
+
+  /* validator 예외는 편집을 막지 않고 failures로 올려보낸다 (콘솔은 호출자가) */
+  var boom = [{ field: 'x', readonly: false, col: {}, editCol: {
+    validator: function () { throw new Error('boom'); } } }];
+  var res = v(boom, { x: 1 }, row);
+  assertEq(res.errors, {}, '예외는 오류로 치지 않는다 (인라인과 같은 규약)');
+  assertEq(res.failures.length, 1, 'failures로 보고');
+  assertEq(res.failures[0].field, 'x', 'failures에 필드명');
+
+  /* false 반환은 메시지 없는 실패 */
+  var f2 = [{ field: 'y', readonly: false, col: {}, editCol: { validator: function () { return false; } } }];
+  assert(v(f2, { y: 1 }, row).errors.y !== undefined, 'false 반환도 실패로 잡힌다');
+
+  assertEq(v(null, {}, row).errors, {}, 'null 필드 안전');
+  assertEq(v(fields, null, row).errors, { n: '양수' }, 'values 없으면 undefined로 검증');
+});
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed === 0 ? 0 : 1);

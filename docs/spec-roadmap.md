@@ -72,6 +72,7 @@
 | [x] | **`trackModel` + `getChanges() · isDirty() · commit() · rollback()`** (변경 추적) | `trackChanges: true` 옵션 + `getChanges()` (added/updated/deleted) / `commitChanges()` / `rollbackChanges()` + dirty 셀·추가 행 표시 — v1.2.0 | **P2** |
 | [x] | `historyModel` + `history({method:'undo'\|'redo'})` | `undoRedo: true` 옵션 + `undo()` / `redo()` / `canUndo()/canRedo()` + Ctrl+Z/Y — v1.2.0 | **P2** (변경 추적 위에) |
 | [x] | `change` 이벤트 (행 단위 변경 묶음) | `rowValueChanged` — 편집·붙여넣기·채우기 공통, payload `{ data, changes }` — v2.0.0 | P3 |
+| [x] | (ParamQuery `editModel`은 셀/행 인라인만 — 폼 편집 없음. Kendo `editable: 'popup'` / AG Grid 팝업 에디터에 대응) | **`popupEditor`** — 행 단위 폼 편집. `position: 'center'`(기본)`\|'left'\|'right'`(슬라이드), 인라인 에디터 위젯 재사용, `instantUpdate`, 커스텀 버튼(`buttons`), 컬럼 단위 오버레이 `column.popupEditor`(label/hint/readonly/order/span/에디터 오버라이드/buttons/before/after), 이벤트 5종 — v2.16.0 | **P2** (사용자 요청) |
 | [x] | 날짜 에디터 (`column > editor: 'date'` — ParamQuery는 jQuery UI datepicker 연동) | `editor: 'date' \| 'datetime'` — 네이티브 `<input type="date">` / `datetime-local`, 커밋 값은 원본 타입 보존(문자열/`Date`/타임스탬프), `editorOptions: { min, max, step, valueType }`, `dataType: 'date'`면 자동 선택 — v2.8.0 | **P2** (사용자 요청) |
 
 ### 2.3 클립보드 · 내보내기 · 상태
@@ -177,6 +178,58 @@
 
 ### v2.1 — "TreeGrid" (§6 T1~T4)
 - treeData 코어(계층 표시·펼침/접힘·계층 정렬/필터), 체크박스 캐스케이드, 부모 요약, 지연 로딩
+
+### v2.16 — 팝업 에디터 popupEditor (사용자 요청)
+행 단위 폼 편집. 기존 인라인 셀 편집을 **대체하지 않고 추가 옵션으로** 얹는다.
+
+**옵션 (그리드 레벨)**
+```js
+popupEditor: {
+  position: 'center',    // 'center'(기본) | 'left' | 'right' (슬라이드 패널)
+  width: 420, columns: 1,
+  title: undefined,      // string | (row) => string, 생략 시 localeText.popupEditTitle
+  trigger: 'dblclick',   // 'dblclick'(기본, 인라인 대체) | 'none'(API·버튼으로만)
+  fields: undefined,     // 표시할 field 목록, 생략 시 field 있는 표시 컬럼 전부
+  instantUpdate: false,
+  closeOnBackdrop: true,
+  buttons: ['save', 'cancel'],
+}
+```
+`popupEditor: true` = 전부 기본값. `setOptions({ popupEditor })` 런타임 변경.
+
+- **컬럼 정의를 그대로 재사용한다** — `editor`·`editorOptions`·`editorSearch`·`dataType`·`validator`·`format`, 라벨은 `headerName`. 별도 폼 스키마를 만들지 않는 것이 설계의 핵심. 편집 불가 컬럼은 폼에 readonly로 표시하고(스샷의 `Age (readonly)`), 내장 컬럼(`__rowNum`/`__rowStatus`/`__detailToggle`/체크박스)은 제외.
+- readonly 표시는 `readOnly` 속성 + `pointer-events: none` + `tabindex="-1"`. **`disabled` 금지**(BUG-006).
+
+**커밋 규약** — `instantUpdate: false`(기본)는 폼 버퍼에 모았다가 Save에서 변경 필드만 일괄 커밋, Cancel/Esc/바깥클릭은 전부 폐기. `instantUpdate: true`는 필드 확정 즉시 커밋하고 **Cancel은 팝업을 연 시점의 스냅샷으로 롤백**한다(사용자 결정 — "취소"라는 단어의 의미와 일치하고 instantUpdate on/off가 같은 최종 결과를 내야 하므로). 어느 쪽이든 실제 커밋 시 기존 `cellValueChanged`·`rowValueChanged`를 그대로 발사해 기존 핸들러 호환을 지킨다.
+
+**검증** — `column.validator`를 필드 변경 시 + Save 시 실행. 실패하면 라벨을 `--dg-invalid-color`로 바꾸고 필드 아래 메시지, **Save 차단**. Save 시 변경 필드마다 `beforeCellSave`를 발사하고 하나라도 `e.cancel`이면 Save 전체 중단.
+
+**컬럼 단위 커스터마이즈 `column.popupEditor`** — 팝업 안에서만 적용되는 오버레이 레이어. 그리드 셀 표시는 건드리지 않는다.
+`hide` · `label` · `hint` · `readonly` · `order` · `span` / 오버라이드 `editor`·`editorOptions`·`editorSearch`·`validator`·`placeholder` / 커스텀 `buttons[]`(입력 오른쪽) · `before(ctx)` · `after(ctx)`(HTML 문자열 또는 Element).
+셀은 좁아서 `select`, 폼은 넓어서 `searchselect` 같은 **맥락별 에디터 교체**가 주 용도.
+입력 자체를 대체하는 `render(ctx)`는 **넣지 않는다** — `editor: { init, getValue, destroy }` 커스텀 에디터가 팝업에서도 동일하게 동작하므로 같은 일을 하는 두 번째 방법을 만들지 않는다. `before`/`after`는 값을 갖지 않는 표시 전용.
+
+**버튼** — `buttons` 배열. 문자열 `'save'`/`'cancel'`은 내장, 객체는 `{ key, text, variant: 'primary'|'default'|'danger', disabled: bool|(ctx)=>bool, onClick(ctx) }`. 배열 순서가 곧 배치 순서라 기본 버튼을 빼거나 앞뒤에 끼울 수 있다. `ctx` = `{ grid, data, colDef?, value?, values, getValue, setValue, isValid, reset, save, cancel, close, fieldEl? }`.
+
+**이벤트** — `beforePopupEdit`(취소 가능) / `popupEditStarted` / `popupFieldChanged` / `beforePopupSave`(취소 가능, `e.values` 가공) / `popupEditStopped`(`{ committed, changes }`).
+
+**API** — `openEditPopup(row, field?) => boolean` · `closeEditPopup(commit?)` · `isPopupEditing()` · `getPopupValues()`.
+
+**순수 함수** — `resolvePopupEditorConfig(option)`(모르는 `position`은 `'center'`로 — `resolveDomLayout` 관례) · `buildPopupFields(columns, config, gridEditable)` · `resolvePopupButtons(buttons)` · `diffPopupValues(original, values, fields)` · `validatePopupValues(fields, values, row)`. 전부 `_test` 노출.
+
+**localeText 추가 키** — `popupEditTitle`(`'Editing {value}'` / `'{value} 편집'`) · `popupSave` · `popupCancel` · `popupClose`(aria).
+
+**CSS** — `.dg-popup-backdrop` / `.dg-popup` / `-header` `-body` `-field` `-label` `-input` `-hint` `-error` `-footer`. BUG-001 3종 세트(루트 안 append + 토큰 블록 셀렉터에 `.dg-popup` 추가 + 다크 후손 셀렉터) 필수. 새 토큰 `--dg-popup-width` · `--dg-popup-backdrop-color` · `--dg-popup-shadow` · `--dg-popup-radius` · `--dg-slide-duration`. left/right는 `transform: translateX()` 트랜지션.
+
+**배타/상호작용** — softDelete 삭제 표시 행·`setEditable(false)`은 열기 차단(인라인과 동일). 팝업 중 인라인 편집·키보드 탐색 잠금. 팝업 중 해당 행이 데이터에서 사라지면 닫기.
+
+**에디터 위젯 팩토리 추출 (완료).** `_startEdit`(~350줄)이 셀에 강결합돼 있어(`cellEl.innerHTML` 직접 조작, 커밋 시 `_renderCellValue(cellEl)`, `flipPanelUp`이 `_bodyEl`/셀 rect 기준, blur=즉시 커밋, Enter/Tab=인접 셀 이동, `this._editing` 싱글턴) 위젯 생성부를 `_createEditorWidget(container, col, value, row, hooks) => { editorType, input, getValue, invalidEl, focus, destroy }`로 뽑았다. **위젯 생성만 공유하고 라이프사이클은 호출자가 감싼다** — 팝업은 필드가 동시에 여러 개 살아 있고 blur가 커밋이 아니다. 셀 결합부는 전부 hooks로 뒤집었다: `editingClass`(인라인 `'dg-cell-editing'`, 팝업 없음) · `flipPanel`(인라인은 셀 rect 기준 상하 반전, 팝업은 no-op — CSS가 패널을 `position: static`으로 흐름에 넣는다) · `onPick`(인라인은 즉시 커밋, 팝업은 값 변경 처리) · `onInput` · `isClosed`(늦게 도착한 `editorSearch.fetch` 판별) · `autoFocus`(팝업은 한 필드만). 검증: 10종 에디터 전수 + BUG-005(editOnSingleClick에서 select 재생성 없음)·BUG-007(커밋 이벤트 재진입 1회 커밋) 회귀 시나리오 통과.
+
+**구현하며 알게 된 것**
+- **진입 애니메이션을 가시성에 걸면 안 된다.** 처음엔 `requestAnimationFrame`으로 `.dg-popup-open`을 붙여 `translateX(±100%) → 0` 트랜지션을 돌렸는데, 프레임이 생성되지 않는 환경(숨겨진 프리뷰 팬, 백그라운드 탭, `display:none` 조상)에서 rAF 콜백이 아예 안 돌아 **패널이 화면 밖에 영구히 남았다.** rAF를 지우고 강제 리플로우로 바꿔도, `@keyframes`로 바꿔도 같은 실패 모드였다(트랜지션·애니메이션 모두 프레임 생성에 묶여 `from` 상태에 멈춘다). 최종 해법은 **움직이는 거리를 24px로 줄이는 것** — 멈춰도 완전히 보이고 조작 가능하다. 일반화하면 *애니메이션의 `from` 상태는 그 자체로 사용 가능한 상태여야 한다.*
+- `popupEditor.order`의 동점 처리: 미지정 필드는 자기 인덱스를 정렬 키로 쓰는데, `order: 0`이 첫 필드의 인덱스 0과 동점이 되어 안정 정렬이 원래 순서를 유지 → "맨 앞으로"가 조용히 무시됐다. **동점이면 명시 지정이 이기도록** 2차 키를 넣었다.
+- 데모 서버에 `Cache-Control: no-store` 추가(server.js·server.py) — 캐시 헤더가 없어 브라우저 휴리스틱 캐시가 옛 `dist/datagrid.js`를 붙들었고, 고친 코드가 반영되지 않아 없는 버그를 쫓았다.
+- Save는 **모든 필드의 `beforeCellSave`가 통과한 뒤에야** 행에 쓴다(중간 거부로 반쯤 저장되는 상태 방지). 닫기를 먼저 끝내고 이벤트를 발사하는 것도 BUG-007과 같은 이유.
 
 ### v2.15 — UI 문자열 다국어 localeText (사용자 선택)
 - 배경: 한국어 프로젝트인데 그리드가 그리는 문자열은 전부 영어 하드코딩이었다(`'Filter…'`, `'(Blanks)'`, `'In range'`, `'No rows to show'`, `'Total'`, aria-label 등 41개). 소비자가 바꿀 방법이 없었다.
