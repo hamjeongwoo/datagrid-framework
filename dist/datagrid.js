@@ -4919,6 +4919,11 @@
       const onPick = h.onPick || (() => {});
       const isClosed = h.isClosed || (() => false);
       const autoFocus = h.autoFocus !== false;
+      /* 셀 앵커 패널을 "항상 펼친 패널"이 아니라 "접혔다 펴지는 콤보박스"로 만든다.
+       * 셀에서는 패널 자체가 에디터고 고르면 커밋+닫힘이라 접을 필요가 없지만,
+       * 폼에서는 위젯이 계속 살아 있어서 접히지 않으면 ① 목록이 늘 펼쳐져 다른
+       * 필드를 밀어내고 ② 고른 값을 보여줄 자리가 없다. */
+      const collapsible = !!h.collapsible;
       const editingClass = h.editingClass;
       const markEditing = () => { if (editingClass) container.classList.add(editingClass); };
       const unmarkEditing = () => { if (editingClass) container.classList.remove(editingClass); };
@@ -5056,6 +5061,51 @@
           ? ssCfg.placeholder : this._t('searchPlaceholder');
         ssPanel.appendChild(ssInput);
         const ssList = el('div', 'dg-searchselect-list', ssPanel);
+
+        /* 값 → 표시 라벨. 정적 옵션에 없으면 lazy 검색으로 알게 된 캐시를 본다
+         * (짝꿍 렌더러 renderers.searchselect와 같은 출처). */
+        const ssLabelOf = v => {
+          if (v === null || v === undefined || v === '') return '';
+          const fromOptions = lookupOptionLabel(col.editorOptions, v);
+          if (fromOptions !== null) return fromOptions;
+          const cached = this._searchSelectLabels && this._searchSelectLabels[col.colId];
+          if (cached && cached[String(v)] !== undefined) return cached[String(v)];
+          return String(v);
+        };
+        /* 콤보박스 모드: 접힘이 기본이고 입력창은 "검색어"가 아니라 "현재 값"을 보여준다 */
+        const ssOpen = () => {
+          if (!collapsible) return;
+          ssPanel.classList.add('dg-searchselect-open');
+        };
+        const ssCollapse = () => {
+          if (!collapsible) return;
+          ssPanel.classList.remove('dg-searchselect-open');
+          ssInput.value = ssLabelOf(ssPicked); /* 고르지 않고 친 검색어는 되돌린다 */
+        };
+        if (collapsible) {
+          ssPanel.classList.add('dg-searchselect-collapsible');
+          ssInput.value = ssLabelOf(value);
+          /* 목록은 **사용자가 조작할 때만** 편다. focus에 걸면 팝업이 열리면서
+           * 주는 프로그래매틱 포커스만으로 드롭다운이 펼쳐진다. */
+          ssInput.addEventListener('focus', () => { ssInput.select(); });
+          ssInput.addEventListener('click', () => {
+            /* 열 때는 전체 목록을 보여준다 (입력창의 라벨이 검색어로 재해석되지 않게) */
+            if (!ssPanel.classList.contains('dg-searchselect-open')) ssRunQuery('');
+            ssOpen();
+          });
+          /* 패널 밖으로 포커스가 나가면 접는다 (패널 안 이동은 유지) */
+          ssPanel.addEventListener('focusout', e => {
+            if (e.relatedTarget && ssPanel.contains(e.relatedTarget)) return;
+            ssCollapse();
+          });
+          /* 목록이 열려 있을 때의 Esc는 목록만 닫는다 — 폼까지 닫히면 안 된다 */
+          ssPanel.addEventListener('keydown', e => {
+            if (e.key !== 'Escape') return;
+            if (!ssPanel.classList.contains('dg-searchselect-open')) return;
+            e.stopPropagation();
+            ssCollapse();
+          });
+        }
         /* 옵션 mousedown이 검색 입력의 포커스를 빼앗으면 focusout 커밋이
          * 클릭보다 먼저 달린다 — 포커스 이동 자체를 막는다 */
         ssList.addEventListener('mousedown', e => { e.preventDefault(); });
@@ -5137,22 +5187,34 @@
           if (!o) return;
           ssPicked = o.value;
           ssCacheLabel(o);
+          /* 콤보박스 모드에서는 고른 값을 입력창에 남기고 목록을 접는다.
+           * (인라인은 onPick이 즉시 커밋하며 에디터째 사라지므로 표시가 불필요) */
+          if (collapsible) { ssInput.value = o.label; ssCollapse(); }
           onPick();
         });
         ssInput.addEventListener('input', () => {
           onInput();
+          ssOpen(); /* 타이핑하면 목록을 편다 */
           const q = ssInput.value;
           if (ssTimer) clearTimeout(ssTimer);
           if (!ssFetch) { ssRunQuery(q); return; }
           ssTimer = setTimeout(() => { ssRunQuery(q); }, ssDebounce);
         });
         ssInput.addEventListener('keydown', e => {
-          if (e.key === 'ArrowDown') { e.preventDefault(); ssSetActive(ssActive + 1); }
+          if (e.key === 'ArrowDown') { e.preventDefault(); ssOpen(); ssSetActive(ssActive + 1); }
           else if (e.key === 'ArrowUp') { e.preventDefault(); ssSetActive(ssActive - 1); }
           else if (e.key === 'Enter' && ssActive >= 0 && ssShown[ssActive]) {
             /* 선택만 반영 — 커밋은 셀로 버블된 Enter를 공용 핸들러가 처리 */
             ssPicked = ssShown[ssActive].value;
             ssCacheLabel(ssShown[ssActive]);
+            if (collapsible) {
+              /* 폼에서는 Enter가 저장까지 가면 안 된다 — 목록을 접는 데서 멈춘다 */
+              e.stopPropagation();
+              e.preventDefault();
+              ssInput.value = ssShown[ssActive].label;
+              ssCollapse();
+              onPick();
+            }
           }
         });
         markEditing();
@@ -5618,6 +5680,7 @@
       } else {
         const widget = this._createEditorWidget(inputWrap, f.editCol, p.values[f.field], p.row, {
           flipPanel: () => {},          /* 폼 안에서는 패널이 흐름대로 펼쳐진다 (CSS) */
+          collapsible: true,            /* 검색형 select는 접히는 콤보박스로 */
           autoFocus: false,             /* 포커스는 _popupFocus가 한 곳에만 준다 */
           onInput: () => { this._popupClearError(f.field); },
           onPick: () => { this._popupFieldChanged(f); },
@@ -5625,6 +5688,10 @@
         });
         if (widget) {
           p.widgets[f.field] = widget;
+          /* 세로로 긴 목록형 위젯은 라벨을 가운데 정렬하면 목록 한가운데에 뜬다 */
+          if (widget.editorType === 'multiselect' || widget.editorType === 'radio') {
+            fieldEl.classList.add('dg-popup-field-tall');
+          }
           /* 위젯 종류마다 발화 이벤트가 달라 둘 다 잡는다 (버블 기준) */
           fieldEl.addEventListener('change', () => { this._popupFieldChanged(f); });
           fieldEl.addEventListener('input', () => { this._popupFieldChanged(f); });
@@ -5791,6 +5858,7 @@
         wrap.innerHTML = '';
         const next = this._createEditorWidget(wrap, f.editCol, value, p.row, {
           flipPanel: () => {},
+          collapsible: true,
           autoFocus: false,
           onInput: () => { this._popupClearError(field); },
           onPick: () => { this._popupFieldChanged(f); },

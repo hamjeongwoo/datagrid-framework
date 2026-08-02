@@ -181,6 +181,11 @@ window.ApiDocs = {
             '<code>editorSearch</code> · <code>dataType</code> · <code>validator</code> · ' +
             '라벨은 <code>headerName</code>). 편집 불가 컬럼은 읽기 전용으로 표시되고, ' +
             '내장 컬럼(행 번호 · 상태 · 디테일 토글 · 체크박스)은 제외됩니다.<br>' +
+            '<strong>폼에서 달라지는 위젯:</strong> 검색형 select(<code>editorSearch</code>)는 셀에서는 ' +
+            '"펼쳐진 패널 + 고르면 즉시 커밋"이지만, 폼에서는 <strong>접히는 콤보박스</strong>가 됩니다 — ' +
+            '입력창이 현재 값의 label을 보여주고 클릭·타이핑할 때만 목록이 펼쳐집니다. ' +
+            '<code>multiselect</code>/<code>radio</code>는 펼친 채로 현재 상태를 그대로 보여주므로 ' +
+            '접지 않습니다.<br>' +
             '<code>position</code>: <code>\'center\'</code>(기본) | <code>\'left\'</code> | ' +
             '<code>\'right\'</code>(슬라이드 패널) · <code>width</code>(기본 420) · ' +
             '<code>columns</code>: 1 | 2 · <code>title</code>: string | (row) => string · ' +
