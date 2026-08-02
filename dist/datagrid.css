@@ -71,7 +71,21 @@
   font-family: var(--dg-font-family);
   font-size: var(--dg-font-size);
   line-height: 1.4;
+  /* 셀은 문단이 아니라 UI다 — 텍스트 선택을 그리드 전체에서 끈다.
+     켜 두면 셀 클릭이 collapsed 선택을 만들어 브라우저가 그 자리에 캐럿을
+     그리고(캐럿 브라우징 시 깜빡임), 드래그가 셀 텍스트를 긁는다.
+     복사는 Ctrl+C / copyToClipboard()가 담당한다 (BUG-012). */
+  user-select: none;
 }
+
+/* 실제 입력 표면에서만 선택을 되살린다 — 인라인 에디터, 필터 메뉴, 팝업 폼.
+   .dg-menu/.dg-popup은 루트 안에 append되므로 none을 상속받는다(BUG-001). */
+.dg-root input,
+.dg-root textarea,
+.dg-menu input,
+.dg-menu textarea,
+.dg-popup input,
+.dg-popup textarea { user-select: text; }
 
 .dg-root *,
 .dg-root *::before,
@@ -463,7 +477,9 @@
   border-radius: 2px;
 }
 
-.dg-cell-editable { cursor: text; }
+/* I빔(cursor: text)은 "클릭하면 입력된다"는 신호인데 편집 진입은 더블클릭이다 —
+   약속을 지키지 못하는 커서라 기본 커서를 쓴다 (BUG-012). */
+.dg-cell-editable { cursor: default; }
 
 /* Inline editor */
 .dg-cell-editor {
