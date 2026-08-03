@@ -1352,6 +1352,13 @@
    고른 값을 표시할 자리가 없다(셀에서는 고르는 즉시 닫히므로 문제가 없었다). */
 .dg-popup .dg-editor-searchselect.dg-searchselect-collapsible {
   position: relative;
+  /* 셀 앵커 패널의 z-index(30)를 반드시 함께 되돌린다 — position만 relative로
+     바꾸면 숫자 z-index가 살아남아 필드마다 stacking context가 생기고, 그 안에
+     갇힌 목록(z-index: 31)은 형제 필드 위로 올라갈 수 없다. 같은 30끼리는 DOM
+     순서로 결판나므로 "뒤에 오는 searchselect가 앞 필드의 목록을 덮는다"
+     (BUG-013). multiselect/radio가 멀쩡했던 건 position: static이라 z-index가
+     애초에 무효였기 때문. */
+  z-index: auto;
   top: auto;
   bottom: auto;
   width: 100%;
