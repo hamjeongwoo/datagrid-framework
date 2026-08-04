@@ -22,7 +22,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.17.0',
+  version: '2.18.0',
   updated: '2026-08-02',
 
   sections: [
@@ -199,7 +199,19 @@ window.ApiDocs = {
             '<code>trigger</code>: <code>\'dblclick\'</code>(기본) | <code>\'none\'</code>(API로만) · ' +
             '<code>fields</code>: 표시할 field 목록(순서도 결정) · ' +
             '<code>instantUpdate</code> · <code>closeOnBackdrop</code> · ' +
-            '<code>buttons</code>(<a href="#grid-options-popupEditor">아래 참고</a>).<br>' +
+            '<code>buttons</code>: 문자열 <code>\'save\'</code>/<code>\'cancel\'</code>/<code>\'close\'</code>는 ' +
+            '내장 버튼, 객체는 <code>{ key, text, variant, title, disabled, onClick(ctx), onLoad(ctx) }</code>이며 ' +
+            '<strong>배열 순서가 배치 순서</strong>입니다. ' +
+            '<code>onLoad</code>는 폼이 <strong>완전히 만들어진 직후 한 번</strong> 호출되어(v2.18) ' +
+            '행 값을 보고 버튼 문구·잠금을 정하거나 필드·값을 초기화하는 자리입니다 — ' +
+            '<code>ctx.buttonEl</code>로 버튼 DOM을 직접 만질 수 있고, ' +
+            '호출 순서는 <strong>DOM 순서</strong>(필드 버튼 → 푸터 버튼)이며 모든 필드가 이미 존재하므로 ' +
+            '다른 필드도 안전하게 건드릴 수 있습니다. ' +
+            '<code>disabled</code>를 함께 선언하면 그 결과가 <code>onLoad</code>의 수동 지정을 덮으므로, ' +
+            '로드 시점에만 잠그려면 <code>onLoad</code>에서 <code>ctx.buttonEl.disabled</code>만 쓰세요. ' +
+            '내장 버튼은 동작이 고정이라 콜백을 받지 않습니다 ' +
+            '(<a href="../examples/features.html#popup-button-onload" target="_blank" rel="noopener">' +
+            'onLoad 데모 ↗</a>).<br>' +
             '<strong>커밋 규약:</strong> 기본은 폼에 모았다가 Save에서 <strong>변경된 필드만 일괄 ' +
             '커밋</strong>하고 Cancel/Esc/바깥클릭은 전부 폐기합니다. ' +
             '<code>instantUpdate: true</code>면 필드를 확정할 때마다 즉시 행에 반영되고, ' +
@@ -216,6 +228,13 @@ window.ApiDocs = {
             "  title: function (row) { return row.name + ' 편집'; },\n" +
             '  buttons: [\n' +
             "    { key: 'reset', text: '초기화', onClick: function (ctx) { ctx.reset(); } },\n" +
+            "    { key: 'approve', text: '승인',\n" +
+            '      onLoad: function (ctx) {          // 폼이 만들어진 직후 한 번\n' +
+            "        var done = ctx.data.status === 'Active';\n" +
+            '        ctx.buttonEl.disabled = done;\n' +
+            "        ctx.buttonEl.textContent = done ? '승인 완료' : '승인';\n" +
+            '      },\n' +
+            "      onClick: function (ctx) { ctx.setValue('status', 'Active'); } },\n" +
             "    { key: 'del', text: '삭제', variant: 'danger',\n" +
             '      disabled: function (ctx) { return ctx.values.locked; },\n' +
             '      onClick: function (ctx) { ctx.grid.removeRows([ctx.data]); ctx.close(); } },\n' +
@@ -1530,10 +1549,14 @@ window.ApiDocs = {
             '<code>editorSearch</code> · <code>validator</code>. 원본 컬럼 정의는 변경되지 않습니다.<br>' +
             '<strong>커스텀 콘텐츠</strong> — <code>buttons</code>(입력 오른쪽에 붙는 버튼 배열, ' +
             '그리드 레벨 <code>buttons</code>와 같은 형식이되 내장 <code>\'save\'</code>/' +
-            '<code>\'cancel\'</code>은 무시) · <code>before(ctx)</code> / <code>after(ctx)</code>' +
+            '<code>\'cancel\'</code>은 무시. <code>onLoad(ctx)</code>도 같이 지원합니다 — ' +
+            '필드 버튼의 <code>onLoad</code>가 푸터 버튼보다 먼저 호출되고, 그 시점에 ' +
+            '<strong>모든 필드가 이미 존재</strong>하므로 뒤 필드의 값도 초기화할 수 있습니다) · ' +
+            '<code>before(ctx)</code> / <code>after(ctx)</code>' +
             '(필드 위/아래에 임의 HTML 문자열 또는 Element 반환).<br>' +
-            '<code>ctx</code>는 <code>{ grid, data, colDef, field, fieldEl, value, values, ' +
-            'getValue(field), setValue(field, v), isValid(), reset(), save(), cancel(), close() }</code>입니다. ' +
+            '<code>ctx</code>는 <code>{ grid, data, colDef, field, fieldEl, buttonEl, value, values, ' +
+            'getValue(field), setValue(field, v), isValid(), reset(), save(), cancel(), close() }</code>입니다 ' +
+            '(<code>buttonEl</code>은 버튼 콜백에서만 채워집니다). ' +
             '<strong>주의:</strong> <code>before</code>/<code>after</code>가 반환한 문자열은 ' +
             'HTML로 삽입되며 이스케이프되지 않습니다(<code>cellRenderer</code>와 동일). ' +
             '입력 자체를 대체하려면 이 슬롯이 아니라 <a href="#column-defs-editor"><code>editor</code></a>의 ' +
@@ -1545,6 +1568,9 @@ window.ApiDocs = {
             '    order: 0,                 // 폼에서는 맨 위로\n' +
             '    editorSearch: true,       // 폼에서만 검색형 select로 교체\n' +
             "    buttons: [{ key: 'hq', text: '본사',\n" +
+            '      onLoad: function (ctx) {                     // 빈 값이면 로드 시점에 채운다\n' +
+            "        if (!ctx.getValue('city')) ctx.setValue('city', 'Seoul');\n" +
+            '      },\n' +
             "      onClick: function (ctx) { ctx.setValue('city', 'Seoul'); } }],\n" +
             "    after: function (ctx) { return '<span>저장된 값: ' + ctx.data.city + '</span>'; },\n" +
             '  } }',

@@ -1869,6 +1869,11 @@ suite('resolvePopupButtons', function () {
   assertEq(r([{ text: 'X', variant: 'weird' }])[0].variant, 'default', '모르는 variant → default');
   assertEq(typeof r([{ text: 'X', onClick: function () {} }])[0].onClick, 'function', 'onClick 보존');
   assertEq(r([{ text: 'X', onClick: 'nope' }])[0].onClick, null, '함수 아닌 onClick 무시');
+  assertEq(typeof r([{ text: 'X', onLoad: function () {} }])[0].onLoad, 'function', 'onLoad 보존');
+  assertEq(r([{ text: 'X', onLoad: 'nope' }])[0].onLoad, null, '함수 아닌 onLoad 무시');
+  assertEq(r([{ text: 'X' }])[0].onLoad, null, 'onLoad 생략 → null');
+  /* 내장 버튼은 콜백 자리가 없다 — 동작이 고정이므로 onLoad도 받지 않는다 */
+  assertEq(r(['save'])[0].onLoad, undefined, '내장 버튼에는 onLoad 없음');
 
   /* text 없는 객체는 그릴 수 없으니 조용히 건너뛴다 (팝업 전체가 죽지 않게) */
   assertEq(r([{ key: 'a' }, 'save']).map(function (x) { return x.key; }), ['save'], 'text 없는 객체 건너뜀');

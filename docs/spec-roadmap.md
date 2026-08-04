@@ -209,7 +209,9 @@ popupEditor: {
 셀은 좁아서 `select`, 폼은 넓어서 `searchselect` 같은 **맥락별 에디터 교체**가 주 용도.
 입력 자체를 대체하는 `render(ctx)`는 **넣지 않는다** — `editor: { init, getValue, destroy }` 커스텀 에디터가 팝업에서도 동일하게 동작하므로 같은 일을 하는 두 번째 방법을 만들지 않는다. `before`/`after`는 값을 갖지 않는 표시 전용.
 
-**버튼** — `buttons` 배열. 문자열 `'save'`/`'cancel'`은 내장, 객체는 `{ key, text, variant: 'primary'|'default'|'danger', disabled: bool|(ctx)=>bool, onClick(ctx) }`. 배열 순서가 곧 배치 순서라 기본 버튼을 빼거나 앞뒤에 끼울 수 있다. `ctx` = `{ grid, data, colDef?, value?, values, getValue, setValue, isValid, reset, save, cancel, close, fieldEl? }`.
+**버튼** — `buttons` 배열. 문자열 `'save'`/`'cancel'`은 내장, 객체는 `{ key, text, variant: 'primary'|'default'|'danger', disabled: bool|(ctx)=>bool, onClick(ctx), onLoad(ctx) }`. 배열 순서가 곧 배치 순서라 기본 버튼을 빼거나 앞뒤에 끼울 수 있다. `ctx` = `{ grid, data, colDef?, value?, values, getValue, setValue, isValid, reset, save, cancel, close, fieldEl?, buttonEl? }`.
+
+`onLoad`(v2.18) — 폼이 **완전히 만들어진 직후 한 번**, DOM 순서(필드 버튼 → 푸터 버튼)로 호출. 행 값을 보고 버튼 문구·잠금을 정하거나 필드·값을 초기화하는 자리다. 설계 요점 세 가지: ① **빌드 도중이 아니라 완료 후** 호출해야 "뒤 필드를 만지는" 초기화가 성립한다(빌드 중 호출이면 아직 없는 필드를 조용히 놓친다). ② **포커스·`popupEditStarted`보다 먼저** 호출해 초기 포커스가 초기화 결과를 보고 정해지고, 리스너가 완성된 상태를 보게 한다. ③ `onLoad` 안에서 `close()/cancel()/save()`로 팝업이 사라질 수 있으므로 목록을 복사해 돌면서 매 반복 생존을 확인하고, 닫혔으면 `openEditPopup`은 `false`를 반환한다(열린 적 없는 것으로 취급). `disabled`를 선언한 버튼은 이후 재평가가 `onLoad`의 수동 지정을 덮는다 — 로드 시점 1회 잠금은 `ctx.buttonEl.disabled`만 쓴다. 내장 버튼은 동작이 고정이라 콜백을 받지 않는다.
 
 **이벤트** — `beforePopupEdit`(취소 가능) / `popupEditStarted` / `popupFieldChanged` / `beforePopupSave`(취소 가능, `e.values` 가공) / `popupEditStopped`(`{ committed, changes }`).
 

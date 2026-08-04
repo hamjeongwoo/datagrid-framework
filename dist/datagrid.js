@@ -1868,6 +1868,7 @@
         title: typeof b.title === 'string' ? b.title : null,
         disabled: b.disabled,
         onClick: typeof b.onClick === 'function' ? b.onClick : null,
+        onLoad: typeof b.onLoad === 'function' ? b.onLoad : null,
       });
     });
     return out;
@@ -5602,6 +5603,11 @@
       };
 
       this._buildPopupDom();
+      /* 폼이 다 만들어진 뒤, 포커스와 이벤트보다 먼저 — onLoad가 필드를 숨기거나
+       * 값을 바꿀 수 있으니 초기 포커스는 그 결과를 보고 정해야 하고,
+       * popupEditStarted 리스너도 초기화가 끝난 상태를 봐야 한다. */
+      this._popupFireButtonLoad();
+      if (!this._popup) return false; /* onLoad가 닫았으면 열린 적 없는 것으로 본다 */
       this._popupFocus(field);
       this._emitter.emit('popupEditStarted', { data: row, field: field || null });
       return true;
@@ -5823,12 +5829,33 @@
         if (b.builtin === 'cancel') { this._popupCancel(); return; }
         if (b.builtin === 'close') { this._popupTeardown(false); return; }
         if (!b.onClick) return;
-        try { b.onClick(this._popupContext(f)); }
+        try { b.onClick(this._popupContext(f, btn)); }
         catch (e) { console.error(`[DataGrid] popup button "${b.key}" onClick failed:`, e); }
         if (this._popup) this._popupSyncButtons();
       });
       const p = this._popup;
       (p._buttons || (p._buttons = [])).push({ def: b, el: btn, field: f });
+    }
+
+    /**
+     * 버튼들의 onLoad를 한 번 호출한다 — 폼이 완전히 만들어진 뒤 DOM 순서대로.
+     * 빌드 도중에 부르면 뒤 필드가 아직 없어서 "다른 필드를 만지는" 초기화가
+     * 조용히 실패한다. onLoad 안에서 close/cancel/save로 팝업이 사라질 수 있으므로
+     * 목록을 미리 복사하고 매 반복마다 생존을 확인한다.
+     */
+    _popupFireButtonLoad() {
+      const p = this._popup;
+      if (!p || !p._buttons) return;
+      const list = p._buttons.slice();
+      for (const { def, el: btn, field } of list) {
+        if (!def.onLoad) continue;
+        if (this._popup !== p || p.closed) return; /* onLoad가 팝업을 닫았다 */
+        try { def.onLoad(this._popupContext(field, btn)); }
+        catch (e) { console.error(`[DataGrid] popup button "${def.key}" onLoad failed:`, e); }
+      }
+      /* onLoad가 값을 바꿨을 수 있으니 disabled를 다시 평가한다.
+       * disabled 옵션이 있는 버튼은 그 결과가 onLoad의 수동 지정을 덮는다. */
+      if (this._popup === p && !p.closed) this._popupSyncButtons();
     }
 
     /** disabled가 함수인 버튼들을 현재 상태로 다시 평가한다. */
@@ -5839,7 +5866,7 @@
         if (def.disabled === undefined) return;
         let off = def.disabled;
         if (typeof def.disabled === 'function') {
-          try { off = def.disabled(this._popupContext(field)); }
+          try { off = def.disabled(this._popupContext(field, btn)); }
           catch (e) {
             console.error(`[DataGrid] popup button "${def.key}" disabled failed:`, e);
             off = false;
@@ -6157,7 +6184,7 @@
     }
 
     /** 버튼·before/after 콜백에 넘기는 컨텍스트. */
-    _popupContext(f) {
+    _popupContext(f, btnEl) {
       const p = this._popup;
       if (!p) return null;
       return {
@@ -6166,6 +6193,7 @@
         colDef: f ? f.col : null,
         field: f ? f.field : null,
         fieldEl: f && p.fieldEls[f.field] ? p.fieldEls[f.field].fieldEl : null,
+        buttonEl: btnEl || null, /* 버튼 콜백에서만 채워진다 (onLoad/onClick/disabled) */
         get value() { return p.values[f ? f.field : null]; },
         get values() { return Object.assign({}, p.values); },
         getValue: name => p.values[name],
@@ -7252,7 +7280,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.17.0';
+  DataGrid.version = '2.18.0';
 
   /**
    * 내장 로케일. `localeText: DataGrid.locales.ko`처럼 통째로 쓰거나,
