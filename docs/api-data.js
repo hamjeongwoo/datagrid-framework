@@ -22,7 +22,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.18.0',
+  version: '2.19.0',
   updated: '2026-08-02',
 
   sections: [
@@ -822,6 +822,8 @@ window.ApiDocs = {
           ['popupCancel', 'Cancel', '취소', 'popupEditor 내장 cancel/close 버튼'],
           ['popupCloseLabel', 'Close editor', '편집 창 닫기', 'popupEditor 헤더 닫기 버튼 aria-label'],
           ['popupReadonlySuffix', ' (readonly)', ' (읽기 전용)', 'popupEditor 읽기 전용 필드 라벨 접미사'],
+          ['requiredValue', '{column} is required', '{column}은(는) 필수 항목입니다', 'column.required 위반 시 거부 메시지'],
+          ['requiredIndicatorLabel', 'Required', '필수', 'required 컬럼 헤더 <code>*</code>의 title 툴팁'],
         ].map(r =>
           `<tr><td><code>${r[0]}</code></td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`
         ).join('') +
@@ -1528,6 +1530,47 @@ window.ApiDocs = {
             "  validator: function (v) { return v >= 0 || '급여는 0 이상이어야 합니다'; } }",
         },
         {
+          name: 'required',
+          demo: 'required-columns',
+          type: 'boolean',
+          default: 'false',
+          since: '2.19.0',
+          description:
+            '<strong>표시와 검증을 한 번에</strong> 켭니다. 빈 값 커밋이 거부되고 — 인라인 편집 · ' +
+            '팝업 폼 · 붙여넣기(<code>pasteTsv</code>) · <code>updateRows</code> · 채우기 드래그가 ' +
+            '모두 같은 규칙을 따릅니다 — 메시지는 <code>localeText.requiredValue</code>' +
+            '(<code>{column}</code> 토큰)에서 옵니다.<br>' +
+            '<strong>표시는 두 곳으로 나뉩니다:</strong> 헤더에 <code>*</code>' +
+            '(<code>--dg-required-color</code>)가 상시 붙어 "이 컬럼은 필수"라는 <em>정적 성질</em>을 알리고, ' +
+            '셀 모서리 마커는 <strong>비어 있는 셀에만</strong> 붙어 <em>조치가 필요한 곳</em>을 가리킵니다. ' +
+            '필수 컬럼의 모든 셀에 마커를 그리면 전부 같은 표시라 정보량이 0이기 때문입니다. ' +
+            '마커 자리는 <code>trackChanges</code>의 수정됨 마커(<strong>왼쪽 위 주황</strong>)와 겹치지 않는 ' +
+            '<strong>오른쪽 위</strong>입니다 — 한 셀에 둘이 동시에 뜰 수 있습니다.<br>' +
+            '<strong>빈 값의 정의:</strong> <code>null</code> · <code>undefined</code> · 빈 문자열 · ' +
+            '공백만 있는 문자열 · 빈 배열(<code>multiselect</code>). ' +
+            '<code>0</code>과 <code>false</code>는 <strong>유효한 값</strong>입니다 — 숫자 0이나 체크 해제를 ' +
+            '미입력으로 취급하면 정상 값의 저장을 막게 됩니다.<br>' +
+            '<code>editor</code>와 같은 규약으로 <strong>편집 의도로 해석</strong>되어 ' +
+            '<code>editable</code>을 생략하면 <code>true</code>가 됩니다(명시적 <code>editable: false</code>가 우선). ' +
+            '표시 기준은 <a href="#grid-options-editableIndicator"><code>editableIndicator</code></a>와 같아 ' +
+            '<strong>그리드를 잠그면(<code>setEditable(false)</code>) 헤더 표식과 셀 마커가 함께 사라집니다</strong> — ' +
+            '고칠 수 없는 자리의 "필수"는 할 일이 없기 때문입니다. 편집 불가 컬럼도 같은 이유로 표시하지 않습니다.<br>' +
+            '<code>validator</code>보다 <strong>먼저</strong> 검사되고, 빈 값이면 <code>validator</code>는 ' +
+            '호출되지 않습니다 — 소비자마다 빈 값 처리를 중복 작성하지 않게. ' +
+            '<a href="#column-defs-popupEditor"><code>popupEditor.required</code></a>로 폼에서만 다르게 ' +
+            '지정할 수도 있습니다.<br>' +
+            '<strong>주의:</strong> <code>number</code>·<code>date</code> 에디터는 빈 입력이 기존 정규화 규칙에 따라 ' +
+            '<strong>이전 값으로 되돌아가므로</strong> 인라인에서는 애초에 빈 값이 커밋되지 않습니다 — ' +
+            '이 컬럼들에서 required 오류 메시지를 보는 경로는 팝업 폼과 붙여넣기입니다. ' +
+            '또 <code>pasteTsv(\'\')</code>는 빈 문자열 가드에서 곧바로 <code>0</code>을 반환해 검증을 거치지 않습니다.',
+          example:
+            "{ field: 'city', headerName: 'City', editor: 'select', editorOptions: cities,\n" +
+            '  required: true }   // editable도 함께 켜진다\n\n' +
+            '// required가 먼저 검사되므로 validator는 빈 값을 볼 일이 없다\n' +
+            "{ field: 'salary', headerName: 'Salary', editor: 'number', required: true,\n" +
+            "  validator: function (v) { return v >= 40000 || '40,000 이상이어야 합니다'; } }",
+        },
+        {
           name: 'popupEditor',
           demo: 'popup-editor-custom',
           type: 'false | object',
@@ -1546,7 +1589,9 @@ window.ApiDocs = {
             '<code>order</code>(작을수록 앞. 지정한 필드만 움직이고 나머지는 컬럼 순서 유지) · ' +
             '<code>span</code>(<code>columns: 2</code>에서 두 칸 차지).<br>' +
             '<strong>오버라이드</strong> — <code>editor</code> · <code>editorOptions</code> · ' +
-            '<code>editorSearch</code> · <code>validator</code>. 원본 컬럼 정의는 변경되지 않습니다.<br>' +
+            '<code>editorSearch</code> · <code>validator</code> · ' +
+            '<code>required</code>(v2.19 — 폼에서만 필수로 올리거나 해제. 그리드 셀의 헤더 표식·마커는 ' +
+            '원본 컬럼의 <code>required</code>를 따릅니다). 원본 컬럼 정의는 변경되지 않습니다.<br>' +
             '<strong>커스텀 콘텐츠</strong> — <code>buttons</code>(입력 오른쪽에 붙는 버튼 배열, ' +
             '그리드 레벨 <code>buttons</code>와 같은 형식이되 내장 <code>\'save\'</code>/' +
             '<code>\'cancel\'</code>은 무시. <code>onLoad(ctx)</code>도 같이 지원합니다 — ' +
@@ -2977,7 +3022,8 @@ window.ApiDocs = {
         { name: '--dg-menu-background-color', default: '#ffffff', description: '필터 메뉴 팝업 배경.' },
         { name: '--dg-menu-shadow', default: '0 4px 16px rgba(24,29,31,.16)', description: '필터 메뉴·에디터 패널 그림자.' },
         { name: '--dg-invalid-color', default: '#e02525', description: '검증 실패 표시(테두리·메시지·팝업 폼 라벨).' },
-        { name: '--dg-dirty-color', default: '#e07c00', description: '변경 추적(trackChanges) dirty 셀 표시.', since: '1.2.0' },
+        { name: '--dg-dirty-color', default: '#e07c00', description: '변경 추적(trackChanges) dirty 셀 표시 — 셀 <strong>왼쪽 위</strong> 모서리.', since: '1.2.0' },
+        { name: '--dg-required-color', default: '#e02525', description: '필수 컬럼(column.required) 헤더 <code>*</code>와 빈 셀 마커 — 셀 <strong>오른쪽 위</strong> 모서리(dirty와 겹치지 않게). 다크는 #ff6b6b.', since: '2.19.0' },
         { name: '--dg-added-row-background-color', default: 'rgba(13,138,68,.08)', description: '추가된 행 배경(trackChanges).', since: '1.2.0' },
         { name: '--dg-range-background-color', default: 'rgba(33,150,243,.14)', description: '셀/블록 범위 선택 배경(cellSelection).', since: '1.2.0' },
         { name: '--dg-group-row-background-color', default: '#f3f6fa', description: '그룹 헤더 행 배경.', since: '1.1.0' },

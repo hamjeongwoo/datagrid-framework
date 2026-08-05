@@ -129,6 +129,10 @@
     popupCancel: 'Cancel',
     popupCloseLabel: 'Close editor',
     popupReadonlySuffix: ' (readonly)',
+
+    /* 필수 컬럼 (column.required) */
+    requiredValue: '{column} is required',
+    requiredIndicatorLabel: 'Required',
   };
 
   const LOCALE_KO = {
@@ -185,6 +189,9 @@
     popupCancel: '취소',
     popupCloseLabel: '편집 창 닫기',
     popupReadonlySuffix: ' (읽기 전용)',
+
+    requiredValue: '{column}은(는) 필수 항목입니다',
+    requiredIndicatorLabel: '필수',
   };
 
   /**
@@ -478,6 +485,44 @@
    */
   function shouldShowEditableIcon(col, gridEditable, indicatorOn) {
     return !!(indicatorOn && gridEditable && col && col.editable);
+  }
+
+  /**
+   * 필수값 판정의 "빈 값" 정의.
+   * 0과 false는 유효한 입력이므로 빈 값이 아니다 — 숫자 0이나 체크 해제를
+   * 미입력으로 오해하면 정상 값의 저장을 막아버린다.
+   * 공백만 있는 문자열과 빈 배열(multiselect)은 빈 값으로 본다.
+   */
+  function isBlankValue(value) {
+    if (value === null || value === undefined) return true;
+    if (typeof value === 'string') return value.trim() === '';
+    if (Array.isArray(value)) return value.length === 0;
+    return false;
+  }
+
+  /** required 위반 여부 — 컬럼이 required가 아니면 값과 무관하게 false. */
+  function isRequiredViolated(col, value) {
+    return !!(col && col.required) && isBlankValue(value);
+  }
+
+  /**
+   * 필수 표시(헤더 표식 · 셀 마커)를 지금 보여줄지.
+   * 기준은 shouldShowEditableIcon과 동일한 "지금 실제로 편집할 수 있는가" —
+   * 고칠 수 없는 자리에 "필수"라고 적어도 사용자가 할 수 있는 일이 없다.
+   * 그리드를 잠그면(setEditable(false)) 표시가 함께 사라진다.
+   */
+  function shouldShowRequired(col, gridEditable) {
+    return !!(gridEditable && col && col.required && col.editable);
+  }
+
+  /**
+   * 셀 코너 마커를 그릴지 — "필수인데 비어 있다"일 때만.
+   * required는 컬럼 전체가 같은 정적 성질이라 모든 셀에 그리면 정보량이 0이다.
+   * 컬럼이 필수라는 사실은 헤더 표식이 상시 알리고, 셀 마커는 조치가 필요한
+   * 곳만 가리킨다(dirty 마커가 "상태"를 가리키는 것과 같은 역할 분담).
+   */
+  function shouldMarkRequiredCell(col, value, gridEditable) {
+    return shouldShowRequired(col, gridEditable) && isBlankValue(value);
   }
 
   /** column.format / DataGrid.format() 진입점 — '#'나 '0'이 있으면 숫자, 아니면 날짜 패턴. */
@@ -1761,6 +1806,7 @@
     hide: false,
     pinned: null,
     align: 'left',
+    required: false,
   };
 
   function normalizeColumns(columnDefs, defaultColDef) {
@@ -1780,10 +1826,12 @@
       }
       const alignExplicit = ('align' in def) || (defaultColDef && 'align' in defaultColDef);
       if (col.dataType === 'number' && !alignExplicit) col.align = 'right';
-      /* editor를 선언했다는 것 자체가 편집 의도 — editable 생략 시 true로.
+      /* editor나 required를 선언했다는 것 자체가 편집 의도 — editable 생략 시 true로.
+       * required는 편집 경로에서만 의미가 있어서, 여기서 올려주지 않으면
+       * `required: true`만 쓴 컬럼이 조용히 아무 일도 하지 않는다.
        * 명시적 editable(false 포함)은 그대로 존중한다. */
       const editableExplicit = ('editable' in def) || (defaultColDef && 'editable' in defaultColDef);
-      if (!editableExplicit && col.editor) col.editable = true;
+      if (!editableExplicit && (col.editor || col.required)) col.editable = true;
       /* 선언적 format — valueFormatter가 없을 때만 합성 (CSV·집계·자동 폭에도 일괄 적용) */
       if (col.format && !col.valueFormatter) {
         col.valueFormatter = (pattern => v => formatValue(v, pattern))(col.format);
@@ -1822,7 +1870,7 @@
   /* ---- popupEditor (행 단위 폼 편집) ---- */
 
   /** `column.popupEditor`가 팝업 안에서만 덮어쓸 수 있는 컬럼 속성. */
-  const POPUP_COLUMN_OVERRIDES = ['editor', 'editorOptions', 'editorSearch', 'validator'];
+  const POPUP_COLUMN_OVERRIDES = ['editor', 'editorOptions', 'editorSearch', 'validator', 'required'];
 
   /**
    * popupEditor 옵션(true 또는 부분 설정 객체)을 완전한 설정으로 정규화한다.
@@ -1955,19 +2003,28 @@
   }
 
   /**
-   * 모든 필드의 validator를 돌려 `{ errors, failures }`를 반환한다.
+   * 모든 필드의 required + validator를 돌려 `{ errors, failures }`를 반환한다.
+   * required가 먼저다 — "값이 있어야 한다"는 validator보다 앞선 기본 규칙이고,
+   * 빈 값을 validator에 넘기면 소비자마다 빈 값 처리를 중복 작성해야 한다.
    * validator 자체가 던진 예외는 편집을 막지 않고(인라인과 동일 규약) `failures`로
    * 올려보내 호출자가 로깅한다 — 순수 함수가 콘솔을 오염시키지 않게.
+   * readonly 필드는 건너뛴다 — 고칠 수 없는 값으로 저장을 막으면 갇힌다.
    */
-  function validatePopupValues(fields, values, row) {
+  function validatePopupValues(fields, values, row, localeText) {
+    const t = localeText || LOCALE_EN;
     const errors = {};
     const failures = [];
     (fields || []).forEach(f => {
       if (f.readonly) return;
-      const validator = (f.editCol || f.col || {}).validator;
-      if (typeof validator !== 'function') return;
+      const col = f.editCol || f.col || {};
+      const value = values ? values[f.field] : undefined;
+      if (isRequiredViolated(col, value)) {
+        errors[f.field] = interpolate(t.requiredValue, { column: f.label || col.headerName || f.field });
+        return; /* 빈 값을 validator에 다시 넘기지 않는다 */
+      }
+      if (typeof col.validator !== 'function') return;
       let result;
-      try { result = validator(values ? values[f.field] : undefined, row); }
+      try { result = col.validator(value, row); }
       catch (e) { failures.push({ field: f.field, error: e }); return; }
       const message = validationMessage(result);
       if (message) errors[f.field] = message;
@@ -3040,6 +3097,16 @@
         const label = el('span', 'dg-header-cell-label', cell);
         this._renderHeaderLabel(label, col);
 
+        /* 필수 표식은 라벨 바로 뒤 — "이 컬럼은 필수"라는 정적 성질은 컬럼 위치에
+         * 한 번만 적는다. 셀 마커는 비어 있는 셀만 가리킨다. */
+        if (shouldShowRequired(col, this._editable)) {
+          cell.classList.add('dg-required-col');
+          const star = el('span', 'dg-required-star', cell);
+          star.textContent = '*';
+          star.setAttribute('title', this._t('requiredIndicatorLabel'));
+          star.setAttribute('aria-hidden', 'true'); /* 의미는 셀의 aria-required가 전달 */
+        }
+
         if (shouldShowEditableIcon(col, this._editable, this.options.editableIndicator)) {
           cell.classList.add('dg-editable-col');
           cell.insertAdjacentHTML('beforeend', EDIT_ICON_SVG);
@@ -3487,6 +3554,18 @@
         if (dirtyFields && col.field !== undefined && (col.field in dirtyFields)) {
           cell.classList.add('dg-cell-dirty');
           cell.title = `Original: ${dirtyFields[col.field]}`;
+        }
+        /* 필수인데 비어 있는 셀 — dirty와 동시에 뜰 수 있어서 CSS에서 반대쪽
+         * 모서리를 쓴다(왼쪽 위 = 수정됨 / 오른쪽 위 = 필수 미입력). */
+        if (shouldShowRequired(col, this._editable)) {
+          cell.setAttribute('aria-required', 'true');
+          if (isBlankValue(row[col.field])) {
+            cell.classList.add('dg-cell-required');
+            cell.setAttribute('aria-invalid', 'true');
+            if (!cell.title) {
+              cell.title = this._t('requiredValue', { column: col.headerName || col.field || '' });
+            }
+          }
         }
         if (rangeRect && cIdx >= rangeRect.c1 && cIdx <= rangeRect.c2) {
           cell.classList.add('dg-cell-range');
@@ -4101,6 +4180,28 @@
       return this._hasCheckboxColumn();
     }
 
+    /**
+     * 커밋 직전 값 검사 — required를 먼저 보고, 통과하면 column.validator.
+     * 오류 메시지 또는 null(통과)을 반환한다.
+     * 인라인 편집 · 채우기 드래그 · 붙여넣기/updateRows가 이 하나를 공유하므로
+     * required 규칙이 어느 경로로 들어와도 같게 적용된다.
+     * validator 자체 예외는 편집을 막지 않는다(기존 규약) — 소비자 코드의 버그로
+     * 저장이 잠기면 더 나쁘다.
+     */
+    _validateCellValue(col, value, row) {
+      if (isRequiredViolated(col, value)) {
+        return this._t('requiredValue', { column: col.headerName || col.field || '' });
+      }
+      if (typeof col.validator !== 'function') return null;
+      let result;
+      try { result = col.validator(value, row); }
+      catch (e) {
+        console.error(`[DataGrid] validator failed for "${col.field}":`, e);
+        return null;
+      }
+      return validationMessage(result);
+    }
+
     /** checkboxSelection 컬럼이 있는가. 있으면 선택 진입점을 체크박스 셀로 한정한다. */
     _hasCheckboxColumn() {
       return this._columns.some(c => c.checkboxSelection);
@@ -4493,12 +4594,7 @@
           const value = seq[i];
           const oldValue = trow[col.field];
           if (value === oldValue) continue;
-          if (col.validator) {
-            let result;
-            try { result = col.validator(value, trow); }
-            catch (e) { result = true; }
-            if (validationMessage(result)) continue;
-          }
+          if (this._validateCellValue(col, value, trow)) continue;
           const evt = { data: trow, colDef: col, oldValue, newValue: value, cancel: false };
           this._emitter.emit('beforeCellSave', evt);
           if (evt.cancel) continue;
@@ -5383,16 +5479,8 @@
             ? !shallowArrayEquals(newValue, normalizeMultiValue(value))
             : !editValueEquals(newValue, value);
           if (changed) {
-            if (col.validator) {
-              let result;
-              try { result = col.validator(newValue, row); }
-              catch (e) {
-                console.error(`[DataGrid] validator failed for "${col.field}":`, e);
-                result = true; /* validator 자체 오류는 편집을 막지 않는다 */
-              }
-              const message = validationMessage(result);
-              if (message) { markInvalid(message); return false; }
-            }
+            const message = this._validateCellValue(col, newValue, row);
+            if (message) { markInvalid(message); return false; }
             const evt = { data: row, colDef: col, oldValue: value, newValue, cancel: false };
             this._emitter.emit('beforeCellSave', evt);
             if (evt.cancel) { markInvalid(); return false; }
@@ -5420,6 +5508,14 @@
           cellEl.classList.toggle('dg-cell-dirty', dirtyNow);
           if (dirtyNow) cellEl.title = `Original: ${orig[col.field]}`;
           else cellEl.removeAttribute('title');
+        }
+        /* 필수 마커도 같은 이유로 제자리 갱신 — 값을 채우면 사라지고 지우면 나타난다.
+         * (required는 빈 값 커밋을 막지만, 원래 비어 있던 셀은 그대로 남는다) */
+        if (shouldShowRequired(col, this._editable)) {
+          const blank = isBlankValue(row[col.field]);
+          cellEl.classList.toggle('dg-cell-required', blank);
+          if (blank) cellEl.setAttribute('aria-invalid', 'true');
+          else cellEl.removeAttribute('aria-invalid');
         }
         /* 같은 이유로 내장 상태 컬럼(statusColumn) 셀도 제자리 갱신 —
          * 편집으로 updated 상태가 생기거나(원복 시) 사라질 수 있다 */
@@ -5730,6 +5826,15 @@
 
       const labelEl = el('label', 'dg-popup-label', fieldEl);
       labelEl.textContent = f.label + (f.readonly ? this._t('popupReadonlySuffix') : '');
+      /* 폼에서도 필수는 라벨에 표시한다 — 그리드 헤더와 같은 규약.
+       * readonly 필드는 검증에서도 건너뛰므로 표식을 달지 않는다. */
+      if (!f.readonly && (f.editCol || f.col || {}).required) {
+        fieldEl.classList.add('dg-popup-required');
+        const star = el('span', 'dg-required-star', labelEl);
+        star.textContent = '*';
+        star.setAttribute('title', this._t('requiredIndicatorLabel'));
+        star.setAttribute('aria-hidden', 'true');
+      }
 
       const controlEl = el('div', 'dg-popup-control', fieldEl);
       const inputWrap = el('div', 'dg-popup-input', controlEl);
@@ -5747,6 +5852,9 @@
         });
         if (widget) {
           p.widgets[f.field] = widget;
+          if ((f.editCol || f.col || {}).required && widget.input) {
+            widget.input.setAttribute('aria-required', 'true');
+          }
           /* 세로로 긴 목록형 위젯은 라벨을 가운데 정렬하면 목록 한가운데에 뜬다 */
           if (widget.editorType === 'multiselect' || widget.editorType === 'radio') {
             fieldEl.classList.add('dg-popup-field-tall');
@@ -5961,7 +6069,7 @@
     _popupValidateField(f) {
       const p = this._popup;
       if (!p) return true;
-      const { errors, failures } = validatePopupValues([f], p.values, p.row);
+      const { errors, failures } = validatePopupValues([f], p.values, p.row, this._localeText);
       failures.forEach(({ field, error }) => {
         console.error(`[DataGrid] validator failed for "${field}":`, error);
       });
@@ -5972,7 +6080,7 @@
 
     _popupValidateAll() {
       const p = this._popup;
-      const { errors, failures } = validatePopupValues(p.fields, p.values, p.row);
+      const { errors, failures } = validatePopupValues(p.fields, p.values, p.row, this._localeText);
       failures.forEach(({ field, error }) => {
         console.error(`[DataGrid] validator failed for "${field}":`, error);
       });
@@ -6304,15 +6412,7 @@
           }
           const oldValue = row[col.field];
           if (editValueEquals(value, oldValue)) return;
-          if (col.validator) {
-            let result;
-            try { result = col.validator(value, row); }
-            catch (e) {
-              console.error(`[DataGrid] validator failed for "${col.field}":`, e);
-              result = true;
-            }
-            if (validationMessage(result)) return;
-          }
+          if (this._validateCellValue(col, value, row)) return;
           const evt = { data: row, colDef: col, oldValue, newValue: value, cancel: false };
           this._emitter.emit('beforeCellSave', evt);
           if (evt.cancel) return;
@@ -7280,7 +7380,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.18.0';
+  DataGrid.version = '2.19.0';
 
   /**
    * 내장 로케일. `localeText: DataGrid.locales.ko`처럼 통째로 쓰거나,
@@ -7306,6 +7406,10 @@
     editValueEquals,
     defaultEditorType,
     shouldShowEditableIcon,
+    isBlankValue,
+    isRequiredViolated,
+    shouldShowRequired,
+    shouldMarkRequiredCell,
     resolveDomLayout,
     resolveDataModes,
     shouldResetPageOnReload,

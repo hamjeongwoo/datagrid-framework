@@ -1223,6 +1223,16 @@ suite('normalizeColumns', function () {
   assertEq(ed[2].editable, true, 'custom editor object also implies editable');
   assertEq(ed[3].editable, false, 'no editor → editable stays false');
 
+  /* required 선언도 편집 의도 — 올려주지 않으면 required만 쓴 컬럼이 조용히 무동작 */
+  var req = T.normalizeColumns([
+    { field: 'a', required: true },
+    { field: 'b', required: true, editable: false },
+    { field: 'c' },
+  ]);
+  assertEq(req[0].editable, true, 'required declared → editable defaults to true');
+  assertEq(req[1].editable, false, 'explicit editable:false wins over required');
+  assertEq(req[2].required, false, 'required defaults to false');
+
   var edDefault = T.normalizeColumns(
     [{ field: 'a', editor: 'text' }, { field: 'b' }],
     { editable: false }
@@ -1451,6 +1461,64 @@ suite('shouldShowEditableIcon', function () {
   assert(!T.shouldShowEditableIcon(null, true, true), 'null 컬럼 → 미표시 (크래시 없음)');
   assert(!T.shouldShowEditableIcon({}, true, true), 'editable 미지정 → 미표시');
   assert(T.shouldShowEditableIcon(editable, true, true) === true, '불리언 반환 (truthy 값 누출 없음)');
+});
+
+/* ---------------- required (column.required) ---------------- */
+suite('isBlankValue', function () {
+  var b = T.isBlankValue;
+  assert(b(null), 'null = 빈 값');
+  assert(b(undefined), 'undefined = 빈 값');
+  assert(b(''), '빈 문자열 = 빈 값');
+  assert(b('   '), '공백만 있는 문자열 = 빈 값');
+  assert(b('\t\n'), '탭·개행만 = 빈 값');
+  assert(b([]), '빈 배열(multiselect) = 빈 값');
+
+  /* 0과 false는 유효한 입력이다 — 빈 값으로 보면 숫자 0이나 체크 해제를
+   * 미입력으로 취급해 정상 값의 저장을 막아버린다 */
+  assert(!b(0), '숫자 0 = 유효한 값');
+  assert(!b(false), 'false(체크 해제) = 유효한 값');
+  assert(!b('0'), "문자열 '0' = 유효한 값");
+  assert(!b(['a']), '항목 있는 배열 = 유효한 값');
+  assert(!b('a'), '문자열 = 유효한 값');
+  assert(!b(new Date(2024, 0, 1)), 'Date 객체 = 유효한 값');
+  assert(!b({}), '객체 = 유효한 값');
+  assert(b(null) === true, '불리언 반환');
+});
+
+suite('isRequiredViolated', function () {
+  var v = T.isRequiredViolated;
+  assert(v({ required: true }, ''), 'required + 빈 값 → 위반');
+  assert(v({ required: true }, null), 'required + null → 위반');
+  assert(!v({ required: true }, 'x'), 'required + 값 있음 → 통과');
+  assert(!v({ required: true }, 0), 'required + 0 → 통과');
+  assert(!v({ required: false }, ''), 'required 아님 → 값과 무관하게 통과');
+  assert(!v({}, ''), 'required 미지정 → 통과');
+  assert(!v(null, ''), 'null 컬럼 → 통과 (크래시 없음)');
+  assert(v({ required: true }, '') === true, '불리언 반환');
+});
+
+suite('shouldShowRequired', function () {
+  var s = T.shouldShowRequired;
+  var req = { required: true, editable: true };
+  assert(s(req, true), 'required + 편집 가능 + 그리드 활성 → 표시');
+  /* editableIndicator와 같은 기준 — 고칠 수 없는 자리의 "필수"는 할 일이 없다 */
+  assert(!s(req, false), '그리드 잠금 → 미표시');
+  assert(!s({ required: true, editable: false }, true), '편집 불가 컬럼 → 미표시');
+  assert(!s({ required: false, editable: true }, true), 'required 아님 → 미표시');
+  assert(!s(null, true), 'null 컬럼 → 미표시');
+  assert(s(req, true) === true, '불리언 반환');
+});
+
+suite('shouldMarkRequiredCell', function () {
+  var m = T.shouldMarkRequiredCell;
+  var req = { required: true, editable: true };
+  /* 셀 마커는 "비어서 조치가 필요한" 셀만 — 컬럼 전체에 그리면 정보량이 0이다 */
+  assert(m(req, '', true), '필수 + 빈 값 → 마커');
+  assert(!m(req, 'Seoul', true), '필수 + 값 있음 → 마커 없음');
+  assert(!m(req, 0, true), '필수 + 0 → 마커 없음 (0은 유효한 값)');
+  assert(!m(req, '', false), '그리드 잠금 → 마커 없음');
+  assert(!m({ required: false, editable: true }, '', true), 'required 아님 → 마커 없음');
+  assert(m(req, '', true) === true, '불리언 반환');
 });
 
 /* ---------------- formatNumber / formatDate / formatValue ---------------- */
@@ -1973,6 +2041,19 @@ suite('buildPopupFields', function () {
   var plain = build([{ field: 'y', colId: 'y', editable: true }], T.resolvePopupEditorConfig(true), true)[0];
   assert(plain.editCol === plain.col, '오버라이드 없으면 editCol === col');
 
+  /* required도 폼 전용 오버라이드 대상 — validator와 같은 층위 */
+  var reqOn = build(
+    [{ field: 'z', colId: 'z', editable: true, popupEditor: { required: true } }],
+    T.resolvePopupEditorConfig(true), true
+  )[0];
+  assertEq(reqOn.editCol.required, true, '폼에서만 필수로 올리기');
+  var reqOff = build(
+    [{ field: 'z', colId: 'z', editable: true, required: true, popupEditor: { required: false } }],
+    T.resolvePopupEditorConfig(true), true
+  )[0];
+  assertEq(reqOff.editCol.required, false, '폼에서만 필수 해제');
+  assertEq(reqOff.col.required, true, '원본 컬럼의 required는 불변 (그리드 셀 마커는 그대로)');
+
   /* config.fields는 목록이자 순서 */
   var picked = build(cols, T.resolvePopupEditorConfig({ fields: ['city', 'name'] }), true);
   assertEq(picked.map(function (x) { return x.field; }), ['city', 'name'], 'fields 순서대로');
@@ -2041,6 +2122,38 @@ suite('validatePopupValues', function () {
 
   assertEq(v(null, {}, row).errors, {}, 'null 필드 안전');
   assertEq(v(fields, null, row).errors, { n: '양수' }, 'values 없으면 undefined로 검증');
+
+  /* ---- required ---- */
+  var reqFields = [
+    { field: 'city', label: '근무 도시', readonly: false, col: {}, editCol: { required: true } },
+    { field: 'ro', label: '읽기', readonly: true, col: {}, editCol: { required: true } },
+  ];
+  var ko = T.resolveLocaleText(DataGrid.locales.ko);
+  assertEq(
+    v(reqFields, { city: '' }, row, ko).errors,
+    { city: '근무 도시은(는) 필수 항목입니다' },
+    'required 위반 → 로케일 메시지 (라벨 사용)'
+  );
+  assertEq(v(reqFields, { city: 'Seoul' }, row, ko).errors, {}, 'required 충족 → 오류 없음');
+  assert(v(reqFields, { ro: '' }, row, ko).errors.ro === undefined, 'readonly 필수는 검증 제외');
+  /* localeText 생략 시 영어 기본 문구 */
+  assert(/is required/.test(v(reqFields, { city: '' }, row).errors.city), 'localeText 생략 → 영어 기본');
+
+  /* required가 validator보다 먼저 — 빈 값을 validator에 넘기지 않는다.
+   * 안 그러면 모든 소비자가 validator 안에서 빈 값 처리를 중복 작성해야 한다 */
+  var calls = [];
+  var both = [{ field: 'z', label: 'Z', readonly: false, col: {}, editCol: {
+    required: true,
+    validator: function (val) { calls.push(val); return '검증 실패'; } } }];
+  var r2 = v(both, { z: '' }, row, ko);
+  assertEq(calls.length, 0, '빈 값이면 validator를 호출하지 않는다');
+  assert(/필수/.test(r2.errors.z), 'required 메시지가 우선');
+  v(both, { z: 'x' }, row, ko);
+  assertEq(calls, ['x'], 'required 통과 후 validator 실행');
+
+  /* 0은 유효한 값이므로 required를 통과하고 validator까지 간다 */
+  var zero = [{ field: 'q', label: 'Q', readonly: false, col: {}, editCol: { required: true } }];
+  assertEq(v(zero, { q: 0 }, row, ko).errors, {}, 'required + 0 → 통과');
 });
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');

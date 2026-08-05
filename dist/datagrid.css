@@ -40,6 +40,7 @@
   --dg-popup-input-min: 150px;   /* 필드 버튼이 붙어도 입력이 이보다 좁아지지 않는다 */
   --dg-slide-duration: 180ms;
   --dg-invalid-color: #e02525;
+  --dg-required-color: #e02525;
   --dg-dirty-color: #e07c00;
   --dg-added-row-background-color: rgba(13, 138, 68, 0.08);
   --dg-deleted-row-opacity: 0.55;
@@ -116,6 +117,8 @@
   --dg-popup-backdrop-color: rgba(0, 0, 0, 0.5);
   --dg-popup-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
   --dg-dirty-color: #ffa940;
+  /* 4px 삼각형·작은 별표는 면적이 작아 어두운 빨강이 배경에 묻는다 — 밝은 쪽으로 */
+  --dg-required-color: #ff6b6b;
   --dg-added-row-background-color: rgba(52, 199, 119, 0.12);
   --dg-deleted-row-opacity: 0.5;
   --dg-range-background-color: rgba(33, 150, 243, 0.26);
@@ -583,6 +586,29 @@
 .dg-cell.dg-cell-fill-preview {
   outline: 1.5px dashed var(--dg-accent-color);
   outline-offset: -2px;
+}
+
+/* 필수 컬럼 (column.required)
+   ─ 헤더의 `*`는 "이 컬럼은 필수"라는 정적 성질을 한 번만 알린다.
+   ─ 셀 마커는 "비어 있어서 조치가 필요하다"만 가리킨다(모든 셀에 그리면 정보량 0).
+   ─ 자리와 색을 dirty와 분리한다: dirty는 왼쪽 위 주황, 필수는 오른쪽 위 빨강.
+     한 셀에 둘이 동시에 뜰 수 있으므로 겹치면 구분이 불가능해진다. */
+.dg-required-star {
+  margin-left: 2px;
+  color: var(--dg-required-color);
+  font-weight: 700;
+  flex: none;
+}
+
+.dg-cell.dg-cell-required:not(.dg-pinned-left):not(.dg-pinned-right) { position: relative; }
+.dg-cell.dg-cell-required::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  border: 4px solid var(--dg-required-color);
+  border-left-color: transparent;
+  border-bottom-color: transparent;
 }
 
 /* 변경 추적 (trackChanges): dirty 셀 모서리 마커 + 추가 행 배경 */

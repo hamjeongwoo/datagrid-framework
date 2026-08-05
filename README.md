@@ -44,7 +44,7 @@ python demo/server.py
 | 페이지 | 내용 |
 |---|---|
 | `index.html` | **Template** — 10,000행 실전 예제 (툴바 · 퀵 필터 · 선택 · 편집 · CSV · 다크 모드) |
-| `examples/features.html` | **Features** — 기능별 데모 60개 (정렬 · 필터 · 그룹핑/집계 · 선택 · 인라인 편집 · **팝업 폼 편집** · 트리 · 원격 데이터/CRUD 스테이징 · 클립보드 · 상태 저장 · Excel/CSV · 10만 행 가상화 · 컬럼 가상화 · 다국어) |
+| `examples/features.html` | **Features** — 기능별 데모 61개 (정렬 · 필터 · 그룹핑/집계 · 선택 · 인라인 편집 · **팝업 폼 편집** · 트리 · 원격 데이터/CRUD 스테이징 · 클립보드 · 상태 저장 · Excel/CSV · 10만 행 가상화 · 컬럼 가상화 · 다국어) |
 | `examples/components.html` | **Components** — 디자인 시스템 갤러리 (토큰 · 헤더/행 상태 · 체크박스 · 태그 · 필터 메뉴 · 페이지네이션 바) |
 
 ## 그리드 옵션
@@ -112,7 +112,8 @@ python demo/server.py
 | `editorOptions` | select/multiselect/radio 선택지 — `['a', 'b']` 또는 `[{ label: '한국', value: 'kr' }]` (label 표시, value 저장·타입 보존). checkbox는 `{ checked: 'Y', unchecked: 'N' }` 매핑. date/datetime은 `{ min, max, step, valueType }` |
 | `editorSearch` | select를 검색 패널로 — `true`(정적 목록 로컬 필터) 또는 `{ fetch(query) => Promise<options>, debounce, minLength, placeholder }` (lazy 검색) |
 | `validator(value, row)` | `true` 또는 오류 메시지 반환 — 거부 시 커밋 차단 + 빨간 표시 |
-| `popupEditor` | 팝업 폼 안에서만 적용되는 컬럼 오버레이 — `false`(폼에서 제외) 또는 `{ label, hint, hide, readonly, order, span, editor, editorOptions, editorSearch, validator, buttons, before(ctx), after(ctx) }`. `hide`/`readonly`는 컬럼의 `hide`/`editable`을 덮어쓰므로 "그리드엔 숨기고 폼에서만 편집"도 가능. 필드 버튼도 `onLoad(ctx)`를 지원하며 푸터 버튼보다 먼저 호출됨. 그리드 셀 표시는 그대로 |
+| `required` | 필수 컬럼 — 표시 + 검증을 함께 켠다. 헤더에 `*`(상시), **비어 있는 셀**에만 오른쪽 위 모서리 마커(`trackChanges`의 왼쪽 위 주황 마커와 자리·색 분리). 빈 값 커밋은 인라인·팝업·붙여넣기·`updateRows`에서 모두 거부(`localeText.requiredValue`). `0`·`false`는 유효한 값. `editor`와 같이 편집 의도로 해석되어 `editable` 생략 시 true. 그리드를 잠그면 표시도 사라짐. `validator`보다 먼저 검사 |
+| `popupEditor` | 팝업 폼 안에서만 적용되는 컬럼 오버레이 — `false`(폼에서 제외) 또는 `{ label, hint, hide, readonly, order, span, editor, editorOptions, editorSearch, validator, required, buttons, before(ctx), after(ctx) }`. `hide`/`readonly`는 컬럼의 `hide`/`editable`을 덮어쓰므로 "그리드엔 숨기고 폼에서만 편집"도 가능. 필드 버튼도 `onLoad(ctx)`를 지원하며 푸터 버튼보다 먼저 호출됨. 그리드 셀 표시는 그대로 |
 | `suppressCopy` | 클립보드 복사에서 제외 (CSV에는 영향 없음) |
 | `exportFormatter(value, row)` | CSV/Excel 내보내기 전용 포맷 (화면과 분리) |
 | `wrapText` | 셀 줄바꿈 (`autoRowHeight`와 함께 행 높이 자동) |

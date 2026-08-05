@@ -72,6 +72,10 @@
             <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M2 4.5h12v1.4H2zM2 7.3h12v1.4H2zM2 10.1h12v1.4H2z"/></svg>
           </button>
         </div>
+        <div class="dg-header-cell dg-required-col" style="width:170px">
+          <span class="dg-header-cell-label">Required</span>
+          <span class="dg-required-star" title="Required" aria-hidden="true">*</span>
+        </div>
       </div>
     </div>
   </div>
@@ -106,6 +110,8 @@
       <div class="dg-row" style="background:var(--dg-row-hover-color)"><div class="dg-cell" style="width:200px">Hovered row</div><div class="dg-cell" style="width:200px">Cell</div><div class="dg-cell" style="width:180px">Cell</div></div>
       <div class="dg-row dg-row-selected"><div class="dg-cell" style="width:200px">Selected row</div><div class="dg-cell dg-cell-focused" style="width:200px">Focused cell</div><div class="dg-cell" style="width:180px">Cell</div></div>
       <div class="dg-row"><div class="dg-cell" style="width:200px">Change tracking</div><div class="dg-cell dg-cell-dirty" style="width:200px" title="Original: 52000">Dirty (modified) cell</div><div class="dg-cell" style="width:180px">Cell</div></div>
+      <div class="dg-row"><div class="dg-cell" style="width:200px">Required (column.required)</div><div class="dg-cell dg-cell-required" style="width:200px" title="City is required" aria-required="true" aria-invalid="true">Empty required cell</div><div class="dg-cell" style="width:180px">Cell</div></div>
+      <div class="dg-row"><div class="dg-cell" style="width:200px">Required + dirty</div><div class="dg-cell dg-cell-dirty dg-cell-required" style="width:200px" title="Original: Seoul">둘이 동시에 — 왼쪽 위 수정됨 / 오른쪽 위 필수</div><div class="dg-cell" style="width:180px">Cell</div></div>
       <div class="dg-row dg-row-added"><div class="dg-cell" style="width:200px">Added row (trackChanges)</div><div class="dg-cell" style="width:200px">Cell</div><div class="dg-cell" style="width:180px">Cell</div></div>
       <div class="dg-row dg-row-deleted"><div class="dg-cell dg-align-center" style="width:90px"><span class="dg-tag dg-tag-red">Deleted</span></div><div class="dg-cell" style="width:200px">Soft-deleted row (softDelete)</div><div class="dg-cell" style="width:290px">삭제 표시 — 편집 차단, restoreRows()로 복원</div></div>
       <div class="dg-row"><div class="dg-cell dg-align-center" style="width:90px"><span class="dg-tag dg-tag-green">New</span></div><div class="dg-cell" style="width:200px">Status column (statusColumn)</div><div class="dg-cell dg-align-center" style="width:290px"><span class="dg-tag dg-tag-yellow">Updated</span></div></div>

@@ -179,6 +179,22 @@
 ### v2.1 — "TreeGrid" (§6 T1~T4)
 - treeData 코어(계층 표시·펼침/접힘·계층 정렬/필터), 체크박스 캐스케이드, 부모 요약, 지연 로딩
 
+### v2.19 — 필수 컬럼 column.required (사용자 요청)
+- 요청: "컬럼 자체가 필수값인 경우 편집 모드일 때 셀에 마킹" — 스샷은 `trackChanges`의 dirty 마커(왼쪽 위 주황 4px 삼각형)였다.
+- **첫 결정: 같은 시각 언어를 재사용하지 않는다.** dirty와 required는 한 셀에 동시에 뜰 수 있어서, 자리·색이 같으면 구분이 불가능해진다. dirty = 왼쪽 위 `--dg-dirty-color`, required = 오른쪽 위 `--dg-required-color`로 분리.
+- **둘째 결정: 성질과 상태를 다른 채널에 싣는다.** required는 컬럼 전체가 같은 *정적 성질*이므로 모든 셀에 그리면 정보량이 0이다(다 같은 표시). 그래서 헤더 `*`가 "이 컬럼은 필수"를 상시 알리고, **셀 마커는 비어 있는 셀에만** 붙어 조치가 필요한 곳을 가리킨다. `editableIndicator`(컬럼 성질 → 헤더)의 선례와 같은 층위.
+- **셋째 결정: 표시만 하지 않고 검증까지 연결한다.** 마커만 그리고 빈 값 저장이 통과되면 마커가 거짓말이 된다. `_validateCellValue(col, value, row)` 하나로 모아 인라인 편집·채우기 드래그·붙여넣기/`updateRows`가 공유하고, 팝업은 `validatePopupValues(fields, values, row, localeText)`가 담당. **required가 `validator`보다 먼저**이고 빈 값이면 `validator`를 호출하지 않는다 — 안 그러면 소비자마다 빈 값 처리를 중복 작성한다.
+- 빈 값 정의(`isBlankValue`): null/undefined/빈 문자열/공백만 있는 문자열/빈 배열. **`0`과 `false`는 유효한 값** — 숫자 0이나 체크 해제를 미입력으로 취급하면 정상 값의 저장을 막는다(BUG-004의 "브라우저가 주는 값을 그대로 믿지 말고 도메인에서 의도를 도출" 계열).
+- `required: true`는 `editor` 선언과 같이 **편집 의도로 해석**해 `editable`을 올려준다. 안 올려주면 `required`만 쓴 컬럼이 조용히 아무 일도 하지 않는다(명시적 `editable: false`는 존중).
+- 표시 조건은 `shouldShowRequired(col, gridEditable)` = 그리드 활성 + 컬럼 editable. **잠그면 헤더 표식과 셀 마커가 함께 사라진다** — 고칠 수 없는 자리의 "필수"는 할 일이 없다.
+- `popupEditor.required`로 폼 전용 오버라이드(`validator`와 같은 층위). 폼에서도 라벨에 `*` + 입력에 `aria-required`.
+- localeText 추가 키: `requiredValue`(`{column}` 토큰) · `requiredIndicatorLabel`.
+- 순수 함수 `isBlankValue` · `isRequiredViolated` · `shouldShowRequired` · `shouldMarkRequiredCell` — `_test` 노출.
+
+**구현하며 알게 된 것 (문서에 반영)**
+- **에디터 타입마다 빈 값 정규화가 다르다.** `number`(그리고 `date`) 에디터는 빈 입력을 `newValue = value`로 **되돌리므로**(datagrid.js의 기존 정규화) `changed`가 false가 되어 검증 자체를 타지 않는다. 즉 숫자 컬럼에서는 인라인으로 required를 위반할 수 없다 — 데이터는 안전하지만 "required는 어디서나 막는다"고 쓰면 과장이 된다. 데모의 인라인 차단 시연은 텍스트 컬럼으로 옮겼다.
+- **`pasteTsv('')`는 `if (!text)` 가드에서 곧바로 0을 반환**해 required 검증을 거치지 않는다. 처음 데모가 이걸 "required가 거부했다"고 표시했는데, **비필수 컬럼에 같은 값을 붙여넣는 대조군**을 돌려보니 그쪽도 0이었다 → 문구가 거짓이었다. 공백 문자열(truthy)로 바꾸고 대조군에서 반영됨을 확인해 원인이 required임을 입증했다. *거부를 검증할 때는 "거부되지 않아야 하는 대조군"이 반드시 필요하다.*
+
 ### v2.16 — 팝업 에디터 popupEditor (사용자 요청)
 행 단위 폼 편집. 기존 인라인 셀 편집을 **대체하지 않고 추가 옵션으로** 얹는다.
 
@@ -205,7 +221,7 @@ popupEditor: {
 **검증** — `column.validator`를 필드 변경 시 + Save 시 실행. 실패하면 라벨을 `--dg-invalid-color`로 바꾸고 필드 아래 메시지, **Save 차단**. Save 시 변경 필드마다 `beforeCellSave`를 발사하고 하나라도 `e.cancel`이면 Save 전체 중단.
 
 **컬럼 단위 커스터마이즈 `column.popupEditor`** — 팝업 안에서만 적용되는 오버레이 레이어. 그리드 셀 표시는 건드리지 않는다.
-`hide` · `label` · `hint` · `readonly` · `order` · `span` / 오버라이드 `editor`·`editorOptions`·`editorSearch`·`validator`·`placeholder` / 커스텀 `buttons[]`(입력 오른쪽) · `before(ctx)` · `after(ctx)`(HTML 문자열 또는 Element).
+`hide` · `label` · `hint` · `readonly` · `order` · `span` / 오버라이드 `editor`·`editorOptions`·`editorSearch`·`validator`·`required`(v2.19)·`placeholder` / 커스텀 `buttons[]`(입력 오른쪽) · `before(ctx)` · `after(ctx)`(HTML 문자열 또는 Element).
 셀은 좁아서 `select`, 폼은 넓어서 `searchselect` 같은 **맥락별 에디터 교체**가 주 용도.
 입력 자체를 대체하는 `render(ctx)`는 **넣지 않는다** — `editor: { init, getValue, destroy }` 커스텀 에디터가 팝업에서도 동일하게 동작하므로 같은 일을 하는 두 번째 방법을 만들지 않는다. `before`/`after`는 값을 갖지 않는 표시 전용.
 
