@@ -3634,6 +3634,7 @@
   <div class="example-card">
     <div class="example-html">
       <div class="toolbar">
+        <button class="tb-btn primary" id="reqAddBtn" type="button">빈 행 추가</button>
         <button class="tb-btn" id="reqClearBtn" type="button">첫 3행의 City 비우기</button>
         <button class="tb-btn" id="reqPasteBtn" type="button">빈 값 붙여넣기 시도</button>
         <button class="tb-btn" id="reqPopupBtn" type="button">첫 행 폼 편집</button>
@@ -3671,6 +3672,21 @@
 
       grid.on('cellValueChanged', function (e) {
         status.textContent = e.colDef.headerName + ' → ' + e.newValue + ' (저장됨)';
+      });
+
+      document.getElementById('reqAddBtn').addEventListener('click', function () {
+        // 빈 행은 필수 컬럼이 전부 비어 있으므로 추가 즉시 마커가 붙는다 —
+        // "새 행에서 아직 채워야 할 칸"을 헤더 *가 아니라 셀이 알려주는 경우
+        grid.addRow({ name: '', city: '', salary: null, department: '', status: 'Active' }, 0);
+        grid.focusCell(0, 'city');
+        var blanks = grid.getRowData()[0];
+        var missing = ['city', 'salary', 'department'].filter(function (f) {
+          var v = blanks[f];
+          return v === null || v === undefined || String(v).trim() === '';
+        });
+        status.textContent = '빈 행을 맨 위에 추가했습니다 — 미입력 필수 칸 ' + missing.length +
+          '개(' + missing.join(', ') + ')에 오른쪽 위 마커가 붙습니다. ' +
+          'Department를 더블클릭해 값을 넣으면 그 칸의 마커만 사라집니다.';
       });
 
       document.getElementById('reqClearBtn').addEventListener('click', function () {
