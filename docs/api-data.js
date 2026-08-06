@@ -22,7 +22,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.19.0',
+  version: '2.19.1',
   updated: '2026-08-02',
 
   sections: [
@@ -823,7 +823,7 @@ window.ApiDocs = {
           ['popupCloseLabel', 'Close editor', '편집 창 닫기', 'popupEditor 헤더 닫기 버튼 aria-label'],
           ['popupReadonlySuffix', ' (readonly)', ' (읽기 전용)', 'popupEditor 읽기 전용 필드 라벨 접미사'],
           ['requiredValue', '{column} is required', '{column}은(는) 필수 항목입니다', 'column.required 위반 시 거부 메시지'],
-          ['requiredIndicatorLabel', 'Required', '필수', 'required 컬럼 헤더 <code>*</code>의 title 툴팁'],
+          ['requiredIndicatorLabel', 'Required', '필수', '팝업 폼 필수 필드 라벨 <code>*</code>의 title 툴팁'],
         ].map(r =>
           `<tr><td><code>${r[0]}</code></td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`
         ).join('') +
@@ -1540,10 +1540,10 @@ window.ApiDocs = {
             '팝업 폼 · 붙여넣기(<code>pasteTsv</code>) · <code>updateRows</code> · 채우기 드래그가 ' +
             '모두 같은 규칙을 따릅니다 — 메시지는 <code>localeText.requiredValue</code>' +
             '(<code>{column}</code> 토큰)에서 옵니다.<br>' +
-            '<strong>표시는 두 곳으로 나뉩니다:</strong> 헤더에 <code>*</code>' +
-            '(<code>--dg-required-color</code>)가 상시 붙어 "이 컬럼은 필수"라는 <em>정적 성질</em>을 알리고, ' +
-            '셀 모서리 마커는 <strong>비어 있는 셀에만</strong> 붙어 <em>조치가 필요한 곳</em>을 가리킵니다. ' +
-            '필수 컬럼의 모든 셀에 마커를 그리면 전부 같은 표시라 정보량이 0이기 때문입니다. ' +
+            '<strong>그리드 표시는 셀 마커 하나입니다</strong>(v2.19.1 — 헤더 표식은 제거) — ' +
+            '<strong>비어 있는 셀에만</strong> 모서리 마커(<code>--dg-required-color</code>)가 붙어 ' +
+            '<em>조치가 필요한 곳</em>을 가리킵니다. 필수 컬럼의 모든 셀에 그리면 전부 같은 표시라 ' +
+            '정보량이 0이기 때문입니다. <code>*</code> 표식은 <strong>팝업 폼 라벨에만</strong> 남습니다. ' +
             '마커 자리는 <code>trackChanges</code>의 수정됨 마커(<strong>왼쪽 위 주황</strong>)와 겹치지 않는 ' +
             '<strong>오른쪽 위</strong>입니다 — 한 셀에 둘이 동시에 뜰 수 있습니다.<br>' +
             '<strong>빈 값의 정의:</strong> <code>null</code> · <code>undefined</code> · 빈 문자열 · ' +
@@ -1553,7 +1553,7 @@ window.ApiDocs = {
             '<code>editor</code>와 같은 규약으로 <strong>편집 의도로 해석</strong>되어 ' +
             '<code>editable</code>을 생략하면 <code>true</code>가 됩니다(명시적 <code>editable: false</code>가 우선). ' +
             '표시 기준은 <a href="#grid-options-editableIndicator"><code>editableIndicator</code></a>와 같아 ' +
-            '<strong>그리드를 잠그면(<code>setEditable(false)</code>) 헤더 표식과 셀 마커가 함께 사라집니다</strong> — ' +
+            '<strong>그리드를 잠그면(<code>setEditable(false)</code>) 셀 마커가 사라집니다</strong> — ' +
             '고칠 수 없는 자리의 "필수"는 할 일이 없기 때문입니다. 편집 불가 컬럼도 같은 이유로 표시하지 않습니다.<br>' +
             '<code>validator</code>보다 <strong>먼저</strong> 검사되고, 빈 값이면 <code>validator</code>는 ' +
             '호출되지 않습니다 — 소비자마다 빈 값 처리를 중복 작성하지 않게. ' +
@@ -3023,7 +3023,7 @@ window.ApiDocs = {
         { name: '--dg-menu-shadow', default: '0 4px 16px rgba(24,29,31,.16)', description: '필터 메뉴·에디터 패널 그림자.' },
         { name: '--dg-invalid-color', default: '#e02525', description: '검증 실패 표시(테두리·메시지·팝업 폼 라벨).' },
         { name: '--dg-dirty-color', default: '#e07c00', description: '변경 추적(trackChanges) dirty 셀 표시 — 셀 <strong>왼쪽 위</strong> 모서리.', since: '1.2.0' },
-        { name: '--dg-required-color', default: '#e02525', description: '필수 컬럼(column.required) 헤더 <code>*</code>와 빈 셀 마커 — 셀 <strong>오른쪽 위</strong> 모서리(dirty와 겹치지 않게). 다크는 #ff6b6b.', since: '2.19.0' },
+        { name: '--dg-required-color', default: '#e02525', description: '필수 컬럼(column.required)의 빈 셀 마커 — 셀 <strong>오른쪽 위</strong> 모서리(dirty와 겹치지 않게). 팝업 폼 라벨의 <code>*</code>에도 쓰인다. 다크는 #ff6b6b.', since: '2.19.0' },
         { name: '--dg-added-row-background-color', default: 'rgba(13,138,68,.08)', description: '추가된 행 배경(trackChanges).', since: '1.2.0' },
         { name: '--dg-range-background-color', default: 'rgba(33,150,243,.14)', description: '셀/블록 범위 선택 배경(cellSelection).', since: '1.2.0' },
         { name: '--dg-group-row-background-color', default: '#f3f6fa', description: '그룹 헤더 행 배경.', since: '1.1.0' },

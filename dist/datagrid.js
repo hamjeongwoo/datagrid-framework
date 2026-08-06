@@ -506,10 +506,10 @@
   }
 
   /**
-   * 필수 표시(헤더 표식 · 셀 마커)를 지금 보여줄지.
+   * 필수 표시를 지금 보여줄지.
    * 기준은 shouldShowEditableIcon과 동일한 "지금 실제로 편집할 수 있는가" —
    * 고칠 수 없는 자리에 "필수"라고 적어도 사용자가 할 수 있는 일이 없다.
-   * 그리드를 잠그면(setEditable(false)) 표시가 함께 사라진다.
+   * 그리드를 잠그면(setEditable(false)) 표시가 사라진다.
    */
   function shouldShowRequired(col, gridEditable) {
     return !!(gridEditable && col && col.required && col.editable);
@@ -518,8 +518,8 @@
   /**
    * 셀 코너 마커를 그릴지 — "필수인데 비어 있다"일 때만.
    * required는 컬럼 전체가 같은 정적 성질이라 모든 셀에 그리면 정보량이 0이다.
-   * 컬럼이 필수라는 사실은 헤더 표식이 상시 알리고, 셀 마커는 조치가 필요한
-   * 곳만 가리킨다(dirty 마커가 "상태"를 가리키는 것과 같은 역할 분담).
+   * 그래서 마커는 조치가 필요한 곳만 가리킨다(dirty 마커가 "상태"를 가리키는 것과
+   * 같은 역할). 그리드 헤더에는 표식을 두지 않는다 — `*`는 팝업 폼 라벨에만.
    */
   function shouldMarkRequiredCell(col, value, gridEditable) {
     return shouldShowRequired(col, gridEditable) && isBlankValue(value);
@@ -3097,16 +3097,6 @@
         const label = el('span', 'dg-header-cell-label', cell);
         this._renderHeaderLabel(label, col);
 
-        /* 필수 표식은 라벨 바로 뒤 — "이 컬럼은 필수"라는 정적 성질은 컬럼 위치에
-         * 한 번만 적는다. 셀 마커는 비어 있는 셀만 가리킨다. */
-        if (shouldShowRequired(col, this._editable)) {
-          cell.classList.add('dg-required-col');
-          const star = el('span', 'dg-required-star', cell);
-          star.textContent = '*';
-          star.setAttribute('title', this._t('requiredIndicatorLabel'));
-          star.setAttribute('aria-hidden', 'true'); /* 의미는 셀의 aria-required가 전달 */
-        }
-
         if (shouldShowEditableIcon(col, this._editable, this.options.editableIndicator)) {
           cell.classList.add('dg-editable-col');
           cell.insertAdjacentHTML('beforeend', EDIT_ICON_SVG);
@@ -5511,10 +5501,10 @@
         }
         /* 필수 마커도 같은 이유로 제자리 갱신 — 값을 채우면 사라지고 지우면 나타난다.
          * (required는 빈 값 커밋을 막지만, 원래 비어 있던 셀은 그대로 남는다) */
-        if (shouldShowRequired(col, this._editable)) {
-          const blank = isBlankValue(row[col.field]);
-          cellEl.classList.toggle('dg-cell-required', blank);
-          if (blank) cellEl.setAttribute('aria-invalid', 'true');
+        if (col.required) {
+          const mark = shouldMarkRequiredCell(col, row[col.field], this._editable);
+          cellEl.classList.toggle('dg-cell-required', mark);
+          if (mark) cellEl.setAttribute('aria-invalid', 'true');
           else cellEl.removeAttribute('aria-invalid');
         }
         /* 같은 이유로 내장 상태 컬럼(statusColumn) 셀도 제자리 갱신 —
@@ -7380,7 +7370,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.19.0';
+  DataGrid.version = '2.19.1';
 
   /**
    * 내장 로케일. `localeText: DataGrid.locales.ko`처럼 통째로 쓰거나,
