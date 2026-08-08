@@ -22,7 +22,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.19.1',
+  version: '2.20.0',
   updated: '2026-08-02',
 
   sections: [
@@ -1369,17 +1369,50 @@ window.ApiDocs = {
         },
         {
           name: 'aggFunc',
-          demo: 'row-grouping',
-          type: "'sum' | 'avg' | 'min' | 'max' | 'count'",
+          demo: 'agg-func-custom',
+          type: "'sum' | 'avg' | 'min' | 'max' | 'count' | (values, ctx) => any",
           since: '1.1.0',
           description:
-            '이 컬럼의 집계 함수. <a href="#grid-options-groupBy"><code>groupBy</code></a> 그룹 헤더 행과 ' +
-            '<a href="#grid-options-grandTotal"><code>grandTotal</code></a> 요약 행에 집계값이 표시됩니다. ' +
-            '<code>count</code>를 제외한 함수는 숫자로 해석 가능한 값만 집계하며(빈 값·문자 제외), ' +
-            '집계값에도 <code>valueFormatter</code>가 적용됩니다(이때 두 번째 인자 <code>row</code>는 <code>null</code>).',
+            '이 컬럼의 집계 함수. <a href="#grid-options-groupBy"><code>groupBy</code></a> 그룹 헤더 행 · ' +
+            '<a href="#grid-options-grandTotal"><code>grandTotal</code></a> 요약 행 · ' +
+            '<a href="#grid-options-treeData"><code>treeData.summary</code></a> 부모 노드 행 ' +
+            '<strong>세 곳 모두</strong>에 같은 규칙으로 적용됩니다. ' +
+            '<code>count</code>를 제외한 내장 집계는 숫자로 해석 가능한 값만 집계하며(빈 값·문자 제외), ' +
+            '집계값에도 <code>valueFormatter</code>가 적용됩니다(이때 두 번째 인자 <code>row</code>는 <code>null</code>).<br>' +
+            '<strong>커스텀 함수</strong>(v2.20) — <code>(values, ctx) => any</code>:<br>' +
+            '<code>values</code>는 그 컬럼의 <strong>원본 값 배열</strong>입니다(null·빈 값 포함 — 거르는 건 소비자 몫). ' +
+            '<code>ctx</code>는 <code>{ rows, field, colDef, parent }</code>이고 ' +
+            '<code>rows</code>는 집계 대상 행(그룹: 그 그룹의 행 / 트리: 자손 <strong>리프</strong> / ' +
+            '전체합계: 현재 뷰 전체), <code>parent</code>는 <strong>트리 요약에서만</strong> 부모 행이고 ' +
+            '나머지 두 곳에서는 <code>null</code>입니다(그 자리엔 행 객체가 없습니다).<br>' +
+            '반환값이 <code>null</code>/<code>undefined</code>면 그 셀은 비웁니다(내장 집계와 같은 규약). ' +
+            '<code>0</code>과 빈 문자열은 유효한 결과로 그대로 표시됩니다. ' +
+            '<strong>커스텀 함수의 결과에는 <code>valueFormatter</code>가 적용되지 않습니다</strong> — ' +
+            '함수가 이미 출력을 결정했는데 포매터가 다시 가공하면 문자열 반환이 망가지기 때문입니다. ' +
+            '함수가 예외를 던지면 그 집계만 비우고 <code>console.error</code>로 <strong>컬럼당 한 번</strong> ' +
+            '보고합니다(부모 노드마다 찍히면 콘솔이 쓸모없어지므로) — 그리드는 계속 그려집니다.<br>' +
+            '집계는 <strong>필터가 적용된 뒤의 행</strong>으로 매번 다시 계산되므로, ' +
+            '트리에서 "이름 (자손 수)" 같은 표시를 만들면 필터를 자동으로 따라갑니다. ' +
+            '<strong>주의:</strong> 트리·그룹의 요약 셀은 그 컬럼의 <em>원래 값을 대체</em>합니다. ' +
+            '트리 컬럼에 <code>aggFunc</code>를 달면 부모 행의 이름 자리에 집계 결과가 그려지므로 ' +
+            '(들여쓰기·셰브론은 유지) 이름을 남기려면 <code>ctx.parent</code>에서 직접 만들어 붙이세요. ' +
+            '또 <code>groupBy</code> 그룹 행은 "<code>aggFunc</code>가 없는 첫 컬럼"을 라벨 자리로 쓰므로, ' +
+            '첫 컬럼에 <code>aggFunc</code>를 달면 그룹 라벨이 다음 컬럼으로 밀립니다.',
           example:
             "{ field: 'salary', aggFunc: 'sum', align: 'right',\n" +
-            "  valueFormatter: function (v) { return '$' + v.toLocaleString(); } }",
+            "  valueFormatter: function (v) { return '$' + v.toLocaleString(); } }\n\n" +
+            '// 트리: 부모 이름 옆에 자손 리프 수 — 필터를 자동으로 따라간다\n' +
+            "{ field: 'name', headerName: 'Name', flex: 2,\n" +
+            '  aggFunc: function (values, ctx) {\n' +
+            "    return ctx.parent.name + ' (' + ctx.rows.length + ')';\n" +
+            '  } }\n\n' +
+            '// 중앙값처럼 내장에 없는 집계\n' +
+            "{ field: 'salary', aggFunc: function (values) {\n" +
+            '    var ns = values.map(Number).filter(function (n) { return !isNaN(n); }).sort(function (a, b) { return a - b; });\n' +
+            '    if (!ns.length) return null;              // null = 표시하지 않음\n' +
+            '    var m = Math.floor(ns.length / 2);\n' +
+            '    return ns.length % 2 ? ns[m] : (ns[m - 1] + ns[m]) / 2;\n' +
+            '  } }',
         },
         {
           name: 'editable',

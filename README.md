@@ -44,7 +44,7 @@ python demo/server.py
 | 페이지 | 내용 |
 |---|---|
 | `index.html` | **Template** — 10,000행 실전 예제 (툴바 · 퀵 필터 · 선택 · 편집 · CSV · 다크 모드) |
-| `examples/features.html` | **Features** — 기능별 데모 61개 (정렬 · 필터 · 그룹핑/집계 · 선택 · 인라인 편집 · **팝업 폼 편집** · 트리 · 원격 데이터/CRUD 스테이징 · 클립보드 · 상태 저장 · Excel/CSV · 10만 행 가상화 · 컬럼 가상화 · 다국어) |
+| `examples/features.html` | **Features** — 기능별 데모 62개 (정렬 · 필터 · 그룹핑/집계 · 선택 · 인라인 편집 · **팝업 폼 편집** · 트리 · 원격 데이터/CRUD 스테이징 · 클립보드 · 상태 저장 · Excel/CSV · 10만 행 가상화 · 컬럼 가상화 · 다국어) |
 | `examples/components.html` | **Components** — 디자인 시스템 갤러리 (토큰 · 헤더/행 상태 · 체크박스 · 태그 · 필터 메뉴 · 페이지네이션 바) |
 
 ## 그리드 옵션
@@ -105,7 +105,7 @@ python demo/server.py
 | `comparator(a, b, rowA, rowB)` | 커스텀 정렬 |
 | `dataType` | `'string'` \| `'number'` \| `'date'` \| `'bool'` — 정렬 비교·필터 종류·정렬 방향·기본 에디터 자동 결정 |
 | `format` | `'$#,##0.00'` \| `'yyyy-MM-dd'` 선언적 포맷 (`DataGrid.format()` 유틸과 동일 패턴) |
-| `aggFunc` | `'sum'` \| `'avg'` \| `'min'` \| `'max'` \| `'count'` — 그룹/전체 요약 집계 |
+| `aggFunc` | `'sum'` \| `'avg'` \| `'min'` \| `'max'` \| `'count'` 또는 커스텀 함수 `(values, ctx) => any` — 그룹 행 · 전체 요약 · 트리 부모 노드에 같은 규칙으로 적용. `ctx = { rows, field, colDef, parent }`이고 `parent`는 트리 요약에서만 부모 행(그룹·전체합계는 `null`). 반환 `null`이면 셀을 비움. 커스텀 결과에는 `valueFormatter`가 적용되지 않는다. 필터 적용 후 행으로 매번 재계산되므로 "이름 (자손 수)" 같은 표시가 필터를 따라간다 |
 | `filter` | `'text'` \| `'number'` \| `'set'` (`true` = text) |
 | `editable` | 더블클릭/Enter로 인라인 편집 — `editor` 선언 시 생략 가능 (명시적 `false`가 우선) |
 | `editor` | `'text'` \| `'number'` \| `'date'` \| `'datetime'` \| `'select'` \| `'multiselect'`(배열 값) \| `'radio'` \| `'checkbox'` 또는 `{ init, getValue, destroy }` 커스텀 객체. 생략 시 `dataType`이 `number`/`date`면 그에 맞는 에디터 |

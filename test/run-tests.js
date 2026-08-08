@@ -364,6 +364,47 @@ suite('aggregateValues', function () {
   assertEq(T.aggregateValues([], 'v', 'sum'), null, 'empty rows -> null');
   assertEq(T.aggregateValues([], 'v', 'count'), 0, 'empty rows count 0');
   assertEq(T.aggregateValues([{ v: -5 }, { v: 3 }], 'v', 'min'), -5, 'negative min');
+
+  /* ---- 커스텀 함수 aggFunc ---- */
+  var seen = null;
+  var out = T.aggregateValues(rows, 'v', function (values, ctx) { seen = { values: values, ctx: ctx }; return 'X'; });
+  assertEq(out, 'X', '함수 반환값이 그대로 집계값');
+  assertEq(seen.values, [10, 20, 30, null, '', 'abc'], 'values는 원본 그대로 (거르지 않는다)');
+  assert(seen.ctx.rows === rows, 'ctx.rows는 집계 대상 행 배열');
+  assertEq(seen.ctx.field, 'v', 'ctx.field');
+  assertEq(seen.ctx.colDef, null, 'opts 없으면 colDef는 null');
+  assertEq(seen.ctx.parent, null, 'opts 없으면 parent는 null');
+
+  var ctx2 = null;
+  var parentRow = { name: 'project' };
+  var col = { field: 'v', aggFunc: 'noop' };
+  T.aggregateValues(rows, 'v', function (v, c) { ctx2 = c; }, { colDef: col, parent: parentRow });
+  assert(ctx2.colDef === col, 'opts.colDef가 ctx로 전달');
+  assert(ctx2.parent === parentRow, 'opts.parent가 ctx로 전달 (트리 요약)');
+
+  /* 문자열이 아닌 값도 그대로 통과 — "이름 (자식 수)" 같은 표시가 목적 */
+  assertEq(
+    T.aggregateValues([{ v: 1 }, { v: 2 }], 'v', function (values, c) { return c.parent.name + ' (' + values.length + ')'; },
+      { parent: { name: 'project' } }),
+    'project (2)',
+    '부모 이름 + 자식 수 조합'
+  );
+
+  /* undefined 반환은 null로 정규화 — 내장 집계의 "표시하지 않음" 규약과 통일 */
+  assertEq(T.aggregateValues(rows, 'v', function () {}), null, 'undefined 반환 → null');
+  assertEq(T.aggregateValues(rows, 'v', function () { return null; }), null, 'null 반환 유지');
+  /* 0과 빈 문자열은 유효한 집계 결과다 */
+  assertEq(T.aggregateValues(rows, 'v', function () { return 0; }), 0, '0 반환 유지');
+  assertEq(T.aggregateValues(rows, 'v', function () { return ''; }), '', '빈 문자열 반환 유지');
+
+  /* 예외는 집계 하나만 null로 만들고 failures로 올려보낸다 (콘솔은 호출자가) */
+  var failures = [];
+  var boom = T.aggregateValues(rows, 'v', function () { throw new Error('boom'); }, { failures: failures });
+  assertEq(boom, null, '예외 → null');
+  assertEq(failures.length, 1, 'failures로 보고');
+  assertEq(failures[0].field, 'v', 'failures에 필드명');
+  /* failures를 안 넘겨도 죽지 않는다 */
+  assertEq(T.aggregateValues(rows, 'v', function () { throw new Error('x'); }), null, 'failures 없어도 안전');
 });
 
 /* ---------------- row grouping ---------------- */
@@ -386,6 +427,23 @@ suite('buildGroupView', function () {
   assertEq([out[0].value, out[0].leafCount, out[0].agg.pay], ['Sales', 2, 300], 'Sales group: first-seen order, count, sum');
   assertEq(out[1].team, 'A', 'leaves follow their group header');
   assertEq([out[3].value, out[3].agg.pay], ['Dev', 800], 'Dev group aggregate');
+
+  /* 커스텀 함수 aggFunc — 그룹에서는 parent가 null이고 rows가 그 그룹의 행들 */
+  var gseen = [];
+  var fnOut = T.buildGroupView(rows, ['dept'], expandAll, [{ field: 'pay', aggFunc: function (values, ctx) {
+    gseen.push({ n: values.length, parent: ctx.parent, field: ctx.field });
+    return values.length + '건';
+  } }]);
+  assertEq(fnOut[0].agg.pay, '2건', '그룹 집계에 함수 반환값');
+  assertEq(gseen[0].parent, null, '그룹에는 부모 행이 없다 → parent null');
+  assertEq(gseen[0].field, 'pay', 'ctx.field 전달');
+  /* 함수 예외는 failures로 — 그룹 뷰 자체는 정상 생성된다 */
+  var gfail = [];
+  var gboom = T.buildGroupView(rows, ['dept'], expandAll,
+    [{ field: 'pay', aggFunc: function () { throw new Error('boom'); } }], gfail);
+  assertEq(gboom.length, 6, '집계가 실패해도 그룹 뷰는 그대로');
+  assertEq(gboom[0].agg.pay, null, '실패한 집계는 null');
+  assertEq(gfail.length, 2, '그룹마다 failure 보고 (호출자가 컬럼당 1회로 접는다)');
 
   /* collapsed: leaves hidden, aggregates still computed */
   var closed = T.buildGroupView(rows, ['dept'], collapseAll, [{ field: 'pay', aggFunc: 'sum' }]);
@@ -1009,6 +1067,22 @@ suite('computeTreeSummary', function () {
   var cnt = T.computeTreeSummary(roots, getId, [{ field: 'size', aggFunc: 'count' }]);
   assertEq(cnt.root.size, 3, 'count counts leaves');
   assertEq(T.computeTreeSummary([], getId, [{ field: 'size', aggFunc: 'sum' }]), {}, 'empty tree');
+
+  /* 커스텀 함수 aggFunc — 트리에서만 ctx.parent가 부모 행으로 채워진다.
+   * "이름 (자손 리프 수)" 표시가 이 API의 주 동기다. */
+  var named = T.computeTreeSummary(roots, getId, [{ field: 'id', aggFunc: function (values, ctx) {
+    return ctx.parent.id + ' (' + ctx.rows.length + ')';
+  } }]);
+  assertEq(named.root.id, 'root (3)', 'parent 행 + 자손 리프 수');
+  assertEq(named.sub.id, 'sub (2)', '중첩 부모도 자기 리프 기준');
+  assertEq(named.single, undefined, '리프 루트는 여전히 요약 없음');
+
+  /* 예외 → 해당 집계만 null, failures로 보고 (부모마다 1건씩) */
+  var tfail = [];
+  var tboom = T.computeTreeSummary(roots, getId,
+    [{ field: 'size', aggFunc: function () { throw new Error('boom'); } }], tfail);
+  assertEq(tboom.root.size, null, '실패한 집계는 null');
+  assertEq(tfail.length, 2, '부모 2개 → failure 2건');
 });
 
 /* ---------------- applyTreeCheck ---------------- */

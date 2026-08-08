@@ -834,11 +834,35 @@
   }
 
   /**
-   * 그룹/전체 요약용 집계. func: 'sum'|'avg'|'min'|'max'|'count'
-   * count는 모든 행을 세고, 나머지는 숫자로 해석 가능한 값만 집계한다.
+   * 그룹/전체 요약용 집계.
+   * func: 'sum'|'avg'|'min'|'max'|'count' 또는 커스텀 함수 `(values, ctx) => any`.
+   *   - values: 그 컬럼의 원본 값 배열(null/빈 값 포함 — 거르는 건 소비자 몫)
+   *   - ctx: { rows, field, colDef, parent } — parent는 트리 요약에서만 부모 행,
+   *     그룹/전체합계에서는 null(그 자리에 행 객체가 없다)
+   *   - 반환 null/undefined = "표시하지 않음"(내장 집계의 규약과 동일)
+   * count는 모든 행을 세고, 나머지 내장 집계는 숫자로 해석 가능한 값만 집계한다.
    * 집계할 숫자가 하나도 없으면 null.
+   *
+   * opts는 내부 전용(소비자에게 넘어가지 않는다): { colDef, parent, failures }.
+   * 소비자 함수의 예외는 집계 하나를 null로 만들고 failures에 모아 호출자가 로깅한다 —
+   * 순수 함수가 콘솔을 오염시키지 않게(validatePopupValues와 같은 규약).
    */
-  function aggregateValues(rows, field, func) {
+  function aggregateValues(rows, field, func, opts) {
+    if (typeof func === 'function') {
+      const ctx = {
+        rows,
+        field,
+        colDef: (opts && opts.colDef) || null,
+        parent: (opts && opts.parent) !== undefined ? opts.parent : null,
+      };
+      let out;
+      try { out = func(rows.map(r => r[field]), ctx); }
+      catch (e) {
+        if (opts && opts.failures) opts.failures.push({ field, error: e });
+        return null; /* 집계 하나가 죽어도 그리드는 계속 그린다 */
+      }
+      return out === undefined ? null : out;
+    }
     if (func === 'count') return rows.length;
     let sum = 0, min = Infinity, max = -Infinity, n = 0;
     for (let i = 0; i < rows.length; i++) {
@@ -868,7 +892,7 @@
    *   집계(agg)는 항상 전체 자식 기준으로 계산된다.
    * 그룹 항목: { __group, field, value, path, level, leafCount, expanded, agg }
    */
-  function buildGroupView(rows, groupFields, isExpanded, aggColumns) {
+  function buildGroupView(rows, groupFields, isExpanded, aggColumns, failures) {
     if (!groupFields || groupFields.length === 0) return rows.slice();
     aggColumns = aggColumns || [];
     const items = [];
@@ -888,7 +912,9 @@
         const expanded = !!isExpanded(path);
         const agg = {};
         aggColumns.forEach(c => {
-          agg[c.field] = aggregateValues(children, c.field, c.aggFunc);
+          /* 그룹 행에는 부모 "행"이 없다 — parent는 null (합성 그룹 항목뿐) */
+          agg[c.field] = aggregateValues(children, c.field, c.aggFunc,
+            { colDef: c, parent: null, failures });
         });
         items.push({
           __group: true,
@@ -1483,7 +1509,7 @@
    * aggColumns: [{ field, aggFunc }]. 반환: getId(부모 행) → { field: 집계값 }.
    * 한 번의 post-order 순회로 리프 목록을 전파한다.
    */
-  function computeTreeSummary(roots, getId, aggColumns) {
+  function computeTreeSummary(roots, getId, aggColumns, failures) {
     const out = {};
     const walk = node => {
       if (node.children.length === 0) return [node.row];
@@ -1493,7 +1519,10 @@
       });
       const agg = {};
       aggColumns.forEach(c => {
-        agg[c.field] = aggregateValues(leaves, c.field, c.aggFunc);
+        /* 트리에서만 parent가 채워진다 — 커스텀 aggFunc가 "이름 (자식 수)" 같은
+         * 부모 기준 표시를 만들 수 있어야 하기 때문 */
+        agg[c.field] = aggregateValues(leaves, c.field, c.aggFunc,
+          { colDef: c, parent: node.row, failures });
       });
       out[getId(node.row)] = agg;
       return leaves;
@@ -2640,7 +2669,9 @@
       if (this._groupBy.length > 0) {
         const toggled = this._groupToggled;
         const defaultExpanded = this._groupDefaultExpanded;
-        display = buildGroupView(rows, this._groupBy, path => toggled[path] !== undefined ? toggled[path] : defaultExpanded, this._aggColumns);
+        const aggFailures = [];
+        display = buildGroupView(rows, this._groupBy, path => toggled[path] !== undefined ? toggled[path] : defaultExpanded, this._aggColumns, aggFailures);
+        this._logAggFailures(aggFailures);
       }
       this._displayRows = display;
 
@@ -2822,11 +2853,14 @@
       /* treeData.summary: 부모 행에 자손 리프 집계 표시 (필터 반영된 트리 기준) */
       this._treeSummary = null;
       if (td.summary && this._aggColumns.length > 0) {
+        const treeAggFailures = [];
         this._treeSummary = computeTreeSummary(
           roots,
           r => this._rowId(r),
-          this._aggColumns
+          this._aggColumns,
+          treeAggFailures
         );
+        this._logAggFailures(treeAggFailures);
       }
 
       this._viewRows = nodes.map(n => n.row);
@@ -3766,9 +3800,26 @@
       return rowEl;
     }
 
+    /**
+     * 커스텀 aggFunc의 예외를 컬럼당 한 번만 로깅한다 — 부모 노드가 100개면
+     * 같은 오류가 100번 찍혀 콘솔이 쓸모없어진다.
+     */
+    _logAggFailures(failures) {
+      if (!failures || !failures.length) return;
+      const seen = {};
+      failures.forEach(f => {
+        if (seen[f.field]) return;
+        seen[f.field] = 1;
+        console.error(`[DataGrid] aggFunc failed for "${f.field}":`, f.error);
+      });
+    }
+
     _formatAggValue(col, value) {
       if (value === null || value === undefined) return '';
-      if (col.valueFormatter && col.aggFunc !== 'count') {
+      /* 커스텀 aggFunc의 결과에는 valueFormatter를 걸지 않는다 — 함수가 이미 출력을
+       * 결정했는데 숫자 포매터가 다시 씹으면 "project (5)" 같은 반환이 망가진다.
+       * 내장 집계(문자열)에만 적용하고, count는 종전대로 제외. */
+      if (col.valueFormatter && typeof col.aggFunc === 'string' && col.aggFunc !== 'count') {
         try { return String(col.valueFormatter(value, null)); }
         catch (e) { /* 집계 행에는 row가 없으므로 실패 시 원시 값으로 폴백 */ }
       }
@@ -4353,7 +4404,12 @@
           if (col.align === 'center') cell.classList.add('dg-align-center');
           cell.classList.add('dg-cell-agg');
           const holder = el('span', 'dg-cell-value', cell);
-          holder.textContent = this._formatAggValue(col, aggregateValues(rows, col.field, col.aggFunc));
+          /* 전체 합계 행도 부모 "행"이 없다 — parent는 null */
+          const gtFailures = [];
+          const gtValue = aggregateValues(rows, col.field, col.aggFunc,
+            { colDef: col, parent: null, failures: gtFailures });
+          this._logAggFailures(gtFailures);
+          holder.textContent = this._formatAggValue(col, gtValue);
         }
       });
       this._footerEl.scrollLeft = this._bodyEl.scrollLeft;
@@ -7370,7 +7426,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.19.1';
+  DataGrid.version = '2.20.0';
 
   /**
    * 내장 로케일. `localeText: DataGrid.locales.ko`처럼 통째로 쓰거나,

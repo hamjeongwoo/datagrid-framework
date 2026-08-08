@@ -3724,6 +3724,70 @@
     </script>
   </div>
 
+  <!-- ======================================================== 커스텀 집계 함수 -->
+  <h2 class="section" id="agg-func-custom">Custom aggFunc (집계 함수 직접 작성)</h2>
+  <p class="section-desc">
+    <code class="inline">aggFunc</code>에 문자열 대신 <code class="inline">(values, ctx) =&gt; any</code> 함수를 줄 수 있습니다.
+    <code class="inline">values</code>는 그 컬럼의 원본 값 배열,
+    <code class="inline">ctx</code>는 <code class="inline">{ rows, field, colDef, parent }</code>이고
+    <code class="inline">parent</code>는 <strong>트리 요약에서만</strong> 부모 행입니다(그룹·전체합계에서는 <code class="inline">null</code>).
+    집계는 <strong>필터 적용 후의 행</strong>으로 매번 다시 계산되므로,
+    아래 Name 컬럼의 <strong>(자손 수)</strong>는 필터를 자동으로 따라갑니다.
+    커스텀 함수의 결과에는 <code class="inline">valueFormatter</code>가 적용되지 않습니다 — 함수가 이미 출력을 정했기 때문입니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <input id="aggcQuick" class="tb-input" type="text" placeholder="필터해서 (자손 수)가 따라오는지 확인 (예: js)" />
+      </div>
+      <div id="gridAggCustom" class="grid-wrap-md"></div>
+      <div class="status-line" id="aggcStatus">폴더 이름 옆 (n)은 자손 파일 수, Size는 중앙값입니다.</div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridAggCustom'), {
+        rowData: DemoData.makeFileTree(31),
+        treeData: { treeField: 'name', defaultExpandLevel: -1, summary: true },
+        columnDefs: [
+          // ctx.parent로 부모 이름을 되살려 붙인다 — 요약 셀은 원래 값을 대체하므로
+          { field: 'name', headerName: 'Name', flex: 2,
+            aggFunc: function (values, ctx) {
+              return ctx.parent.name + ' (' + ctx.rows.length + ')';
+            } },
+          { field: 'type', headerName: 'Type', width: 90 },
+          // 내장에 없는 집계 — 중앙값
+          { field: 'size', headerName: 'Size 중앙값', width: 130, dataType: 'number',
+            aggFunc: function (values) {
+              var ns = values.map(Number).filter(function (n) { return !isNaN(n); })
+                             .sort(function (a, b) { return a - b; });
+              if (!ns.length) return null;            // null = 이 셀은 비운다
+              var m = Math.floor(ns.length / 2);
+              var mid = ns.length % 2 ? ns[m] : (ns[m - 1] + ns[m]) / 2;
+              return Math.round(mid) + ' KB';
+            } },
+          // 확장자 분포처럼 숫자가 아닌 집계도 자유롭게
+          { field: 'modified', headerName: '확장자 분포', width: 190,
+            aggFunc: function (values, ctx) {
+              var byExt = {};
+              ctx.rows.forEach(function (r) {
+                var ext = (r.name.split('.').pop() || '?');
+                byExt[ext] = (byExt[ext] || 0) + 1;
+              });
+              return Object.keys(byExt).sort().map(function (k) {
+                return k + '×' + byExt[k];
+              }).join(', ');
+            } },
+        ],
+      });
+
+      document.getElementById('aggcQuick').addEventListener('input', function (e) {
+        grid.setQuickFilter(e.target.value);
+        document.getElementById('aggcStatus').textContent = e.target.value
+          ? '필터 적용 — 첫 폴더의 집계가 남은 파일 기준으로 재계산되었습니다.'
+          : '폴더 이름 옆 (n)은 자손 파일 수, Size는 중앙값입니다.';
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>
