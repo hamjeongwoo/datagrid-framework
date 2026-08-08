@@ -296,7 +296,52 @@ suite('normalizeMultiValue', function () {
   assertEq(n(undefined), [], 'undefined → empty');
   assertEq(n('a'), ['a'], 'single value wrapped');
   assertEq(n(0), [0], 'falsy single value (0) wrapped');
-  assertEq(n(''), [''], 'falsy single value (empty string) wrapped');
+
+  /* 콤마 구분 문자열도 다중 값 표현으로 받는다 (v2.21) */
+  assertEq(n('a,b'), ['a', 'b'], '콤마 문자열 분해');
+  assertEq(n('a, b ,c'), ['a', 'b', 'c'], '항목 trim');
+  assertEq(n('a,,b'), ['a', 'b'], '빈 항목 제거');
+  assertEq(n(','), [], '구분자만 → 선택 없음');
+  assertEq(n(''), [], '빈 문자열 = 선택 없음 (v2.21 — 이전엔 [""])');
+  assertEq(n('   '), [], '공백만 → 선택 없음');
+  /* 배열 항목은 손대지 않는다 — 이미 분해된 값을 다시 쪼개면 안 된다 */
+  assertEq(n(['a,b']), ['a,b'], '배열 안의 콤마는 그대로 (한 항목)');
+  assertEq(n([' a ']), [' a '], '배열 항목은 trim하지 않는다');
+});
+
+suite('denormalizeMultiValue', function () {
+  var d = T.denormalizeMultiValue;
+  /* 원본이 쓰던 표현을 유지한다 — 편집 한 번에 값 타입이 바뀌면 서버 스키마와 어긋난다 */
+  assertEq(d(['a', 'b'], ['x']), ['a', 'b'], '원본이 배열 → 배열');
+  assertEq(d(['a', 'b'], 'x'), 'a,b', '원본이 문자열 → 콤마 문자열');
+  assertEq(d(['a', 'b'], null), 'a,b', '원본 null → 문자열이 기본');
+  assertEq(d(['a', 'b'], undefined), 'a,b', '원본 undefined → 문자열이 기본');
+  assertEq(d([], 'x'), '', '선택 없음 + 문자열 원본 → 빈 문자열');
+  assertEq(d([], ['x']), [], '선택 없음 + 배열 원본 → 빈 배열');
+  /* 반환 배열은 사본이어야 한다 (호출자가 원본을 쥐고 흔들지 못하게) */
+  var src = ['a'];
+  assert(d(src, []) !== src, '배열 반환은 사본');
+  /* 문자열 입력도 받아 정규화 후 다시 직렬화한다 */
+  assertEq(d('a, b', 'x'), 'a,b', '문자열 입력 → 정규화된 문자열');
+});
+
+suite('sameEditValue', function () {
+  var s = T.sameEditValue;
+  /* 다중 값은 표현이 아니라 내용으로 비교 — 열었다 그냥 닫으면 변경이 아니어야 한다 */
+  assert(s('a,b', ['a', 'b'], true), '콤마 문자열 == 배열');
+  assert(s('a, b', 'a,b', true), '공백 차이는 같은 값');
+  assert(s(null, '', true), 'null == 빈 문자열 (둘 다 선택 없음)');
+  assert(s('', [], true), '빈 문자열 == 빈 배열');
+  assert(!s('a,b', 'b,a', true), '순서가 다르면 다른 값');
+  assert(!s('a', 'a,b', true), '항목 수가 다르면 다른 값');
+  /* multi가 아니면 종전대로 엄격 비교 — 콤마가 든 일반 문자열을 쪼개면 안 된다 */
+  assert(s('a,b', 'a,b', false), '비다중: 같은 문자열');
+  assert(!s('a, b', 'a,b', false), '비다중: 공백 차이는 다른 값');
+  assert(!s(null, '', false), '비다중: null !== 빈 문자열');
+  /* 한쪽이 배열이면 multi 플래그가 없어도 내용 비교로 넘어간다 (기존 동작) */
+  assert(s(['a'], 'a', false), '한쪽이 배열이면 내용 비교');
+  /* Date 비교는 종전대로 */
+  assert(s(new Date(2024, 0, 1), new Date(2024, 0, 1), false), 'Date는 시각으로 비교');
 });
 
 suite('shallowArrayEquals', function () {
@@ -321,6 +366,14 @@ suite('lookupOptionLabels', function () {
   assertEq(l(opts, [3]), ['레벨3'], 'number value matched');
   assertEq(l(opts, ['js', null, 'css']), ['JS', 'CSS'], 'null entries skipped');
   assertEq(l(undefined, ['js']), ['js'], 'no options → raw strings');
+
+  /* 콤마 문자열도 배열과 똑같이 label로 매핑된다 (v2.21) —
+   * 이전에는 'js,css'가 통째로 옵션 조회에 실패해 코드 그대로 칩 하나가 됐다 */
+  assertEq(l(opts, 'js,css'), ['JS', 'CSS'], '콤마 문자열 → label 배열');
+  assertEq(l(opts, 'js, css'), ['JS', 'CSS'], '공백 있는 콤마 문자열');
+  assertEq(l(opts, ''), [], '빈 문자열 → 빈 배열 (칩 없음)');
+  /* 숫자 값은 분해 후 문자열이 되지만 lookupOptionLabel이 String 비교로 잡는다 */
+  assertEq(l(opts, '3'), ['레벨3'], '문자열로 들어온 숫자 값도 매칭');
 });
 
 /* ---------------- floating filter model ---------------- */

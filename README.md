@@ -108,7 +108,7 @@ python demo/server.py
 | `aggFunc` | `'sum'` \| `'avg'` \| `'min'` \| `'max'` \| `'count'` 또는 커스텀 함수 `(values, ctx) => any` — 그룹 행 · 전체 요약 · 트리 부모 노드에 같은 규칙으로 적용. `ctx = { rows, field, colDef, parent }`이고 `parent`는 트리 요약에서만 부모 행(그룹·전체합계는 `null`). 반환 `null`이면 셀을 비움. 커스텀 결과에는 `valueFormatter`가 적용되지 않는다. 필터 적용 후 행으로 매번 재계산되므로 "이름 (자손 수)" 같은 표시가 필터를 따라간다 |
 | `filter` | `'text'` \| `'number'` \| `'set'` (`true` = text) |
 | `editable` | 더블클릭/Enter로 인라인 편집 — `editor` 선언 시 생략 가능 (명시적 `false`가 우선) |
-| `editor` | `'text'` \| `'number'` \| `'date'` \| `'datetime'` \| `'select'` \| `'multiselect'`(배열 값) \| `'radio'` \| `'checkbox'` 또는 `{ init, getValue, destroy }` 커스텀 객체. 생략 시 `dataType`이 `number`/`date`면 그에 맞는 에디터 |
+| `editor` | `'text'` \| `'number'` \| `'date'` \| `'datetime'` \| `'select'` \| `'multiselect'` \| `'radio'` \| `'checkbox'` 또는 `{ init, getValue, destroy }` 커스텀 객체. 생략 시 `dataType`이 `number`/`date`면 그에 맞는 에디터.<br>`multiselect`의 값은 **배열과 콤마 구분 문자열을 모두** 받는다 — `['js','css']`와 `'js,css'`(항목 공백 허용)가 같은 값이고 표시·편집·변경 판정이 동일하다. 커밋은 **그 행이 원래 쓰던 표현을 유지**하며(배열→배열, 문자열→콤마 문자열), 원본이 `null`/빈 값이면 콤마 문자열이 기본. 구분자는 `,` 고정이라 옵션 값에 콤마가 들어가면 배열로 저장해야 한다 |
 | `editorOptions` | select/multiselect/radio 선택지 — `['a', 'b']` 또는 `[{ label: '한국', value: 'kr' }]` (label 표시, value 저장·타입 보존). checkbox는 `{ checked: 'Y', unchecked: 'N' }` 매핑. date/datetime은 `{ min, max, step, valueType }` |
 | `editorSearch` | select를 검색 패널로 — `true`(정적 목록 로컬 필터) 또는 `{ fetch(query) => Promise<options>, debounce, minLength, placeholder }` (lazy 검색) |
 | `validator(value, row)` | `true` 또는 오류 메시지 반환 — 거부 시 커밋 차단 + 빨간 표시 |
@@ -140,7 +140,7 @@ cellRenderer: DataGrid.renderers.progress()   // 0–100 진행 바
 cellRenderer: DataGrid.renderers.select()     // 저장된 value를 editorOptions의 label로 표시
 cellRenderer: DataGrid.renderers.radio()      // select와 동일 (radio 에디터 짝꿍)
 cellRenderer: DataGrid.renderers.searchselect() // select와 동일 + lazy 검색으로 고른 값도 label로 (editorSearch 짝꿍)
-cellRenderer: DataGrid.renderers.multiselect() // 값 배열을 label 칩 목록으로
+cellRenderer: DataGrid.renderers.multiselect() // 다중 값을 label 칩 목록으로 (배열·콤마 문자열 모두)
 cellRenderer: DataGrid.renderers.checkbox()   // 값을 체크박스 모양으로 (표시 전용, Y/N·0/1 매핑 지원)
 ```
 

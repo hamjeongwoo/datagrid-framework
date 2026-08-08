@@ -22,7 +22,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.20.0',
+  version: '2.21.0',
   updated: '2026-08-02',
 
   sections: [
@@ -1447,8 +1447,17 @@ window.ApiDocs = {
             '(select는 드롭다운, radio는 multiselect와 같은 셀 앵커 라디오 패널). ' +
             "select는 <a href='#column-defs-editorSearch'><code>editorSearch</code></a>를 주면 " +
             '검색 입력이 있는 옵션 패널로 바뀝니다 (v2.3.0). ' +
-            '<code>\'multiselect\'</code>(v2.2.0)는 셀 아래에 체크리스트 패널을 펼치고 <strong>배열</strong>을 ' +
+            '<code>\'multiselect\'</code>(v2.2.0)는 셀 아래에 체크리스트 패널을 펼치고 ' +
             '<code>editorOptions</code> 순서로 커밋합니다 — 내용이 같으면 커밋하지 않습니다. ' +
+            '<strong>값 표현은 배열과 콤마 구분 문자열을 모두 받습니다</strong>(v2.21) — ' +
+            '<code>[\'js\', \'css\']</code>와 <code>"js,css"</code>(항목 앞뒤 공백 허용)가 같은 값이고, ' +
+            '읽기·표시·편집·변경 판정이 모두 두 표현을 동일하게 다룹니다. ' +
+            '커밋할 때는 <strong>그 행이 원래 쓰던 표현을 유지</strong>합니다 — 배열이었으면 배열, ' +
+            '문자열이었으면 콤마 문자열이고, 원본이 <code>null</code>/빈 값이라 추론할 게 없으면 ' +
+            '<strong>콤마 문자열이 기본</strong>입니다(편집 한 번에 컬럼의 값 타입이 바뀌면 서버 스키마와 어긋나므로). ' +
+            '전부 해제하면 문자열 컬럼은 <code>\'\'</code>, 배열 컬럼은 <code>[]</code>가 됩니다. ' +
+            '구분자는 <code>,</code>로 고정이며 옵션으로 열지 않습니다 — ' +
+            '<strong>옵션 값 자체에 콤마가 들어 있으면 분해되므로</strong> 그런 값은 배열로 저장하세요. ' +
             '<code>\'checkbox\'</code>(v2.2.0)는 체크박스입니다 — 기본은 불리언 커밋이고, ' +
             "<code>editorOptions: { checked: 'Y', unchecked: 'N' }</code> 매핑을 주면 " +
             "그 값('Y'/'N', 1/0 등)으로 읽고 커밋합니다. 매핑 없이도 'y'/'yes'/'true'/'1' 계열 문자열은 " +
@@ -1470,7 +1479,7 @@ window.ApiDocs = {
             "{ field: 'reviewAt', editor: 'datetime', format: 'yyyy-MM-dd HH:mm',\n" +
             "  editorOptions: { min: '2026-01-01', max: '2026-12-31' } }\n" +
             '\n' +
-            "{ field: 'skills', editor: 'multiselect',   // 값은 ['js', 'css'] 같은 배열\n" +
+            "{ field: 'skills', editor: 'multiselect',   // 값은 ['js','css'] 또는 'js,css'\n" +
             "  editorOptions: [{ label: 'JavaScript', value: 'js' }, { label: 'CSS', value: 'css' }],\n" +
             '  cellRenderer: DataGrid.renderers.multiselect() }\n' +
             '\n' +
@@ -2993,10 +3002,16 @@ window.ApiDocs = {
           signature: 'DataGrid.renderers.multiselect(options?: Array<string | { label, value }>)',
           since: '2.2.0',
           description:
-            'multiselect 에디터의 짝꿍 렌더러 — 값 <strong>배열</strong>을 label 칩 목록으로 표시합니다. ' +
+            'multiselect 에디터의 짝꿍 렌더러 — 다중 값을 label 칩 목록으로 표시합니다. ' +
+            '<strong>배열과 콤마 구분 문자열을 모두 받습니다</strong>(v2.21) — ' +
+            '<code>[\'js\',\'css\']</code>와 <code>"js,css"</code>·<code>"js, css"</code>가 같은 결과를 냅니다. ' +
             '<code>options</code>를 생략하면 그 컬럼의 <code>editorOptions</code>를 사용하고, ' +
-            '목록에 없는 값은 문자열 그대로 칩이 되며 빈 배열/null은 빈 셀입니다. label은 HTML 이스케이프됩니다.',
-          example: "cellRenderer: DataGrid.renderers.multiselect()   // ['js','css'] → 'JavaScript' 'CSS' 칩",
+            '목록에 없는 값은 문자열 그대로 칩이 되며 빈 배열·빈 문자열·null은 빈 셀입니다. ' +
+            'label은 HTML 이스케이프됩니다.',
+          example:
+            "cellRenderer: DataGrid.renderers.multiselect()\n" +
+            "// ['js','css'] → 'JavaScript' 'CSS' 칩\n" +
+            "// 'js,css'     → 같은 결과 (콤마 문자열도 매핑된다)",
         },
         {
           name: 'checkbox',

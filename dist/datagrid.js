@@ -769,11 +769,47 @@
     return !!value;
   }
 
-  /** multiselect 값 정규화: 배열 그대로, null/undefined → [], 단일 값 → [값]. */
+  /** 다중 값 저장 표현의 구분자. 옵션으로 열지 않는다 — 표현이 늘면 왕복 규칙이 흔들린다. */
+  const MULTI_SEPARATOR = ',';
+
+  /**
+   * multiselect 값 정규화 → 항상 배열.
+   * 배열은 그대로, 콤마 구분 문자열은 분해(항목 trim, 빈 항목 제거),
+   * null/undefined/빈 문자열은 [], 그 외 단일 값은 [값].
+   * 렌더러·에디터·변경감지가 전부 이 함수를 거치므로, 두 표현을 여기서 한 번만 흡수한다.
+   * 한계: 옵션 값 자체에 콤마가 들어 있으면 분해된다(콤마 저장 표현의 본질적 제약).
+   */
   function normalizeMultiValue(value) {
     if (Array.isArray(value)) return value;
     if (value === null || value === undefined) return [];
+    if (typeof value === 'string') {
+      return value.split(MULTI_SEPARATOR).map(s => s.trim()).filter(s => s !== '');
+    }
     return [value];
+  }
+
+  /**
+   * 편집 결과(배열)를 저장 표현으로 되돌린다.
+   * **원본이 쓰던 표현을 유지한다** — 배열이면 배열, 그 외(문자열·null·미정의)면
+   * 콤마 문자열. 편집 한 번으로 컬럼의 값 타입이 바뀌면 서버 스키마와 어긋나므로
+   * 타입 보존이 기본이고, 추론할 원본이 없을 때의 기본값이 문자열이다.
+   */
+  function denormalizeMultiValue(values, original) {
+    const list = normalizeMultiValue(values);
+    if (Array.isArray(original)) return list.slice();
+    return list.join(MULTI_SEPARATOR);
+  }
+
+  /**
+   * 편집 전후 값의 동등 판정. 다중 값은 **표현이 아니라 내용**으로 비교한다 —
+   * `['a','b']` · `'a,b'` · `'a, b'`는 모두 같은 값이다. 표현 차이(공백·타입)만으로
+   * 변경으로 잡히면 열었다 그냥 닫아도 저장이 일어난다.
+   */
+  function sameEditValue(newValue, oldValue, multi) {
+    if (multi || Array.isArray(newValue) || Array.isArray(oldValue)) {
+      return shallowArrayEquals(normalizeMultiValue(newValue), normalizeMultiValue(oldValue));
+    }
+    return editValueEquals(newValue, oldValue);
   }
 
   /** 두 배열의 얕은 동등성 (길이·순서 포함 엄격 비교). 배열이 아니면 false. */
@@ -2023,10 +2059,8 @@
       if (f.readonly) return;
       const oldValue = original ? original[f.field] : undefined;
       const newValue = values ? values[f.field] : undefined;
-      const same = Array.isArray(newValue) || Array.isArray(oldValue)
-        ? shallowArrayEquals(normalizeMultiValue(newValue), normalizeMultiValue(oldValue))
-        : editValueEquals(newValue, oldValue);
-      if (!same) changes[f.field] = { oldValue, newValue };
+      const multi = (f.editCol || f.col || {}).editor === 'multiselect';
+      if (!sameEditValue(newValue, oldValue, multi)) changes[f.field] = { oldValue, newValue };
     });
     return changes;
   }
@@ -5205,7 +5239,9 @@
           panel.querySelectorAll('input').forEach(cb => {
             if (cb.checked) out.push(cb.__dgValue);
           });
-          return out;
+          /* 원본이 콤마 문자열이면 문자열로 되돌려 커밋한다 — 편집 한 번에
+           * 컬럼의 값 타입이 바뀌지 않게 (value는 편집 진입 시의 원본) */
+          return denormalizeMultiValue(out, value);
         };
         invalidEl = cellEl;
       } else if (editorType === 'select' && col.editorSearch) {
@@ -5518,11 +5554,12 @@
             const n = Number(newValue);
             newValue = newValue === '' || isNaN(n) ? value : n;
           }
-          /* 배열 값(multiselect)은 참조가 아니라 내용으로 변경 여부를 판정.
-           * 원본이 null/단일 값이어도 배열로 정규화해 비교한다 (열었다 그냥
-           * 닫았을 때 null → [] 스퓨리어스 커밋 방지). */
+          /* 다중 값은 참조나 표현이 아니라 **내용**으로 변경 여부를 판정한다.
+           * 양쪽을 배열로 정규화하므로 배열/콤마 문자열 어느 표현이어도,
+           * 원본이 null/단일 값이어도 같게 비교된다 (열었다 그냥 닫았을 때의
+           * null → '' 스퓨리어스 커밋 방지). */
           const changed = editorType === 'multiselect'
-            ? !shallowArrayEquals(newValue, normalizeMultiValue(value))
+            ? !shallowArrayEquals(normalizeMultiValue(newValue), normalizeMultiValue(value))
             : !editValueEquals(newValue, value);
           if (changed) {
             const message = this._validateCellValue(col, newValue, row);
@@ -6060,10 +6097,7 @@
         newValue = newValue === '' || isNaN(n) ? p.original[f.field] : n;
       }
       const oldValue = p.values[f.field];
-      const same = Array.isArray(newValue) || Array.isArray(oldValue)
-        ? shallowArrayEquals(normalizeMultiValue(newValue), normalizeMultiValue(oldValue))
-        : editValueEquals(newValue, oldValue);
-      if (same) return;
+      if (sameEditValue(newValue, oldValue, w.editorType === 'multiselect')) return;
 
       p.values[f.field] = newValue;
       this._popupValidateField(f);
@@ -7426,7 +7460,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.20.0';
+  DataGrid.version = '2.21.0';
 
   /**
    * 내장 로케일. `localeText: DataGrid.locales.ko`처럼 통째로 쓰거나,
@@ -7474,6 +7508,8 @@
     lookupOptionLabels,
     isCheckedValue,
     normalizeMultiValue,
+    denormalizeMultiValue,
+    sameEditValue,
     shallowArrayEquals,
     buildTsv,
     parseTsv,
