@@ -55,7 +55,7 @@
 | [x] | `groupModel > showSummary · grandSummary`, `column > summary`, `summaryData`, util `aggregate` | `column.aggFunc: 'sum'\|'avg'\|'min'\|'max'\|'count'` (그룹 헤더 행 집계) + `grandTotal: true` 전체 요약 행 — v1.1.0 | **P1** (그룹핑과 함께) |
 | [x] | `collapse() / expand() / toggle()` (그룹 전체) | `expandAllGroups()` / `collapseAllGroups()` — v1.1.0 | **P1** (그룹핑과 함께) |
 | [x] | `group` / `beforeGroupExpand` / `toggle` 이벤트 | `groupChanged` / `groupToggled` — v1.1.0 | **P1** (그룹핑과 함께) |
-| [x] | **`dataModel`** (원격 데이터: `url · method · postData · getData · location:'remote'`, remote 정렬/필터/페이징) | `dataSource: { url, method, params, parse }` + `sortMode/filterMode/pageMode: 'client'\|'server'`(v2.13.0부터 sort/filter는 미지정 시 `pageMode` 상속) + `reloadData()` + `dataLoadError` — 데모 서버 `/api/employees` 포함 — v1.2.0 | **P2** |
+| [x] | **`dataModel`** (원격 데이터: `url · method · postData · getData · location:'remote'`, remote 정렬/필터/페이징) | `dataSource: { url, method, params, parse, autoLoad }` + `sortMode/filterMode/pageMode: 'client'\|'server'`(v2.13.0부터 sort/filter는 미지정 시 `pageMode` 상속) + `reloadData()` + `dataLoadError` — `autoLoad: false`로 최초 자동 조회 보류(v2.24.0) — 데모 서버 `/api/employees` 포함 — v1.2.0 | **P2** |
 | [x] | `detailModel` + `rowExpand/rowCollapse` (마스터-디테일 행) | `rowDetail: { renderer, height }` + `expandRow()/collapseRow()/toggleRowDetail()/isRowExpanded()` + `rowExpanded`/`rowCollapsed` — 가변 높이 가상화(computeRowTops) — v1.2.0 | **P2** |
 | [x] | `column > formula` (계산 컬럼) | `valueGetter(row)` — 파생 값을 row[field]에 기록(정렬·필터·내보내기 공유) — v1.2.0 | **P2** |
 | [x] | `mergeCells` | `mergeCells: ['field'...]` — 표시 순서 기준 연속 동일 값 세로 병합 (그룹/디테일에서 단절) — v2.0.0 | P3 |
@@ -179,6 +179,15 @@
 
 ### v2.1 — "TreeGrid" (§6 T1~T4)
 - treeData 코어(계층 표시·펼침/접힘·계층 정렬/필터), 체크박스 캐스케이드, 부모 요약, 지연 로딩
+
+### v2.24 — dataSource.autoLoad (사용자 요청)
+- 요청: "최초에 조회를 할 건지 말 건지 옵션. 기본은 true." 검색 조건을 받은 뒤 조회하는 화면에서 생성 직후의 조건 없는 전체 조회가 낭비였다.
+- **위치를 `dataSource` 안으로.** dataSource 없이는 의미가 없는 옵션이고, `request`/`parse`/`headers`/`paramsFormat`이 이미 거기 모여 있다. 최상위 옵션을 늘리지 않는다.
+- **끄는 것은 "자동"뿐이라는 규칙 하나로 정리한다.** `reloadData()`·`loadMore()` 같은 명시적 호출은 그대로 동작하고, 한 번 조회한 뒤에는 정렬·필터의 자동 재조회도 평소대로다. `autoLoad`는 데이터 소스를 비활성화하는 스위치가 아니다.
+- `setDataSource()`도 새 소스가 `autoLoad: false`면 교체만 하고 조회하지 않는다 — "이 소스는 그리드가 스스로 부르지 않는다"가 생성 시점에만 적용되면 반쪽이 된다. 기존 동작 변경이지만 `autoLoad`를 적은 소스에만 해당한다.
+- 순수 함수 `shouldAutoLoad(dataSource)` — 끄는 건 정확히 `false`일 때만(`0`·`'false'`·`null`은 미지정 취급). `_test` 노출.
+- **조합 검증에서 [BUG-013](bug-reports/2026-08-09-013-infinite-append-skips-first-page.md)이 나왔다** — 무한 스크롤 + `autoLoad: false`에서 스크롤만으로 `page=1`부터 받아 0페이지가 통째로 비었다. `_loadedOnce` 가드로 수정. 같은 구멍이 **첫 조회 실패 경로로는 v2.22부터 열려 있었다.**
+- 데모: features.html `#auto-load` — 부서명 입력 + 조회 버튼, 요청 횟수를 상태 줄에 노출해 "아직 요청 없음"이 눈에 보이게.
 
 ### v2.23 — 무한 스크롤의 페이지 크기 변경 UI (사용자 요청)
 - 요청: "페이지 사이즈를 초기에 셋팅만 하고 바꿀 UI가 없다." 맞는 지적이고, **페이저를 없앤 대가**였다 — 크기 선택은 원래 페이저 패널에만 있었는데 무한 스크롤이 그 패널을 통째로 대체했다. 기능을 대체할 때 그 안에 딸려 있던 조작까지 같이 사라지지 않았는지 확인해야 했다.

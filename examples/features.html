@@ -3878,6 +3878,80 @@
     </script>
   </div>
 
+  <!-- ======================================================== 최초 조회 보류 -->
+  <h2 class="section" id="auto-load">Deferred First Load (dataSource.autoLoad)</h2>
+  <p class="section-desc">
+    <code class="inline">dataSource.autoLoad: false</code>면 그리드가 <strong>스스로 첫 조회를 하지 않습니다</strong>
+    (기본값 <code class="inline">true</code>). 검색 조건을 받은 뒤에 조회하는 화면, 비싼 쿼리,
+    탭이 열릴 때까지 미루는 경우에 씁니다.
+    <strong>데이터 소스를 끄는 게 아니라 "자동"만 끄는 것</strong>이라
+    <code class="inline">reloadData()</code> · <code class="inline">loadMore()</code> 같은 명시적 호출은 그대로 동작하고,
+    정렬·필터 자동 재조회도 <strong>한 번이라도 조회한 뒤부터는</strong> 평소처럼 동작합니다.
+    <code class="inline">setDataSource()</code>도 새 소스가 <code class="inline">autoLoad: false</code>면
+    교체만 하고 조회하지 않습니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <input class="tb-input" id="alDept" type="text" placeholder="부서명 (예: Engineering)">
+        <button class="tb-btn primary" id="alSearchBtn" type="button">조회</button>
+        <button class="tb-btn" id="alSwapBtn" type="button">setDataSource() — 자동 조회 없음</button>
+      </div>
+      <div id="gridAutoLoad" class="grid-wrap-sm"></div>
+      <div class="status-line" id="alStatus">
+        아직 요청을 보내지 않았습니다 — 부서명을 넣고 조회를 누르세요. (네트워크 탭에 요청이 없습니다)
+      </div>
+    </div>
+    <script type="text/x-example">
+      var status = document.getElementById('alStatus');
+      var deptInput = document.getElementById('alDept');
+      var calls = 0;
+
+      // 요청을 조립할 때마다 입력값을 읽어 보낸다 (교체용 소스와 공유)
+      function buildParams() {
+        calls++;
+        return { quickFilter: deptInput.value || undefined };
+      }
+      function makeSource(url) {
+        return { url: url, autoLoad: false, params: buildParams };
+      }
+
+      var grid = new DataGrid(document.getElementById('gridAutoLoad'), {
+        dataSource: makeSource('/api/employees'),   // autoLoad: false — 생성 시 조회하지 않는다
+        sortMode: 'server',
+        filterMode: 'server',
+        pageMode: 'server',
+        pagination: true,
+        paginationPageSize: 20,
+        localeText: DataGrid.locales.ko,
+        columnDefs: [
+          { field: 'id', headerName: 'ID', width: 70 },
+          { field: 'name', headerName: 'Name', flex: 1 },
+          { field: 'department', headerName: 'Department', width: 150, filter: 'text' },
+          { field: 'city', headerName: 'City', width: 130 },
+        ],
+      });
+
+      grid.on('dataChanged', function (e) {
+        status.textContent = '요청 ' + calls + '회 — ' + e.rowCount + '행 수신. ' +
+          '이제 헤더 정렬·필터도 서버로 나갑니다.';
+      });
+
+      // 조회는 소비자가 시작한다 (reloadData는 1페이지로 되돌린 뒤 요청)
+      document.getElementById('alSearchBtn').addEventListener('click', function () {
+        grid.reloadData();
+      });
+
+      // 새 소스도 autoLoad: false면 교체만 되고 요청은 나가지 않는다
+      document.getElementById('alSwapBtn').addEventListener('click', function () {
+        var before = calls;
+        grid.setDataSource(makeSource('/api/employees'));
+        status.textContent = '데이터 소스만 교체 — 요청 횟수가 ' + before + '회 그대로입니다(' + calls + '회). ' +
+          '조회를 눌러야 받아옵니다.';
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

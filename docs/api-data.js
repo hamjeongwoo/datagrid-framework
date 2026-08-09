@@ -22,7 +22,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.23.0',
+  version: '2.24.0',
   updated: '2026-08-09',
 
   sections: [
@@ -419,11 +419,12 @@ window.ApiDocs = {
         {
           name: 'dataSource',
           demo: 'remote-data',
-          type: '{ url, method?, params?, request?, parse?, headers?, paramsFormat?, paramsSerializer? }',
+          type: '{ url, method?, params?, autoLoad?, request?, parse?, headers?, paramsFormat?, paramsSerializer? }',
           since: '1.2.0',
           description:
             '원격 데이터 소스. <code>fetch</code>로 <code>url</code>을 호출해 행을 불러옵니다. ' +
             '<code>method</code> 기본은 GET(파라미터를 쿼리스트링으로, POST면 JSON body로), ' +
+            '<code>autoLoad</code>는 생성 시 자동 조회 여부(기본 <code>true</code> — 아래 참고, since 2.24.0), ' +
             '<code>params</code>는 항상 포함할 고정 파라미터(객체 또는 함수), ' +
             '<code>request(state)</code>는 기본 파라미터 매핑을 서버 스펙으로 대체하는 훅(since 2.5.0), ' +
             '<code>parse(json)</code>은 응답을 <code>{ rows, total }</code>로 바꾸는 훅' +
@@ -434,14 +435,30 @@ window.ApiDocs = {
             '<code>paramsSerializer(params)</code>는 GET 쿼리스트링 생성을 통째로 대체하는 훅' +
             '(since 2.10.0)입니다. ' +
             '로딩 중 오버레이가 표시되고 실패 시 <code>dataLoadError</code> 이벤트가 발생합니다. ' +
-            '<code>reloadData()</code>로 다시 불러오고 <code>setDataSource()</code>로 교체합니다. ' +
+            '<code>reloadData()</code>로 다시 불러오고 <code>setDataSource()</code>로 교체합니다.<br><br>' +
+            '<strong><code>autoLoad: false</code> (2.24.0)</strong> — 그리드가 <strong>스스로 첫 조회를 하지 ' +
+            '않습니다.</strong> 검색 조건을 받은 뒤에 조회하는 화면, 비싼 쿼리, 탭이 열릴 때까지 미루는 ' +
+            '경우에 씁니다. 데이터 소스를 끄는 게 아니라 <strong>"자동"만 끄는 것</strong>이라 ' +
+            '<code>reloadData()</code> · <code>loadMore()</code> 같은 명시적 호출은 그대로 동작하고, ' +
+            '정렬·필터·페이지 이동에 따른 자동 재조회도 <strong>한 번이라도 조회한 뒤부터는</strong> ' +
+            '평소처럼 동작합니다. <code>rowData</code>를 함께 주면 첫 조회 전까지 그 데이터가 보입니다. ' +
+            '<code>setDataSource()</code>도 새 소스가 <code>autoLoad: false</code>면 교체만 하고 ' +
+            '조회하지 않습니다 — "이 소스는 그리드가 스스로 부르지 않는다"가 생성 시점에만 적용되면 ' +
+            '반쪽짜리가 되기 때문입니다. <code>infiniteScroll</code>과 함께 쓰면 첫 조회 전까지는 ' +
+            '스크롤로도 자동 조회되지 않고, 그 상태의 <code>loadMore()</code>는 이어받기가 아니라 ' +
+            '<strong>첫 페이지</strong>를 불러옵니다.<br><br>' +
             '<strong>단계별 레시피는 <a href="#remote-data-guide">Remote Data Source 가이드</a> 참고.</strong>',
           example:
             "dataSource: {\n" +
             "  url: '/api/employees',\n" +
             "  params: function () { return { token: auth.token }; },\n" +
             '},\n' +
-            "sortMode: 'server', pageMode: 'server', pagination: true",
+            "sortMode: 'server', pageMode: 'server', pagination: true\n" +
+            '\n' +
+            '// 조회 버튼을 누를 때까지 서버를 부르지 않는 화면\n' +
+            "dataSource: { url: '/api/employees', autoLoad: false },\n" +
+            '// …\n' +
+            "searchBtn.addEventListener('click', function () { grid.reloadData(); });",
         },
         {
           name: 'infiniteScroll',
@@ -1238,6 +1255,36 @@ window.ApiDocs = {
             '  },\n' +
             '}',
         },
+        {
+          name: 'Step 9. 첫 조회를 미루기 — autoLoad',
+          demo: 'auto-load',
+          since: '2.24.0',
+          description:
+            '기본적으로 그리드는 생성되자마자 <code>dataSource</code>를 한 번 호출합니다. ' +
+            '<strong>검색 조건을 받은 뒤에 조회하는 화면</strong>에서는 이 첫 요청이 낭비이고 ' +
+            '(조건 없는 전체 조회) 비싼 쿼리라면 서버에도 부담입니다. ' +
+            '<code>autoLoad: false</code>로 끄고 조회 시점을 소비자가 정하세요.<br><br>' +
+            '끄는 건 <strong>자동 조회뿐</strong>입니다 — <code>reloadData()</code>는 그대로 동작하고, ' +
+            '한 번 조회한 뒤에는 정렬·필터·페이지 이동에 따른 자동 재조회도 평소처럼 일어납니다. ' +
+            '조회 전까지 뭔가 보여주고 싶으면 <code>rowData</code>를 함께 주면 됩니다 ' +
+            '(그 데이터가 첫 조회 때 교체됩니다).',
+          example:
+            'var grid = new DataGrid(el, {\n' +
+            '  dataSource: {\n' +
+            "    url: '/api/employees',\n" +
+            '    autoLoad: false,                       // 생성 시 조회하지 않는다\n' +
+            '    params: function () {                  // 조회할 때마다 입력값을 읽는다\n' +
+            '      return { dept: deptInput.value || undefined };\n' +
+            '    },\n' +
+            '  },\n' +
+            "  pageMode: 'server',\n" +
+            '  pagination: true,\n' +
+            '});\n' +
+            '\n' +
+            "searchBtn.addEventListener('click', function () {\n" +
+            '  grid.reloadData();   // 여기서부터 조회 — 이후 정렬·필터는 자동 재조회\n' +
+            '});',
+        },
       ],
     },
 
@@ -1946,7 +1993,9 @@ window.ApiDocs = {
             '저장 후 <strong>보던 페이지 그대로</strong> 새로고침하려면 ' +
             '<code>reloadData({ keepPage: true })</code>. 정렬 클릭·필터 변경·페이지 이동에 따른 자동 재조회는 ' +
             '이 메서드를 거치지 않으므로 영향받지 않습니다(페이지 이동은 이동한 페이지를, 필터는 1페이지를 요청). ' +
-            '조회 조건 변경 패턴은 <a href="#remote-data-guide">가이드 Step 5</a> 참고.',
+            '조회 조건 변경 패턴은 <a href="#remote-data-guide">가이드 Step 5</a> 참고.<br><br>' +
+            '<code>dataSource.autoLoad: false</code>로 자동 조회를 꺼둔 그리드에서 ' +
+            '<strong>첫 조회를 시작하는 것도 이 메서드</strong>입니다(2.24.0).',
           example:
             'grid.reloadData();                    // 조건 변경 후 — 1페이지부터\n' +
             'grid.reloadData({ keepPage: true });  // 저장 후 새로고침 — 보던 페이지 유지',
@@ -1973,7 +2022,10 @@ window.ApiDocs = {
             '<code>infiniteScroll</code>에서 다음 페이지를 <strong>수동으로</strong> 불러옵니다 — ' +
             '스크롤이 생기지 않는 레이아웃이나 "더 보기" 버튼용입니다. ' +
             '요청을 시작했으면 <code>true</code>, 이미 마지막이거나 로드 중이거나 무한 스크롤이 ' +
-            '아니면 <code>false</code>를 반환합니다.',
+            '아니면 <code>false</code>를 반환합니다. ' +
+            '<code>autoLoad: false</code>로 아직 아무것도 받지 않은 상태라면 ' +
+            '이어받기가 아니라 <strong>첫 페이지</strong>를 불러옵니다(2.24.0) — ' +
+            '받지도 않은 페이지의 "다음"을 요청하면 첫 페이지가 통째로 비기 때문입니다.',
           example:
             'if (!grid.loadMore()) {\n' +
             "  console.log(grid.hasMoreRows() ? '로드 중' : '마지막 페이지');\n" +

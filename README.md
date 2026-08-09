@@ -44,7 +44,7 @@ python demo/server.py
 | 페이지 | 내용 |
 |---|---|
 | `index.html` | **Template** — 10,000행 실전 예제 (툴바 · 퀵 필터 · 선택 · 편집 · CSV · 다크 모드) |
-| `examples/features.html` | **Features** — 기능별 데모 63개 (정렬 · 필터 · 그룹핑/집계 · 선택 · 인라인 편집 · **팝업 폼 편집** · 트리 · 원격 데이터/CRUD 스테이징 · 클립보드 · 상태 저장 · Excel/CSV · 10만 행 가상화 · 컬럼 가상화 · 다국어) |
+| `examples/features.html` | **Features** — 기능별 데모 64개 (정렬 · 필터 · 그룹핑/집계 · 선택 · 인라인 편집 · **팝업 폼 편집** · 트리 · 원격 데이터/CRUD 스테이징 · 클립보드 · 상태 저장 · Excel/CSV · 10만 행 가상화 · 컬럼 가상화 · 다국어) |
 | `examples/components.html` | **Components** — 디자인 시스템 갤러리 (토큰 · 헤더/행 상태 · 체크박스 · 태그 · 필터 메뉴 · 페이지네이션 바) |
 
 ## 그리드 옵션
@@ -89,7 +89,7 @@ python demo/server.py
 | `domLayout` | `'normal'` \| `'fill'` \| `'autoHeight'` | 높이 결정 방식. `'normal'`(기본) = `height: 100%`(컨테이너 높이가 확정일 때), `'fill'` = 컨테이너를 정확히 채움(데이터 양과 무관 — `flex: 1` 영역용), `'autoHeight'` = 내용 높이만큼 늘어남(세로 가상화 없음) |
 | `showHeader` | boolean | `false`면 헤더 영역 숨김 |
 | `columnGroups` | array | 2단 컬럼 그룹 헤더 `[{ headerName, children }]` |
-| `dataSource` | object | 원격 데이터 `{ url, method, params, request, parse, headers, paramsFormat, paramsSerializer }` — `request(state)`로 요청 파라미터를 서버 스펙에 맞춤, `parse(json)`으로 응답 변환, `headers`로 인증, `paramsFormat`으로 중첩 표기 선택(`'dot'` 기본 → `page.selectPage=1` Spring·ASP.NET / `'bracket'` → `page[selectPage]=1` qs·PHP·Rails), `paramsSerializer(params)`로 쿼리스트링 생성 자체를 대체 (`reloadData()` 재요청, `setDataSource()` 교체) |
+| `dataSource` | object | 원격 데이터 `{ url, method, params, autoLoad, request, parse, headers, paramsFormat, paramsSerializer }` — `autoLoad: false`면 **생성 시 자동 조회를 하지 않음**(기본 true — 검색 조건을 받은 뒤 `reloadData()`로 시작, 명시적 호출과 첫 조회 이후의 자동 재조회는 그대로), `request(state)`로 요청 파라미터를 서버 스펙에 맞춤, `parse(json)`으로 응답 변환, `headers`로 인증, `paramsFormat`으로 중첩 표기 선택(`'dot'` 기본 → `page.selectPage=1` Spring·ASP.NET / `'bracket'` → `page[selectPage]=1` qs·PHP·Rails), `paramsSerializer(params)`로 쿼리스트링 생성 자체를 대체 (`reloadData()` 재요청, `setDataSource()` 교체) |
 | `rowDetail` | object | 마스터-디테일 `{ renderer(row), height }` (`expandRow`/`collapseRow`/`toggleRowDetail`) |
 | `treeData` | object | 계층 데이터 트리 표시 `{ treeField, indent, defaultExpandLevel, childrenField \| parentIdField+idField, cascade, checkboxDisabled(row), summary, fetchChildren(row), hasChildren(row) }` — `checkboxSelection` 컬럼과 함께 쓰면 3상태 캐스케이드 선택. `pagination`/`groupBy`와 배타 |
 | `title` / `toolbar` | string / element | 그리드 타이틀 바 / 소비자 DOM 툴바 슬롯 |

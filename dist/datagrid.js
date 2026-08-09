@@ -493,6 +493,18 @@
     return !(opts && opts.keepPage);
   }
 
+  /**
+   * 그리드가 dataSource를 받았을 때 **스스로** 첫 조회를 할지 (dataSource.autoLoad, 기본 true).
+   *
+   * false면 그리드가 먼저 서버를 부르지 않는다 — 검색 조건을 입력받은 뒤에 조회하는 화면,
+   * 비싼 쿼리, 탭이 열릴 때까지 미루는 경우용. 조회는 소비자가 reloadData()로 시작한다.
+   * 명시적 호출(reloadData/loadMore)은 이 옵션과 무관하게 항상 조회한다 —
+   * autoLoad는 "자동"만 끄는 것이지 데이터 소스를 비활성화하는 게 아니다.
+   */
+  function shouldAutoLoad(dataSource) {
+    return !!(dataSource && dataSource.autoLoad !== false);
+  }
+
   const INFINITE_DEFAULT_THRESHOLD = 200;
 
   /**
@@ -2523,6 +2535,7 @@
       }
       this._hasMore = true; /* 아직 더 받을 게 있는가 */
       this._loadingMore = false; /* 추가 로드 진행 중 (전면 오버레이 없이) */
+      this._loadedOnce = false; /* 이 소스에서 0페이지를 한 번이라도 받았는가 (이어받기의 전제) */
       this._infiniteStatusEl = null;
 
       /* tree data — pagination/groupBy와 배타 (ParamQuery도 페이징 비호환 명시) */
@@ -2593,7 +2606,8 @@
       this._bindEvents();
 
       this.setRowData(options.rowData || []);
-      if (options.dataSource) this.reloadData();
+      /* autoLoad: false면 그리드가 먼저 서버를 부르지 않는다 (rowData를 줬으면 그게 그대로 보인다) */
+      if (shouldAutoLoad(options.dataSource)) this.reloadData();
 
       /* gridReady: 생성자 반환 후 핸들러가 등록될 시간을 주기 위해 비동기로 1회 발생 */
       setTimeout(() => {
@@ -6993,6 +7007,10 @@
      */
     _maybeLoadMore() {
       if (!this._infinite || this._destroyed) return false;
+      /* 이어받기는 "0페이지가 이미 있다"를 전제로 다음 페이지를 요청한다. 첫 조회가
+       * 아직 없으면(autoLoad: false, 또는 첫 조회 실패) 그 전제가 깨져서 page 1부터
+       * 받아 0페이지가 통째로 비는 구멍이 생긴다 (BUG-013). */
+      if (!this._loadedOnce) return false;
       const body = this._bodyEl;
       const go = shouldLoadMore({
         enabled: true,
@@ -7014,7 +7032,9 @@
      */
     loadMore() {
       if (!this._infinite || !this._hasMore || this._loading || this._loadingMore) return false;
-      this._fetchData({ append: true });
+      /* 아직 아무것도 안 받았으면(autoLoad: false) "다음 페이지"는 0페이지다 —
+       * append로 보내면 0페이지를 건너뛴다 (BUG-013) */
+      this._fetchData(this._loadedOnce ? { append: true } : undefined);
       return true;
     }
 
@@ -7143,6 +7163,7 @@
           if (append) {
             this._rows = this._rows.concat(newRows); /* 누적 — 선택·추적·히스토리는 유지 */
           } else {
+            this._loadedOnce = true; /* 이제 0페이지가 있다 — 이어받기의 전제가 성립 */
             this._rows = newRows;
             this._selection = {};
             this._focusedCell = null;
@@ -7215,10 +7236,14 @@
      * 원격 데이터 소스를 런타임에 교체하고 1페이지부터 다시 불러온다.
      * 조회 조건(파라미터)만 바뀌는 경우라면 dataSource.params를 함수로 두고
      * reloadData()를 호출하는 쪽이 가볍다.
+     *
+     * 새 소스가 autoLoad: false면 교체만 하고 조회하지 않는다 — "이 소스는 그리드가
+     * 스스로 부르지 않는다"는 규칙이 생성 시점에만 적용되면 반쪽짜리가 된다.
      */
     setDataSource(dataSource) {
       this.options.dataSource = dataSource;
-      this.reloadData(); /* reloadData가 1페이지로 되돌린다 */
+      this._loadedOnce = false; /* 새 소스 — 지금 들고 있는 행은 이 소스의 0페이지가 아니다 */
+      if (shouldAutoLoad(dataSource)) this.reloadData(); /* reloadData가 1페이지로 되돌린다 */
     }
 
     /* ---- data API ---- */
@@ -7851,7 +7876,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.23.0';
+  DataGrid.version = '2.24.0';
 
   /**
    * 내장 로케일. `localeText: DataGrid.locales.ko`처럼 통째로 쓰거나,
@@ -7884,6 +7909,7 @@
     resolveDomLayout,
     resolveDataModes,
     shouldResetPageOnReload,
+    shouldAutoLoad,
     resolveInfiniteScroll,
     pageSizeSelectOptions,
     shouldLoadMore,

@@ -1782,6 +1782,23 @@ suite('shouldResetPageOnReload', function () {
   assert(!T.shouldResetPageOnReload({ keepPage: true, silent: true }), '다른 키가 섞여도 유지');
 });
 
+suite('shouldAutoLoad — dataSource 최초 자동 조회', function () {
+  /* 기본은 조회 — 기존 코드(autoLoad를 적지 않은 전부)의 동작이 그대로여야 한다 */
+  assert(T.shouldAutoLoad({ url: '/api/x' }), '생략 → 자동 조회');
+  assert(T.shouldAutoLoad({ url: '/api/x', autoLoad: true }), 'true → 자동 조회');
+
+  /* 끄는 건 정확히 false일 때만 */
+  assert(!T.shouldAutoLoad({ url: '/api/x', autoLoad: false }), 'false → 조회 안 함');
+  assert(T.shouldAutoLoad({ url: '/api/x', autoLoad: 0 }), '0은 false가 아니므로 조회 (엄격 비교)');
+  assert(T.shouldAutoLoad({ url: '/api/x', autoLoad: null }), 'null은 미지정 취급 → 조회');
+  assert(T.shouldAutoLoad({ url: '/api/x', autoLoad: undefined }), 'undefined → 조회');
+  assert(T.shouldAutoLoad({ url: '/api/x', autoLoad: 'false' }), "문자열 'false'는 참값 → 조회");
+
+  /* dataSource 자체가 없으면 조회할 대상이 없다 */
+  assert(!T.shouldAutoLoad(null), 'dataSource 없음 → 조회 안 함');
+  assert(!T.shouldAutoLoad(undefined), 'undefined dataSource 안전');
+});
+
 suite('shouldShowEditableIcon', function () {
   var editable = { editable: true };
   var readonly = { editable: false };
