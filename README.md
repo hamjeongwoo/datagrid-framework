@@ -44,7 +44,7 @@ python demo/server.py
 | 페이지 | 내용 |
 |---|---|
 | `index.html` | **Template** — 10,000행 실전 예제 (툴바 · 퀵 필터 · 선택 · 편집 · CSV · 다크 모드) |
-| `examples/features.html` | **Features** — 기능별 데모 62개 (정렬 · 필터 · 그룹핑/집계 · 선택 · 인라인 편집 · **팝업 폼 편집** · 트리 · 원격 데이터/CRUD 스테이징 · 클립보드 · 상태 저장 · Excel/CSV · 10만 행 가상화 · 컬럼 가상화 · 다국어) |
+| `examples/features.html` | **Features** — 기능별 데모 63개 (정렬 · 필터 · 그룹핑/집계 · 선택 · 인라인 편집 · **팝업 폼 편집** · 트리 · 원격 데이터/CRUD 스테이징 · 클립보드 · 상태 저장 · Excel/CSV · 10만 행 가상화 · 컬럼 가상화 · 다국어) |
 | `examples/components.html` | **Components** — 디자인 시스템 갤러리 (토큰 · 헤더/행 상태 · 체크박스 · 태그 · 필터 메뉴 · 페이지네이션 바) |
 
 ## 그리드 옵션
@@ -58,6 +58,7 @@ python demo/server.py
 | `pagination` | boolean | 페이지네이션 사용 |
 | `paginationPageSize` | number | 페이지 크기 (기본 20) |
 | `paginationPageSizeOptions` | array | 페이지 크기 선택지 |
+| `infiniteScroll` | boolean \| object | 무한 스크롤 `{ threshold, pageSize }` — 바닥 근처에서 다음 페이지를 자동 조회해 **이어 붙임**(교체 아님). `dataSource` 필요, 페이저 UI·`treeData`와 배타. 켜면 `pageMode`가 `'server'`로 올라감. 끝 판정은 서버 플래그(`last`/`lastPage`/`isLast`/`hasMore`/`hasNext`) → `total` → 수신 건수 순. 하단 상태 바가 진행/마지막을 표시 (`loadMore()` / `hasMoreRows()`, `rowsAppended` / `lastPageReached`) |
 | `zebra` | boolean | 홀수 행 배경 |
 | `theme` | `'light'` \| `'dark'` | 초기 테마 |
 | `localeText` | object | 그리드가 그리는 UI 문자열(필터 메뉴·페이지네이션·오버레이·요약·aria-label) 교체. 내장 `DataGrid.locales.ko` / `.en`, 지정한 키만 덮어쓰고 나머지는 영어. `{from}`·`{total}`·`{column}`·`{count}` 토큰 치환, `setOptions`로 런타임 전환 |
@@ -162,6 +163,7 @@ cellRenderer: DataGrid.renderers.checkbox()   // 값을 체크박스 모양으�
 `showLoadingOverlay()` / `hideLoadingOverlay()` ·
 `setTheme('light'|'dark')` · `refresh()` · `refreshCell(row, field)` / `refreshRow(row)` / `refreshColumn(colId)` ·
 `setOptions(patch)` · `expandRow(row)` / `collapseRow(row)` / `toggleRowDetail(row)` · `reloadData({ keepPage? })`(1페이지로 리셋 후 재조회 — 보던 페이지를 지키려면 `{ keepPage: true }`) / `setDataSource(ds)` ·
+`loadMore()` / `hasMoreRows()` (infiniteScroll — 수동 이어받기 · 남은 페이지 확인) ·
 `toggleNode(row, expanded?)` / `expandNode(row)` / `collapseNode(row)` / `isNodeExpanded(row)` / `expandAllNodes(level?)` / `collapseAllNodes()` ·
 `setPinnedTopRows(rows)` · `setEnabled(bool)` / `isEnabled()` · `once(event, fn)` · `destroy()`
 
@@ -193,6 +195,8 @@ grid.setOptions({
 grid.on('selectionChanged', function (e) { e.selectedRows });
 grid.on('cellValueChanged', function (e) { e.data, e.colDef, e.oldValue, e.newValue });
 grid.on('rowValueChanged', function (e) { e.data, e.changes /* 행 단위 변경 묶음 */ });
+grid.on('rowsAppended', function (e) { e.rows /* 이번에 받은 행 */, e.page, e.loaded, e.hasMore });
+grid.on('lastPageReached', function (e) { e.loaded, e.total /* 서버가 안 주면 null */ });
 grid.on('sortChanged' | 'filterChanged' | 'paginationChanged' | 'groupChanged' |
         'groupToggled' | 'editingStarted' | 'editingStopped' | 'rowClicked' |
         'rowDoubleClicked' | 'cellClicked' | 'cellDoubleClicked' | 'columnResized' |

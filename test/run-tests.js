@@ -859,14 +859,24 @@ suite('dataSource request/response', function () {
   assertEq(req10.headers, { 'X-Token': 'live' }, 'headers function evaluated per request');
   assertEq(T.buildDataSourceRequest({ url: '/x' }, state).headers, null, 'no headers option → null');
 
-  assertEq(T.parseDataSourceResponse([{ a: 1 }]), { rows: [{ a: 1 }], total: 1 }, 'bare array response');
+  assertEq(T.parseDataSourceResponse([{ a: 1 }]), { rows: [{ a: 1 }], total: 1, hasTotal: false, last: null },
+    'bare array response');
   assertEq(
     T.parseDataSourceResponse({ rows: [{ a: 1 }], total: 99 }),
-    { rows: [{ a: 1 }], total: 99 },
+    { rows: [{ a: 1 }], total: 99, hasTotal: true, last: null },
     '{rows, total} response'
   );
-  assertEq(T.parseDataSourceResponse({ rows: [{}] }), { rows: [{}], total: 1 }, 'total defaults to rows.length');
-  assertEq(T.parseDataSourceResponse(null), { rows: [], total: 0 }, 'malformed response → empty');
+  assertEq(T.parseDataSourceResponse({ rows: [{}] }), { rows: [{}], total: 1, hasTotal: false, last: null },
+    'total defaults to rows.length');
+  assertEq(T.parseDataSourceResponse(null), { rows: [], total: 0, hasTotal: false, last: null },
+    'malformed response → empty');
+
+  /* v2.22 — hasTotal은 "서버가 실제로 준 총건수인가". rows.length로 채운 값을
+   * 기지의 총계로 믿으면 무한 스크롤이 첫 페이지에서 끝나버린다. */
+  assertEq(T.parseDataSourceResponse({ rows: [{}, {}] }).hasTotal, false, '채운 total은 hasTotal false');
+  assertEq(T.parseDataSourceResponse({ rows: [], total: 0 }).hasTotal, true, 'total: 0도 서버가 준 값');
+  assertEq(T.parseDataSourceResponse({ rows: [{}], last: true }).last, true, '마지막 페이지 플래그를 함께 읽는다');
+  assertEq(T.parseDataSourceResponse({ rows: [{}], hasMore: true }).last, false, 'hasMore는 반전');
 });
 
 /* ---------------- buildGroupHeaderRuns ---------------- */
@@ -1561,6 +1571,173 @@ suite('resolveDataModes — pageMode 상속', function () {
   assertEq(T.resolveDataModes({ pageMode: 'server', sortMode: null }).sortMode, 'server', 'null → 미지정으로 상속');
   assertEq(T.resolveDataModes({ pageMode: 'server', sortMode: undefined }).sortMode, 'server', 'undefined → 상속');
   assertEq(T.resolveDataModes({ pageMode: 'server', sortMode: 'oops' }).sortMode, 'client', '잘못된 값 → client');
+
+  /* v2.22 — infiniteScroll은 서버 페이징이 전제이므로 pageMode를 올린다 */
+  var inf = T.resolveDataModes({ infiniteScroll: true });
+  assertEq(inf.pageMode, 'server', 'infiniteScroll → pageMode server');
+  assertEq(inf.sortMode, 'server', 'sort도 따라 올라감');
+  assertEq(inf.filterMode, 'server', 'filter도 따라 올라감');
+  assertEq(inf.warnings.length, 0, '자동 승격은 경고 대상 아님');
+  /* 명시 지정은 여전히 이긴다 */
+  assertEq(T.resolveDataModes({ infiniteScroll: true, pageMode: 'client' }).pageMode, 'client',
+    '명시한 pageMode가 승격을 이긴다');
+  assertEq(T.resolveDataModes({ infiniteScroll: true, sortMode: 'client' }).warnings[0], 'sortMode',
+    '승격된 server + 명시 client는 종전대로 경고');
+});
+
+suite('resolveInfiniteScroll — 무한 스크롤 옵션 정규화', function () {
+  var ds = { url: '/api/x' };
+
+  var off = T.resolveInfiniteScroll({});
+  assertEq(off.enabled, false, '옵션 없으면 비활성');
+  assertEq(off.warnings.length, 0, '비활성은 경고 없음');
+  assertEq(T.resolveInfiniteScroll(undefined).enabled, false, 'options 자체가 없어도 크래시 없음');
+  assertEq(T.resolveInfiniteScroll({ infiniteScroll: false, dataSource: ds }).enabled, false, 'false는 비활성');
+
+  var on = T.resolveInfiniteScroll({ infiniteScroll: true, dataSource: ds });
+  assertEq(on.enabled, true, 'true + dataSource → 활성');
+  assertEq(on.threshold, 200, '기본 임계값 200px');
+  assertEq(on.pageSize, null, 'pageSize 미지정이면 null (paginationPageSize를 쓴다)');
+
+  /* dataSource 없이는 자동 조회할 대상이 없다 — 조용히 무시하지 않고 알린다 */
+  var noDs = T.resolveInfiniteScroll({ infiniteScroll: true });
+  assertEq(noDs.enabled, false, 'dataSource 없으면 비활성');
+  assertEq(noDs.warnings[0], 'noDataSource', '경고 키');
+
+  var cfg = T.resolveInfiniteScroll({ infiniteScroll: { threshold: 50, pageSize: 30 }, dataSource: ds });
+  assertEq(cfg.threshold, 50, '객체 설정 threshold');
+  assertEq(cfg.pageSize, 30, '객체 설정 pageSize');
+  assertEq(T.resolveInfiniteScroll({ infiniteScroll: { threshold: 0 }, dataSource: ds }).threshold, 0,
+    'threshold 0 = 정확히 바닥에서만 (유효값)');
+  assertEq(T.resolveInfiniteScroll({ infiniteScroll: { threshold: -5 }, dataSource: ds }).threshold, 200,
+    '음수는 기본값으로');
+  assertEq(T.resolveInfiniteScroll({ infiniteScroll: { threshold: 'x' }, dataSource: ds }).threshold, 200,
+    '숫자 아니면 기본값');
+  assertEq(T.resolveInfiniteScroll({ infiniteScroll: { pageSize: 0 }, dataSource: ds }).pageSize, null,
+    'pageSize 0은 무효');
+  assertEq(T.resolveInfiniteScroll({ infiniteScroll: { pageSize: 25.7 }, dataSource: ds }).pageSize, 25,
+    '소수는 내림');
+
+  /* 어긋난 조합 — 막지는 않고 경고만 */
+  var client = T.resolveInfiniteScroll({ infiniteScroll: true, dataSource: ds, pageMode: 'client' });
+  assertEq(client.enabled, true, "pageMode: 'client'여도 막지는 않는다 (request 훅 구성 가능)");
+  assertEq(client.warnings[0], 'clientPageMode', '경고 키');
+  assertEq(T.resolveInfiniteScroll({ infiniteScroll: true, dataSource: ds, domLayout: 'autoHeight' }).warnings[0],
+    'autoHeight', 'autoHeight는 스크롤이 안 생겨 끝까지 받는다 — 경고');
+  assertEq(T.resolveInfiniteScroll({ infiniteScroll: true, domLayout: 'autoHeight' }).warnings.length, 1,
+    '비활성이면 추가 경고를 쌓지 않는다 (noDataSource 하나뿐)');
+});
+
+suite('shouldLoadMore — 바닥 판정', function () {
+  var base = {
+    enabled: true, hasMore: true, loading: false, threshold: 200,
+    scrollTop: 0, clientHeight: 400, scrollHeight: 4000,
+  };
+  var w = function (patch) {
+    var o = {}, k;
+    for (k in base) o[k] = base[k];
+    for (k in patch || {}) o[k] = patch[k];
+    return o;
+  };
+
+  assertEq(T.shouldLoadMore(w()), false, '맨 위에서는 로드 안 함');
+  assertEq(T.shouldLoadMore(w({ scrollTop: 3399 })), false, '남은 201px — 아직');
+  assertEq(T.shouldLoadMore(w({ scrollTop: 3400 })), true, '남은 거리가 임계값과 같으면 로드 (경계 포함)');
+  assertEq(T.shouldLoadMore(w({ scrollTop: 3401 })), true, '임계값 안으로 들어오면 로드');
+  assertEq(T.shouldLoadMore(w({ scrollTop: 3600 })), true, '완전히 바닥이면 로드');
+  assertEq(T.shouldLoadMore(w({ scrollTop: 3400, threshold: 0 })), false, 'threshold 0이면 정확히 바닥에서만');
+  assertEq(T.shouldLoadMore(w({ scrollTop: 3600, threshold: 0 })), true, 'threshold 0 + 바닥');
+
+  /* 가드 3종 */
+  assertEq(T.shouldLoadMore(w({ scrollTop: 3600, enabled: false })), false, '비활성이면 안 함');
+  assertEq(T.shouldLoadMore(w({ scrollTop: 3600, hasMore: false })), false, '마지막이면 안 함');
+  assertEq(T.shouldLoadMore(w({ scrollTop: 3600, loading: true })), false, '로드 중이면 안 함 (중복 요청 방지)');
+
+  /* 첫 페이지가 뷰포트를 못 채운 경우 — 스크롤이 없으니 scroll 이벤트도 없다.
+   * 이걸 바닥으로 보지 않으면 "더 있는데 멈춘 그리드"가 된다. */
+  assertEq(T.shouldLoadMore(w({ scrollHeight: 300, clientHeight: 400 })), true,
+    '내용이 뷰포트보다 작으면 바닥으로 본다');
+
+  /* 레이아웃이 없는 경우(숨겨진 탭 등)는 판정 불가 — 안 보이는 그리드가 끝까지 받아버리면 안 된다 */
+  assertEq(T.shouldLoadMore(w({ clientHeight: 0, scrollHeight: 0 })), false, 'clientHeight 0이면 판정 보류');
+  assertEq(T.shouldLoadMore(undefined), false, '인자 없어도 크래시 없음');
+});
+
+suite('readLastPageFlag — 서버 마지막 페이지 플래그', function () {
+  assertEq(T.readLastPageFlag({ last: true }), true, 'last: true = 마지막 (Spring Data Page)');
+  assertEq(T.readLastPageFlag({ last: false }), false, 'last: false = 더 있음');
+  assertEq(T.readLastPageFlag({ lastPage: true }), true, 'lastPage');
+  assertEq(T.readLastPageFlag({ isLast: true }), true, 'isLast');
+  /* hasMore/hasNext는 의미가 반대 */
+  assertEq(T.readLastPageFlag({ hasMore: true }), false, 'hasMore: true = 아직 아님');
+  assertEq(T.readLastPageFlag({ hasMore: false }), true, 'hasMore: false = 마지막');
+  assertEq(T.readLastPageFlag({ hasNext: false }), true, 'hasNext: false = 마지막');
+
+  assertEq(T.readLastPageFlag({}), null, '아무 키도 없으면 모름');
+  assertEq(T.readLastPageFlag(null), null, 'null 안전');
+  assertEq(T.readLastPageFlag([1, 2]), null, '배열 응답에는 플래그가 없다');
+  /* 불리언이 아닌 값은 모름 — 문자열 'false'가 true로 읽히면 안 된다 */
+  assertEq(T.readLastPageFlag({ last: 'false' }), null, "문자열 'false'는 모름으로");
+  assertEq(T.readLastPageFlag({ last: 0 }), null, '숫자도 모름으로');
+  /* 우선순위: last가 hasMore보다 앞 */
+  assertEq(T.readLastPageFlag({ last: true, hasMore: true }), true, 'last가 우선');
+});
+
+suite('resolveLastPage — 마지막 페이지 확정', function () {
+  /* 1. 명시 플래그가 최우선 — 다른 신호로 덮지 않는다 */
+  assertEq(T.resolveLastPage({ explicit: false, receivedCount: 0 }), false,
+    '서버가 더 있다고 하면 0건이어도 그 말을 따른다');
+  assertEq(T.resolveLastPage({ explicit: true, receivedCount: 50, pageSize: 50, total: 1000, loaded: 50 }), true,
+    '서버가 마지막이라 하면 다른 신호와 무관하게 마지막');
+
+  /* 2. 수신 0건 = 무한 루프 안전장치 */
+  assertEq(T.resolveLastPage({ explicit: null, receivedCount: 0 }), true, '0건이면 마지막');
+  assertEq(T.resolveLastPage({ receivedCount: 0, pageSize: 50 }), true, 'explicit 생략 + 0건');
+
+  /* 3. total 기지 */
+  assertEq(T.resolveLastPage({ receivedCount: 20, pageSize: 50, loaded: 100, total: 100 }), true,
+    'loaded === total이면 마지막');
+  assertEq(T.resolveLastPage({ receivedCount: 50, pageSize: 50, loaded: 50, total: 500 }), false,
+    'total이 남았으면 더 있음');
+  /* total을 모르면(null) 이 규칙은 건너뛴다 — rows.length로 채운 값을 믿으면 첫 페이지에서 끝난다 */
+  assertEq(T.resolveLastPage({ receivedCount: 50, pageSize: 50, loaded: 50, total: null }), false,
+    'total 미지 + 꽉 찬 페이지 = 더 있음');
+
+  /* 4. 부분 페이지 추론 */
+  assertEq(T.resolveLastPage({ receivedCount: 30, pageSize: 50, loaded: 130 }), true,
+    'pageSize보다 적게 오면 마지막');
+  assertEq(T.resolveLastPage({ receivedCount: 50, pageSize: 50, loaded: 150 }), false,
+    '꽉 찬 페이지면 더 있음 (다음 요청이 0건이면 그때 끝)');
+  /* pageSize를 모르면 추론하지 않는다 */
+  assertEq(T.resolveLastPage({ receivedCount: 3, loaded: 3 }), false, 'pageSize 없으면 부분 페이지 추론 없음');
+  assertEq(T.resolveLastPage(undefined), true, '인자 없으면 0건 취급 → 마지막 (무한 루프 방지 쪽으로)');
+});
+
+suite('resolveInfiniteStatus — 하단 상태 바 문구', function () {
+  var loading = T.resolveInfiniteStatus({ loading: true, hasMore: true, loaded: 40 });
+  assertEq(loading.kind, 'loading', '로딩 중');
+  assertEq(loading.key, 'loadingMore', '로케일 키');
+
+  /* 로딩이 마지막 판정보다 우선 — 로딩 중에 "마지막"이 뜨면 안 된다 */
+  assertEq(T.resolveInfiniteStatus({ loading: true, hasMore: false, loaded: 40 }).kind, 'loading',
+    '로딩이 우선');
+
+  var end = T.resolveInfiniteStatus({ loading: false, hasMore: false, loaded: 137 });
+  assertEq(end.kind, 'end', '마지막 도달');
+  assertEq(end.key, 'noMoreRows', '로케일 키');
+  assertEq(end.params.loaded, 137, '누적 건수');
+
+  var moreNoTotal = T.resolveInfiniteStatus({ loading: false, hasMore: true, loaded: 40, total: null });
+  assertEq(moreNoTotal.key, 'rowsLoaded', 'total 모르면 누적만');
+  assertEq(moreNoTotal.params.loaded, 40, '누적 건수');
+
+  var moreTotal = T.resolveInfiniteStatus({ loading: false, hasMore: true, loaded: 40, total: 500 });
+  assertEq(moreTotal.key, 'rowsLoadedOfTotal', 'total 알면 분모까지');
+  assertEq(moreTotal.params.total, 500, '총건수');
+
+  assertEq(T.resolveInfiniteStatus({}).kind, 'end', '아무것도 없으면 더 받을 게 없는 상태');
+  assertEq(T.resolveInfiniteStatus({}).params.loaded, 0, '0건');
+  assertEq(T.resolveInfiniteStatus(undefined).kind, 'end', '인자 없어도 크래시 없음');
 });
 
 suite('shouldResetPageOnReload', function () {

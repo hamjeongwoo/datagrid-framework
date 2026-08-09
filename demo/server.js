@@ -14,6 +14,10 @@
  *   GET /api/employees-v3?page.selectPage=1&page.pageSize=20&sorts[0].field=name&sorts[0].dir=asc
  *   (paramsSerializer용 compact 표기 sortSpec=name:asc,salary:desc도 수용)
  *   → { rows: [...], total: n, receivedParams: 서버가 복원한 중첩 구조 }
+ *
+ * 무한 스크롤 시연용 (infiniteScroll — 총건수를 주지 않는 서버):
+ *   GET /api/employees-infinite?page=0&pageSize=25
+ *   → { rows: [...], last: true|false }   (total 없음 — last 플래그로만 끝을 안다)
  */
 'use strict';
 var http = require('http');
@@ -207,13 +211,61 @@ function handleEmployeesV3Api(req, res, query) {
   }, 120);
 }
 
+/* 무한 스크롤 시연용: 총건수를 주지 않고 마지막 페이지 플래그(last)만 준다.
+ * total 없이도 종료를 알 수 있는지가 이 엔드포인트의 요점. */
+function handleEmployeesInfiniteApi(req, res, query) {
+  var rows = EMPLOYEES.slice();
+
+  var quick = query.get('quickFilter');
+  if (quick) {
+    var needle = quick.toLowerCase();
+    rows = rows.filter(function (r) {
+      return Object.keys(r).some(function (k) {
+        return String(r[k]).toLowerCase().indexOf(needle) !== -1;
+      });
+    });
+  }
+
+  var sort = query.get('sort');
+  if (sort) {
+    try {
+      var model = JSON.parse(sort);
+      rows.sort(function (a, b) {
+        for (var i = 0; i < model.length; i++) {
+          var f = model[i].field;
+          var dir = model[i].dir === 'desc' ? -1 : 1;
+          var av = a[f], bv = b[f];
+          var cmp = typeof av === 'number' && typeof bv === 'number'
+            ? av - bv
+            : String(av).localeCompare(String(bv));
+          if (cmp !== 0) return cmp * dir;
+        }
+        return 0;
+      });
+    } catch (e) { /* 잘못된 sort 파라미터는 무시 */ }
+  }
+
+  var count = rows.length;
+  var page = Number(query.get('page')) || 0;
+  var pageSize = Number(query.get('pageSize')) || 20;
+  var start = page * pageSize;
+  var slice = rows.slice(start, start + pageSize);
+
+  setTimeout(function () {
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    /* total 없음 — 클라이언트는 last 플래그로만 끝을 안다 (Spring Data Page와 같은 이름) */
+    res.end(JSON.stringify({ rows: slice, last: start + slice.length >= count, page: page }));
+  }, 260);
+}
+
 http.createServer(function (req, res) {
   var urlPath = decodeURIComponent(req.url.split('?')[0]);
   if (urlPath === '/api/employees' || urlPath === '/api/employees-v2' ||
-      urlPath === '/api/employees-v3') {
+      urlPath === '/api/employees-v3' || urlPath === '/api/employees-infinite') {
     var query = new URL(req.url, 'http://localhost').searchParams;
     if (urlPath === '/api/employees-v3') handleEmployeesV3Api(req, res, query);
     else if (urlPath === '/api/employees-v2') handleEmployeesV2Api(req, res, query);
+    else if (urlPath === '/api/employees-infinite') handleEmployeesInfiniteApi(req, res, query);
     else handleEmployeesApi(req, res, query);
     return;
   }

@@ -107,6 +107,12 @@
     noRowsToShow: 'No rows to show',
     loading: 'Loading…',
 
+    /* 무한 스크롤 하단 상태 바 (infiniteScroll) */
+    loadingMore: 'Loading more…',
+    rowsLoaded: '{loaded} rows loaded',
+    rowsLoadedOfTotal: '{loaded} of {total} rows loaded',
+    noMoreRows: 'All {loaded} rows loaded',
+
     /* 그룹 헤더 · 전체 요약 행 */
     groupTotal: 'Total',
     rowCount: '({count})',
@@ -170,6 +176,11 @@
 
     noRowsToShow: '표시할 데이터가 없습니다',
     loading: '불러오는 중…',
+
+    loadingMore: '더 불러오는 중…',
+    rowsLoaded: '{loaded}건 불러옴',
+    rowsLoadedOfTotal: '{total}건 중 {loaded}건 불러옴',
+    noMoreRows: '{loaded}건 — 마지막 페이지입니다',
 
     groupTotal: '합계',
     rowCount: '({count}건)',
@@ -449,7 +460,12 @@
   function resolveDataModes(options) {
     const opts = options || {};
     const norm = value => (value === 'server' ? 'server' : 'client');
-    const pageMode = norm(opts.pageMode);
+    /* 무한 스크롤은 "바닥에서 다음 페이지를 서버에 요청"이므로 서버 페이징이 전제다.
+     * pageMode를 적지 않았으면 server로 올린다(그러면 sort/filter도 따라 올라간다). */
+    const infinite = !!opts.infiniteScroll;
+    const pageMode = infinite && (opts.pageMode === undefined || opts.pageMode === null)
+      ? 'server'
+      : norm(opts.pageMode);
     const warnings = [];
     const inherit = key => {
       const raw = opts[key];
@@ -475,6 +491,110 @@
    */
   function shouldResetPageOnReload(opts) {
     return !(opts && opts.keepPage);
+  }
+
+  const INFINITE_DEFAULT_THRESHOLD = 200;
+
+  /**
+   * infiniteScroll 옵션 정규화 — true | { threshold, pageSize }.
+   *
+   * 무한 스크롤은 "바닥에 닿으면 다음 페이지를 자동 조회해 누적"이므로 원격
+   * dataSource가 없으면 자동 조회할 대상 자체가 없다(클라이언트는 이미 전량을
+   * 들고 있다) — 조용히 무시하지 않고 warnings로 알린 뒤 비활성.
+   *
+   * pageMode: 'client'를 명시하면 요청에 page/pageSize가 실리지 않아 매번 같은
+   * 페이지를 받아 누적하게 된다. 이 역시 warnings로 알린다(막지는 않는다 —
+   * request 훅으로 직접 페이징 파라미터를 만드는 구성이 가능하므로).
+   *
+   * 순수 함수 — 경고 출력은 호출자가 한다.
+   */
+  function resolveInfiniteScroll(options) {
+    const opts = options || {};
+    const raw = opts.infiniteScroll;
+    const warnings = [];
+    if (!raw) return { enabled: false, threshold: INFINITE_DEFAULT_THRESHOLD, pageSize: null, warnings };
+    const cfg = typeof raw === 'object' ? raw : {};
+    let enabled = true;
+    if (!opts.dataSource) { enabled = false; warnings.push('noDataSource'); }
+    if (enabled && opts.pageMode === 'client') warnings.push('clientPageMode');
+    /* autoHeight는 바디가 내용만큼 자라 스크롤이 생기지 않는다 = 항상 바닥이다.
+     * 막지는 않되(작은 데이터셋에서는 의도일 수 있다) 끝까지 다 받는다는 걸 알린다. */
+    if (enabled && opts.domLayout === 'autoHeight') warnings.push('autoHeight');
+    const threshold = typeof cfg.threshold === 'number' && cfg.threshold >= 0
+      ? cfg.threshold
+      : INFINITE_DEFAULT_THRESHOLD;
+    const pageSize = typeof cfg.pageSize === 'number' && cfg.pageSize > 0 ? Math.floor(cfg.pageSize) : null;
+    return { enabled, threshold, pageSize, warnings };
+  }
+
+  /**
+   * 지금 다음 페이지를 불러와야 하는가.
+   *
+   * scrollHeight <= clientHeight(스크롤이 아예 생기지 않은 경우)도 "바닥"으로
+   * 판정된다 — 첫 페이지가 뷰포트를 못 채우면 scroll 이벤트가 영영 오지 않아
+   * "더 있는데 멈춘 그리드"가 되기 때문. append 직후 이 함수를 다시 돌리면
+   * 뷰포트가 찰 때까지 이어 받는다.
+   */
+  function shouldLoadMore(state) {
+    const s = state || {};
+    if (!s.enabled || !s.hasMore || s.loading) return false;
+    /* 레이아웃이 아직 없거나(숨겨진 탭·display:none) 높이가 0이면 "바닥"을 판정할 수 없다.
+     * 이 가드가 없으면 안 보이는 그리드가 스스로 끝까지 다 받아버린다. */
+    if (!s.clientHeight) return false;
+    const threshold = typeof s.threshold === 'number' ? s.threshold : INFINITE_DEFAULT_THRESHOLD;
+    const remaining = (s.scrollHeight || 0) - (s.scrollTop || 0) - (s.clientHeight || 0);
+    return remaining <= threshold;
+  }
+
+  /**
+   * 응답에서 "마지막 페이지" 플래그를 읽는다 — true(마지막) | false(더 있음) | null(모름).
+   *
+   * 서버마다 이름이 갈린다: Spring Data Page는 `last`/`hasNext`, 커스텀 API는
+   * `hasMore`/`lastPage`/`isLast`가 흔하다. hasMore/hasNext는 의미가 반대이므로 뒤집는다.
+   * 불리언이 아닌 값은 모름으로 둔다(문자열 'false'가 true로 읽히지 않게).
+   */
+  function readLastPageFlag(obj) {
+    if (!obj || typeof obj !== 'object') return null;
+    if (typeof obj.last === 'boolean') return obj.last;
+    if (typeof obj.lastPage === 'boolean') return obj.lastPage;
+    if (typeof obj.isLast === 'boolean') return obj.isLast;
+    if (typeof obj.hasMore === 'boolean') return !obj.hasMore;
+    if (typeof obj.hasNext === 'boolean') return !obj.hasNext;
+    return null;
+  }
+
+  /**
+   * 마지막 페이지인지 확정한다. 우선순위:
+   *   1. 서버 명시 플래그 — 있으면 무조건 그것(다른 신호로 덮지 않는다)
+   *   2. 수신 0건 — 무한 루프 안전장치. 플래그도 total도 없는 서버에서 이게
+   *      없으면 바닥에 닿을 때마다 영원히 빈 응답을 요청한다
+   *   3. total을 서버가 실제로 준 경우 loaded >= total
+   *   4. 받은 건수가 요청한 pageSize보다 적으면 마지막 (관례적 추론)
+   * 어느 것도 성립하지 않으면 "더 있음".
+   */
+  function resolveLastPage(ctx) {
+    const c = ctx || {};
+    if (typeof c.explicit === 'boolean') return c.explicit;
+    const received = c.receivedCount || 0;
+    if (received === 0) return true;
+    if (typeof c.total === 'number' && c.total >= 0 && (c.loaded || 0) >= c.total) return true;
+    if (typeof c.pageSize === 'number' && c.pageSize > 0 && received < c.pageSize) return true;
+    return false;
+  }
+
+  /**
+   * 하단 상태 바에 무엇을 쓸지 — { kind, key, params }.
+   * kind: 'loading' | 'end' | 'more'. key는 로케일 키, params는 {token} 치환값.
+   * DOM 없이 결정되도록 분리(테스트 가능).
+   */
+  function resolveInfiniteStatus(state) {
+    const s = state || {};
+    const loaded = s.loaded || 0;
+    const hasTotal = typeof s.total === 'number' && s.total >= 0;
+    if (s.loading) return { kind: 'loading', key: 'loadingMore', params: {} };
+    if (!s.hasMore) return { kind: 'end', key: 'noMoreRows', params: { loaded, total: hasTotal ? s.total : loaded } };
+    if (hasTotal) return { kind: 'more', key: 'rowsLoadedOfTotal', params: { loaded, total: s.total } };
+    return { kind: 'more', key: 'rowsLoaded', params: { loaded } };
   }
 
   /**
@@ -1245,12 +1365,24 @@
   /**
    * 원격 응답 해석 기본값: 배열이면 그대로, 아니면 { rows, total }를 기대한다.
    * 항상 { rows: [], total: n } 형태로 정규화한다.
+   *
+   * hasTotal은 "총건수를 서버가 실제로 준 것인지"다. total이 없으면 rows.length로
+   * 채우는데 그 값을 기지의 총건수로 믿으면 무한 스크롤이 첫 페이지에서 곧바로
+   * loaded >= total이 되어 항상 마지막 페이지가 된다 — 채운 값과 받은 값을 구분한다.
+   * last는 마지막 페이지 플래그(없으면 null).
    */
   function parseDataSourceResponse(json) {
-    if (Array.isArray(json)) return { rows: json, total: json.length };
+    if (Array.isArray(json)) {
+      return { rows: json, total: json.length, hasTotal: false, last: null };
+    }
     const rows = json && Array.isArray(json.rows) ? json.rows : [];
-    const total = json && typeof json.total === 'number' ? json.total : rows.length;
-    return { rows, total };
+    const hasTotal = !!(json && typeof json.total === 'number');
+    return {
+      rows,
+      total: hasTotal ? json.total : rows.length,
+      hasTotal,
+      last: readLastPageFlag(json),
+    };
   }
 
   /**
@@ -2333,6 +2465,35 @@
       this._pageSizeOptions = options.paginationPageSizeOptions || [10, 20, 50, 100];
       this._currentPage = 0;
 
+      /* 무한 스크롤 — 페이저 UI와 배타지만 요청 조립에는 페이징이 필요하다 */
+      const infinite = resolveInfiniteScroll(options);
+      infinite.warnings.forEach(key => {
+        if (key === 'noDataSource') {
+          console.warn(
+            '[DataGrid] infiniteScroll은 dataSource가 필요합니다 — 자동 조회할 대상이 없어 무시합니다.'
+          );
+        } else if (key === 'clientPageMode') {
+          console.warn(
+            "[DataGrid] infiniteScroll인데 pageMode: 'client'입니다 — 요청에 page/pageSize가 실리지 않아 " +
+              '같은 페이지를 반복해 누적할 수 있습니다. dataSource.request로 직접 페이징 파라미터를 만드는 경우가 아니라면 pageMode를 생략하세요.'
+          );
+        } else if (key === 'autoHeight') {
+          console.warn(
+            "[DataGrid] infiniteScroll인데 domLayout: 'autoHeight'입니다 — 바디가 내용만큼 자라 스크롤이 " +
+              '생기지 않으므로 마지막 페이지까지 연달아 불러옵니다.'
+          );
+        }
+      });
+      this._infinite = infinite.enabled;
+      this._infiniteThreshold = infinite.threshold;
+      if (this._infinite) {
+        if (infinite.pageSize) this._pageSize = infinite.pageSize;
+        this._pagination = true; /* 요청에 page/pageSize를 싣기 위함 — 페이저 UI는 그리지 않는다 */
+      }
+      this._hasMore = true; /* 아직 더 받을 게 있는가 */
+      this._loadingMore = false; /* 추가 로드 진행 중 (전면 오버레이 없이) */
+      this._infiniteStatusEl = null;
+
       /* tree data — pagination/groupBy와 배타 (ParamQuery도 페이징 비호환 명시) */
       this._treeData = options.treeData || null;
       this._treeExpanded = {}; /* rowId -> bool */
@@ -2346,6 +2507,10 @@
       this._treeLoading = {}; /* rowId -> true (fetchChildren 진행 중) */
       this._treeLoaded = {}; /* rowId -> true (fetchChildren 완료 — 리프 확정 포함) */
       if (this._treeData) {
+        if (this._infinite) {
+          console.error('[DataGrid] treeData는 infiniteScroll과 함께 쓸 수 없습니다 — infiniteScroll을 끕니다.');
+          this._infinite = false;
+        }
         if (this._pagination) {
           console.error('[DataGrid] treeData는 pagination과 함께 쓸 수 없습니다 — pagination을 끕니다.');
           this._pagination = false;
@@ -2388,6 +2553,7 @@
         );
       });
       this._serverTotal = 0;
+      this._serverTotalKnown = false; /* 총건수를 서버가 실제로 준 것인지 (무한 스크롤 종료 판정용) */
       this._loadSeq = 0;
 
       this._pasteCount = 0; /* paste 이벤트/클립보드 API 폴백의 이중 실행 방지용 */
@@ -2504,7 +2670,12 @@
       this._overlayEl = el('div', 'dg-overlay', root);
       this._overlayEl.hidden = true;
 
-      if (this._pagination) {
+      /* 무한 스크롤은 페이저 대신 하단 상태 바를 쓴다 (둘은 배타) */
+      if (this._infinite) {
+        this._infiniteStatusEl = el('div', 'dg-infinite-status', root);
+        this._infiniteStatusEl.setAttribute('role', 'status');
+        this._infiniteStatusEl.setAttribute('aria-live', 'polite');
+      } else if (this._pagination) {
         this._pagingEl = el('div', 'dg-paging-panel', root);
       }
 
@@ -2561,6 +2732,7 @@
         } else {
           this._renderVisibleRows();
         }
+        this._maybeLoadMore(); /* 바닥 근처면 다음 페이지 (infiniteScroll일 때만) */
       });
 
       this._canvasEl.addEventListener('click', e => { this._onCellClick(e); });
@@ -2709,7 +2881,9 @@
       }
       this._displayRows = display;
 
-      if (this._pagination) {
+      /* 무한 스크롤은 페이지 개념을 화면에서 지운다 — 쌓인 전체가 곧 한 화면이다.
+       * _pagination은 요청 조립용으로만 켜져 있으므로 여기서는 페이징하지 않는다. */
+      if (this._pagination && !this._infinite) {
         if (this._pageMode === 'server') {
           /* 서버 페이징: 현재 rows가 곧 한 페이지. 총계는 서버 응답 기준 */
           const total = this._serverTotal;
@@ -2952,6 +3126,7 @@
       this._renderPinnedTop();
       this._renderGrandTotal();
       this._renderPaging();
+      this._renderInfiniteStatus();
       this._updateOverlay();
       this._emitter.emit('viewRendered', {
         displayedRowCount: this._viewRows.length,
@@ -6687,6 +6862,12 @@
 
     setPage(page) {
       if (!this._pagination) return;
+      if (this._infinite) {
+        /* 무한 스크롤에는 "지금 몇 페이지"가 없다 — 쌓인 전체가 한 화면이다.
+         * 임의 페이지로 뛰면 누적이 통째로 버려지므로 조용히 하지 않고 알린다. */
+        console.warn('[DataGrid] infiniteScroll에서는 setPage()를 쓸 수 없습니다 — 처음부터 다시 받으려면 reloadData()를 쓰세요.');
+        return;
+      }
       this._currentPage = page;
       this._focusedCell = null;
       this.refresh();
@@ -6703,6 +6884,64 @@
       this.refresh();
       this._emitter.emit('paginationChanged', { page: this._currentPage, pageSize: this._pageSize });
       if (this._pageMode === 'server') this._fetchData(); /* 위에서 계산한 페이지를 유지 */
+    }
+
+    /* ---- infinite scroll ---- */
+
+    /**
+     * 하단 상태 바 갱신 — "불러오는 중 / N건 불러옴 / 마지막 페이지".
+     * 높이는 상태와 무관하게 고정이라 로드가 끝나도 그리드가 흔들리지 않는다.
+     */
+    _renderInfiniteStatus() {
+      const box = this._infiniteStatusEl;
+      if (!box) return;
+      const status = resolveInfiniteStatus({
+        loading: this._loading || this._loadingMore,
+        hasMore: this._hasMore,
+        loaded: this._rows.length,
+        total: this._serverTotalKnown ? this._serverTotal : null,
+      });
+      box.className = `dg-infinite-status dg-infinite-${status.kind}`;
+      box.innerHTML =
+        (status.kind === 'loading' ? '<span class="dg-spinner"></span>' : '') +
+        `<span>${escapeHtml(this._t(status.key, status.params))}</span>`;
+    }
+
+    /**
+     * 바닥 근처면 다음 페이지를 자동 조회한다. 호출자는 스크롤 핸들러와
+     * 응답 처리 끝(첫 페이지가 뷰포트를 못 채운 경우 이어 받기).
+     * 요청을 시작했으면 true.
+     */
+    _maybeLoadMore() {
+      if (!this._infinite || this._destroyed) return false;
+      const body = this._bodyEl;
+      const go = shouldLoadMore({
+        enabled: true,
+        hasMore: this._hasMore,
+        loading: this._loading || this._loadingMore,
+        threshold: this._infiniteThreshold,
+        scrollTop: body.scrollTop,
+        clientHeight: body.clientHeight,
+        scrollHeight: body.scrollHeight,
+      });
+      if (!go) return false;
+      this._fetchData({ append: true });
+      return true;
+    }
+
+    /**
+     * 다음 페이지를 수동으로 불러온다 (스크롤 없이 "더 보기" 버튼 등).
+     * 요청을 시작했으면 true — 이미 마지막이거나 로드 중이면 false.
+     */
+    loadMore() {
+      if (!this._infinite || !this._hasMore || this._loading || this._loadingMore) return false;
+      this._fetchData({ append: true });
+      return true;
+    }
+
+    /** 아직 더 받을 페이지가 있는가 (무한 스크롤이 아니면 항상 false). */
+    hasMoreRows() {
+      return !!(this._infinite && this._hasMore);
     }
 
     /* ---- overlays ---- */
@@ -6755,9 +6994,18 @@
      * 현재 상태(페이지·정렬·필터)가 요청 파라미터로 전달되고, 응답이 도착하면
      * 행을 교체하고 refresh한다. 경합은 마지막 요청만 반영한다.
      */
-    _fetchData() {
+    _fetchData(fetchOpts) {
       const ds = this.options.dataSource;
       if (!ds || !ds.url || typeof fetch === 'undefined') return;
+      /* append = 무한 스크롤의 다음 페이지 이어받기. append가 아니면 "처음부터 다시"이므로
+       * 무한 스크롤 상태(페이지·더 있음)를 요청 조립 전에 되돌린다 — 정렬/필터가 바뀌면
+       * 서버가 전체를 다시 정렬/필터하므로 쌓아둔 것을 들고 있을 수 없다. */
+      const append = !!(fetchOpts && fetchOpts.append) && this._infinite;
+      const prevPage = this._currentPage;
+      if (this._infinite) {
+        if (append) this._currentPage += 1;
+        else { this._currentPage = 0; this._hasMore = true; }
+      }
       const req = buildDataSourceRequest(ds, {
         pagination: this._pagination,
         page: this._currentPage,
@@ -6781,7 +7029,10 @@
         for (const hk in req.headers) { headers[hk] = req.headers[hk]; hasHeaders = true; }
       }
       if (hasHeaders) opts.headers = headers;
-      this.showLoadingOverlay();
+      /* 추가 로드는 전면 오버레이를 띄우지 않는다 — 보고 있던 행이 매번 가려지면
+       * 무한 스크롤이 아니라 페이지 이동처럼 느껴진다. 하단 상태 바가 대신 알린다. */
+      if (append) { this._loadingMore = true; this._renderInfiniteStatus(); }
+      else this.showLoadingOverlay();
       const seq = ++this._loadSeq;
       fetch(req.url, opts)
         .then(r => {
@@ -6800,22 +7051,81 @@
           } else {
             parsed = parseDataSourceResponse(json);
           }
+          const newRows = (parsed.rows || []).slice();
           this._serverTotal = parsed.total;
-          this._rows = (parsed.rows || []).slice();
-          this._selection = {};
-          this._focusedCell = null;
-          this._lastClickedViewIndex = -1;
-          this._resetTracking();
-          this._undoStack = [];
-          this._redoStack = [];
-          this.hideLoadingOverlay();
+          /* "서버가 준 총건수"와 "없어서 rows.length로 채운 값"을 구분한다 —
+           * 후자를 기지의 총계로 믿으면 무한 스크롤이 첫 페이지에서 끝나버린다.
+           * 소비자 parse는 hasTotal을 모르므로 total이 숫자인지로 판단한다. */
+          this._serverTotalKnown = parsed.hasTotal !== undefined
+            ? !!parsed.hasTotal
+            : typeof parsed.total === 'number';
+          if (append) {
+            this._rows = this._rows.concat(newRows); /* 누적 — 선택·추적·히스토리는 유지 */
+          } else {
+            this._rows = newRows;
+            this._selection = {};
+            this._focusedCell = null;
+            this._lastClickedViewIndex = -1;
+            this._resetTracking();
+            this._undoStack = [];
+            this._redoStack = [];
+          }
+
+          let reachedLast = false;
+          if (this._infinite) {
+            /* 플래그는 parse 반환값 → 원본 응답 순으로 찾는다. parse가 { rows, total }만
+             * 만들어도 원본 json의 last/hasMore를 살릴 수 있게. */
+            let explicit = readLastPageFlag(parsed);
+            if (explicit === null) explicit = readLastPageFlag(json);
+            const last = resolveLastPage({
+              explicit,
+              receivedCount: newRows.length,
+              pageSize: this._pageSize,
+              loaded: this._rows.length,
+              total: this._serverTotalKnown ? this._serverTotal : null,
+            });
+            reachedLast = this._hasMore && last;
+            this._hasMore = !last;
+          }
+
+          if (append) {
+            this._loadingMore = false;
+          } else {
+            this.hideLoadingOverlay();
+            /* 무한 스크롤의 비-append 조회는 "처음부터 다시"다 — 쌓인 걸 버렸는데
+             * 스크롤 위치만 남으면 새 목록의 한복판에서 시작하게 된다.
+             * (refresh 전에 옮겨야 렌더 창이 새 위치로 계산된다) */
+            if (this._infinite) this._bodyEl.scrollTop = 0;
+          }
           this.refresh(); /* 페이지는 유지 — 서버 페이징 이동 후 리셋되면 안 된다 */
           this._emitDataChanged();
+          if (this._infinite) {
+            if (append) {
+              this._emitter.emit('rowsAppended', {
+                rows: newRows,
+                page: this._currentPage,
+                loaded: this._rows.length,
+                hasMore: this._hasMore,
+              });
+            }
+            /* 마지막 도달은 전이에서 한 번만 */
+            if (reachedLast) {
+              this._emitter.emit('lastPageReached', {
+                loaded: this._rows.length,
+                total: this._serverTotalKnown ? this._serverTotal : null,
+              });
+            }
+            /* 첫 페이지가 뷰포트를 못 채웠으면 이어 받는다 (스크롤이 안 생겨
+             * scroll 이벤트가 영영 오지 않는 경우) */
+            this._maybeLoadMore();
+          }
         })
         .catch(err => {
           if (this._destroyed || seq !== this._loadSeq) return;
           console.error('[DataGrid] dataSource load failed:', err);
-          this.hideLoadingOverlay();
+          /* 실패한 페이지는 되돌린다 — 그대로 두면 다음 시도가 그 페이지를 건너뛴다 */
+          if (append) { this._currentPage = prevPage; this._loadingMore = false; this._renderInfiniteStatus(); }
+          else this.hideLoadingOverlay();
           this._emitter.emit('dataLoadError', { error: err });
         });
     }
@@ -7460,7 +7770,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.21.0';
+  DataGrid.version = '2.22.0';
 
   /**
    * 내장 로케일. `localeText: DataGrid.locales.ko`처럼 통째로 쓰거나,
@@ -7493,6 +7803,11 @@
     resolveDomLayout,
     resolveDataModes,
     shouldResetPageOnReload,
+    resolveInfiniteScroll,
+    shouldLoadMore,
+    readLastPageFlag,
+    resolveLastPage,
+    resolveInfiniteStatus,
     formatNumber,
     formatDate,
     formatValue,

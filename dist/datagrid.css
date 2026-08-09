@@ -1105,6 +1105,34 @@
 }
 
 /* ==========================================================================
+   Infinite scroll status bar (infiniteScroll)
+   ========================================================================== */
+
+/* 높이는 상태와 무관하게 고정 — 로딩이 끝나거나 마지막에 닿아도 그리드가 흔들리지 않는다 */
+.dg-infinite-status {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 var(--dg-cell-horizontal-padding);
+  border-top: 1px solid var(--dg-border-color);
+  background: var(--dg-background-color);
+  color: var(--dg-secondary-foreground-color);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.dg-infinite-status .dg-spinner { width: 13px; height: 13px; border-width: 2px; }
+/* 마지막 페이지 — 평상시 상태와 확실히 구분되도록 강조한다 */
+.dg-infinite-status.dg-infinite-end {
+  color: var(--dg-foreground-color);
+  font-weight: 600;
+  background: var(--dg-header-background-color);
+}
+
+/* ==========================================================================
    Overlays
    ========================================================================== */
 

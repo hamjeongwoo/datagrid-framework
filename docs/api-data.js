@@ -22,8 +22,8 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.21.0',
-  updated: '2026-08-02',
+  version: '2.22.0',
+  updated: '2026-08-09',
 
   sections: [
 
@@ -444,6 +444,51 @@ window.ApiDocs = {
             "sortMode: 'server', pageMode: 'server', pagination: true",
         },
         {
+          name: 'infiniteScroll',
+          demo: 'infinite-scroll',
+          type: 'boolean | { threshold?: number, pageSize?: number }',
+          default: 'false',
+          since: '2.22.0',
+          description:
+            '무한 스크롤. 바닥에서 <code>threshold</code>(기본 200px) 안으로 들어오면 다음 페이지를 ' +
+            '자동으로 조회해 <strong>기존 행 뒤에 이어 붙입니다</strong>(교체가 아닙니다). ' +
+            '<code>pageSize</code>는 한 번에 받을 행 수(생략 시 <code>paginationPageSize</code>).<br><br>' +
+            '<strong><code>dataSource</code>가 필요합니다</strong> — 없으면 <code>console.warn</code> 후 ' +
+            '무시됩니다(클라이언트가 이미 전량을 들고 있으면 자동 조회할 대상이 없습니다). ' +
+            '켜면 <code>pageMode</code>가 <code>\'server\'</code>로 올라가고 ' +
+            '<code>sortMode</code>/<code>filterMode</code>도 따라옵니다(명시하면 그 값이 우선).<br><br>' +
+            '<strong>페이저 UI와 배타입니다</strong> — 대신 하단 상태 바가 ' +
+            '"불러오는 중 / N건 불러옴 / 마지막 페이지"를 표시합니다(높이 고정이라 상태가 바뀌어도 ' +
+            '그리드가 흔들리지 않습니다). <code>setPage()</code>는 무한 스크롤에서 동작하지 않고, ' +
+            '<code>treeData</code>와도 함께 쓸 수 없습니다.<br><br>' +
+            '<strong>마지막 페이지 판정</strong>은 다음 순서입니다. ' +
+            '① 서버가 준 플래그 — 응답(또는 <code>parse</code> 반환값)의 <code>last</code> · ' +
+            '<code>lastPage</code> · <code>isLast</code>가 <code>true</code>이거나 ' +
+            '<code>hasMore</code> · <code>hasNext</code>가 <code>false</code>면 마지막입니다 ' +
+            '(Spring Data <code>Page</code>의 <code>last</code>가 그대로 동작합니다). ' +
+            '② 수신 0건. ③ 응답에 <code>total</code>이 있고 누적이 그에 도달. ' +
+            '④ 받은 건수가 요청한 <code>pageSize</code>보다 적을 때. ' +
+            '플래그를 주면 <strong>끝을 확인하려고 빈 페이지를 한 번 더 요청하지 않습니다.</strong><br><br>' +
+            '정렬·필터가 바뀌거나 <code>reloadData()</code>를 호출하면 누적을 버리고 0페이지부터 ' +
+            '다시 쌓습니다(스크롤도 맨 위로). 추가 로드 중에는 전면 로딩 오버레이를 띄우지 않습니다 — ' +
+            '보고 있던 행이 매번 가려지면 페이지 이동처럼 느껴지기 때문입니다.<br><br>' +
+            '<strong>주의:</strong> <code>domLayout: \'autoHeight\'</code>는 바디가 내용만큼 자라 ' +
+            '스크롤이 생기지 않으므로 마지막 페이지까지 연달아 불러옵니다(경고 표시). ' +
+            '그리드가 화면에 없거나 높이가 0이면 바닥을 판정할 수 없어 자동 조회하지 않습니다.',
+          example:
+            "var grid = new DataGrid(el, {\n" +
+            "  dataSource: { url: '/api/employees' },   // { rows, last } 또는 { rows, total }\n" +
+            '  infiniteScroll: { threshold: 200, pageSize: 25 },\n' +
+            '});\n' +
+            '\n' +
+            "grid.on('rowsAppended', function (e) {\n" +
+            "  console.log(e.rows.length + '행 추가, 누적 ' + e.loaded);\n" +
+            '});\n' +
+            "grid.on('lastPageReached', function (e) {\n" +
+            "  console.log('끝 — 총 ' + e.loaded + '행');\n" +
+            '});',
+        },
+        {
           name: 'sortMode',
           demo: 'remote-data',
           type: "'client' | 'server'",
@@ -807,6 +852,10 @@ window.ApiDocs = {
           ['lastPage', 'Last page', '마지막 페이지', '» 버튼 aria-label'],
           ['noRowsToShow', 'No rows to show', '표시할 데이터가 없습니다', '빈 데이터 오버레이'],
           ['loading', 'Loading…', '불러오는 중…', '로딩 오버레이 · 검색형 select 로딩'],
+          ['loadingMore', 'Loading more…', '더 불러오는 중…', 'infiniteScroll 상태 바 — 추가 로드 중'],
+          ['rowsLoaded', '{loaded} rows loaded', '{loaded}건 불러옴', 'infiniteScroll 상태 바 — total을 모를 때'],
+          ['rowsLoadedOfTotal', '{loaded} of {total} rows loaded', '{total}건 중 {loaded}건 불러옴', 'infiniteScroll 상태 바 — total을 알 때'],
+          ['noMoreRows', 'All {loaded} rows loaded', '{loaded}건 — 마지막 페이지입니다', 'infiniteScroll 상태 바 — 마지막 페이지'],
           ['groupTotal', 'Total', '합계', 'grandTotal 요약 행 라벨'],
           ['rowCount', '({count})', '({count}건)', '그룹 헤더 · 전체 요약 행의 건수'],
           ['searchPlaceholder', 'Search…', '검색…', 'editorSearch 검색 입력 (컬럼 placeholder가 우선)'],
@@ -1149,6 +1198,39 @@ window.ApiDocs = {
             '    grid.reloadData();\n' +
             '  });\n' +
             '});',
+        },
+        {
+          name: 'Step 8. 페이저 대신 무한 스크롤 — infiniteScroll',
+          demo: 'infinite-scroll',
+          since: '2.22.0',
+          description:
+            '<code>pagination</code> 대신 <code>infiniteScroll</code>을 켜면 바닥에 닿을 때마다 다음 페이지를 ' +
+            '자동으로 받아 <strong>이어 붙입니다</strong>. 요청 파라미터는 서버 페이징과 똑같이 ' +
+            '<code>page</code>/<code>pageSize</code>이므로 <strong>서버는 그대로 두고</strong> 옵션만 바꾸면 됩니다.<br><br>' +
+            '<strong>서버가 할 일은 하나</strong> — 마지막 페이지임을 알려주는 것입니다. ' +
+            '<code>last</code>(Spring Data <code>Page</code> 그대로) · <code>lastPage</code> · ' +
+            '<code>isLast</code> · <code>hasMore</code> · <code>hasNext</code> 중 아무 이름이나 좋습니다. ' +
+            '이걸 주면 하단 상태 바가 곧바로 "마지막 페이지"로 바뀌고, <strong>끝을 확인하려고 빈 페이지를 ' +
+            '한 번 더 요청하지 않습니다.</strong> 플래그가 없으면 <code>total</code>로, 그것도 없으면 ' +
+            '"받은 건수 &lt; pageSize"로 추론합니다.<br><br>' +
+            '<code>parse</code>를 쓰는 경우, 플래그를 <strong>반환 객체에 실어도 되고 안 실어도 됩니다</strong> — ' +
+            '반환값에서 못 찾으면 <strong>원본 응답의 최상위</strong>에서 다시 찾습니다. ' +
+            '다만 플래그가 envelope 안쪽(<code>json.result.last</code>)에 있으면 최상위가 아니므로 ' +
+            '<code>parse</code>가 꺼내 올려줘야 합니다.',
+          example:
+            '// 서버 응답: { "rows": [...], "last": false }\n' +
+            'var grid = new DataGrid(el, {\n' +
+            "  dataSource: { url: '/api/employees' },\n" +
+            '  infiniteScroll: { pageSize: 50 },   // pagination·pageMode 지정 불필요\n' +
+            '});\n' +
+            '\n' +
+            '// envelope 응답 — 플래그가 안쪽에 있으면 parse가 꺼내 올린다\n' +
+            'dataSource: {\n' +
+            "  url: '/api/employees',\n" +
+            '  parse: function (json) {\n' +
+            '    return { rows: json.result.items, last: json.result.last };\n' +
+            '  },\n' +
+            '}',
         },
       ],
     },
@@ -1874,6 +1956,33 @@ window.ApiDocs = {
             'URL·훅 구성이 통째로 바뀔 때 사용하고, 조회 조건 값만 바뀌면 <code>params</code> 함수 + ' +
             '<code>reloadData()</code>가 더 가볍습니다(<a href="#remote-data-guide">가이드</a> 참고).',
           example: "grid.setDataSource({ url: '/api/archived-employees' });",
+        },
+        {
+          name: 'loadMore',
+          demo: 'infinite-scroll',
+          group: 'Data',
+          signature: 'loadMore(): boolean',
+          since: '2.22.0',
+          description:
+            '<code>infiniteScroll</code>에서 다음 페이지를 <strong>수동으로</strong> 불러옵니다 — ' +
+            '스크롤이 생기지 않는 레이아웃이나 "더 보기" 버튼용입니다. ' +
+            '요청을 시작했으면 <code>true</code>, 이미 마지막이거나 로드 중이거나 무한 스크롤이 ' +
+            '아니면 <code>false</code>를 반환합니다.',
+          example:
+            'if (!grid.loadMore()) {\n' +
+            "  console.log(grid.hasMoreRows() ? '로드 중' : '마지막 페이지');\n" +
+            '}',
+        },
+        {
+          name: 'hasMoreRows',
+          demo: 'infinite-scroll',
+          group: 'Data',
+          signature: 'hasMoreRows(): boolean',
+          since: '2.22.0',
+          description:
+            '아직 받을 페이지가 남아 있는지. <code>infiniteScroll</code>이 아니면 항상 ' +
+            '<code>false</code>입니다.',
+          example: 'moreBtn.disabled = !grid.hasMoreRows();',
         },
         {
           name: 'addRow',
@@ -2859,7 +2968,41 @@ window.ApiDocs = {
           since: '1.2.0',
           description:
             '<code>dataSource</code> 로드가 실패했을 때(네트워크 오류, HTTP 에러 상태). ' +
-            '콘솔에도 기록되며 기존 행은 유지됩니다.',
+            '콘솔에도 기록되며 기존 행은 유지됩니다. <code>infiniteScroll</code>의 추가 로드가 ' +
+            '실패하면 <strong>페이지 번호가 되돌려지므로</strong> 다음 시도가 같은 페이지를 다시 요청합니다 ' +
+            '(건너뛰지 않습니다).',
+        },
+        {
+          name: 'rowsAppended',
+          demo: 'infinite-scroll',
+          payload: '{ rows, page, loaded, hasMore }',
+          since: '2.22.0',
+          description:
+            '<code>infiniteScroll</code>이 다음 페이지를 이어 붙였을 때. <code>rows</code>는 ' +
+            '<strong>이번에 받은 행만</strong>, <code>loaded</code>는 누적 행 수, ' +
+            '<code>page</code>는 방금 받은 페이지 번호(0-based)입니다. ' +
+            '누적을 버리고 다시 쌓는 경우(정렬·필터 변경, <code>reloadData()</code>)에는 ' +
+            '발생하지 않습니다 — 그때는 <code>dataChanged</code>를 쓰세요.',
+          example:
+            "grid.on('rowsAppended', function (e) {\n" +
+            "  status.textContent = e.loaded + '행 로드됨';\n" +
+            '});',
+        },
+        {
+          name: 'lastPageReached',
+          demo: 'infinite-scroll',
+          payload: '{ loaded, total }',
+          since: '2.22.0',
+          description:
+            '더 받을 페이지가 없다고 판정된 순간 <strong>한 번만</strong> 발생합니다(전이 시점). ' +
+            '<code>total</code>은 서버가 <code>total</code>을 준 경우에만 숫자이고, 아니면 ' +
+            '<code>null</code>입니다 — 마지막 페이지 플래그만 주는 서버에서는 <code>loaded</code>가 ' +
+            '유일한 전체 건수입니다. 정렬·필터로 다시 쌓기 시작하면 상태가 초기화되므로 ' +
+            '조건이 바뀔 때마다 다시 발생할 수 있습니다.',
+          example:
+            "grid.on('lastPageReached', function (e) {\n" +
+            "  moreBtn.disabled = true;\n" +
+            '});',
         },
         {
           name: 'gridReady',

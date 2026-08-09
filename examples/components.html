@@ -319,6 +319,26 @@
     </div>
   </div>
 
+  <!-- Infinite scroll status bar -->
+  <h2 class="section">Infinite Scroll Status Bar</h2>
+  <p class="section-desc">
+    <code class="inline">infiniteScroll</code>의 하단 상태 바. 세 상태 모두 <strong>높이가 같아서</strong>
+    로드가 끝나거나 마지막에 닿아도 그리드가 흔들리지 않습니다.
+    마지막 상태만 배경·글자색·굵기로 강조합니다.
+  </p>
+  <div class="dg-root specimen">
+    <div class="dg-infinite-status dg-infinite-more"><span>50 rows loaded</span></div>
+  </div>
+  <div class="dg-root specimen" style="margin-top:12px">
+    <div class="dg-infinite-status dg-infinite-more"><span>50 of 500 rows loaded</span></div>
+  </div>
+  <div class="dg-root specimen" style="margin-top:12px">
+    <div class="dg-infinite-status dg-infinite-loading"><span class="dg-spinner"></span><span>Loading more…</span></div>
+  </div>
+  <div class="dg-root specimen" style="margin-top:12px">
+    <div class="dg-infinite-status dg-infinite-end"><span>All 500 rows loaded</span></div>
+  </div>
+
   <!-- Overlays -->
   <h2 class="section">Overlays</h2>
   <p class="section-desc">로딩 스피너와 빈 상태 패널.</p>

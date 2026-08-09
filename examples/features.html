@@ -3788,6 +3788,91 @@
     </script>
   </div>
 
+  <!-- ======================================================== 무한 스크롤 -->
+  <h2 class="section" id="infinite-scroll">Infinite Scroll (infiniteScroll)</h2>
+  <p class="section-desc">
+    <code class="inline">infiniteScroll: true | { threshold, pageSize }</code>는 바닥 근처에 닿으면
+    다음 페이지를 자동으로 조회해 <strong>기존 행 뒤에 이어 붙입니다</strong>(교체가 아닙니다).
+    <code class="inline">dataSource</code>가 필요하며 페이저 UI와는 배타입니다 —
+    대신 하단 상태 바가 <strong>불러오는 중 / N건 불러옴 / 마지막 페이지</strong>를 알립니다.
+    <strong>끝 판정</strong>은 서버가 준 플래그(<code class="inline">last</code> ·
+    <code class="inline">lastPage</code> · <code class="inline">isLast</code> ·
+    <code class="inline">hasMore</code> · <code class="inline">hasNext</code>)가 최우선이고,
+    없으면 <code class="inline">total</code> → 수신 건수 순으로 추론합니다.
+    이 데모 서버(<code class="inline">/api/employees-infinite</code>)는 <strong>총건수를 주지 않고</strong>
+    <code class="inline">last</code>만 주므로, 마지막 페이지 표시가 순전히 그 플래그에서 나옵니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <input class="tb-input" id="infQuick" type="text" placeholder="서버측 quickFilter… (예: Seoul)">
+        <button class="tb-btn" id="infMoreBtn" type="button">loadMore()</button>
+        <button class="tb-btn" id="infReloadBtn" type="button">reloadData()</button>
+      </div>
+      <div id="gridInfinite" class="grid-wrap-md"></div>
+      <div class="status-line" id="infStatus">아래로 스크롤하면 25행씩 자동으로 이어 받습니다.</div>
+    </div>
+    <script type="text/x-example">
+      var status = document.getElementById('infStatus');
+
+      var grid = new DataGrid(document.getElementById('gridInfinite'), {
+        // 서버는 { rows, last } 만 준다 — total 없음
+        dataSource: { url: '/api/employees-infinite' },
+        // infiniteScroll을 켜면 pageMode가 'server'로 올라가고 sort/filter도 따라온다
+        infiniteScroll: { threshold: 200, pageSize: 25 },
+        localeText: DataGrid.locales.ko,
+        rowNumbers: true,          // 몇 번째 행까지 쌓였는지 눈으로 확인
+        columnDefs: [
+          { field: 'id', headerName: 'ID', width: 70 },
+          { field: 'name', headerName: 'Name', flex: 1 },
+          { field: 'department', headerName: 'Department', width: 150 },
+          { field: 'city', headerName: 'City', width: 130 },
+          { field: 'salary', headerName: 'Salary', dataType: 'number', format: '$#,##0', width: 130 },
+        ],
+      });
+
+      // 누적을 버리고 다시 쌓는 경우(정렬·필터·reloadData)는 rowsAppended가 아니라 dataChanged.
+      // 이어 받기일 때는 바로 아래 rowsAppended가 이 문구를 덮어쓴다.
+      grid.on('dataChanged', function (e) {
+        status.textContent = '처음부터 다시 — ' + e.rowCount + '행 (아래로 스크롤하면 이어 받습니다)';
+      });
+
+      // 한 페이지가 도착할 때마다 (교체가 아니라 누적이므로 rows는 이번에 받은 것만)
+      grid.on('rowsAppended', function (e) {
+        status.textContent = 'page ' + e.page + ' 도착 — 이번에 ' + e.rows.length +
+          '행, 누적 ' + e.loaded + '행' + (e.hasMore ? ' (더 있음)' : '');
+      });
+
+      // 서버가 last: true를 준 순간 한 번만 발생한다
+      grid.on('lastPageReached', function (e) {
+        status.textContent = '마지막 페이지 도달 — 총 ' + e.loaded +
+          '행 (서버가 total을 주지 않으므로 e.total은 ' + e.total + ')';
+      });
+
+      grid.on('dataLoadError', function (e) {
+        status.textContent = '로드 실패: ' + e.error.message;
+      });
+
+      // 스크롤 없이 수동으로 한 페이지 더 (이미 마지막이면 false)
+      document.getElementById('infMoreBtn').addEventListener('click', function () {
+        if (!grid.loadMore()) {
+          status.textContent = grid.hasMoreRows()
+            ? '이미 불러오는 중입니다.'
+            : '더 받을 페이지가 없습니다 (hasMoreRows() === false).';
+        }
+      });
+
+      // 조회 조건이 바뀌면 누적을 버리고 처음부터 다시 쌓는다
+      document.getElementById('infQuick').addEventListener('input', function (e) {
+        grid.setQuickFilter(e.target.value);
+      });
+      document.getElementById('infReloadBtn').addEventListener('click', function () {
+        grid.reloadData();
+        status.textContent = '처음부터 다시 — 누적을 버리고 0페이지부터 쌓습니다.';
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

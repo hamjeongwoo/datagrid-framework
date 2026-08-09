@@ -59,6 +59,7 @@
 | [x] | `detailModel` + `rowExpand/rowCollapse` (마스터-디테일 행) | `rowDetail: { renderer, height }` + `expandRow()/collapseRow()/toggleRowDetail()/isRowExpanded()` + `rowExpanded`/`rowCollapsed` — 가변 높이 가상화(computeRowTops) — v1.2.0 | **P2** |
 | [x] | `column > formula` (계산 컬럼) | `valueGetter(row)` — 파생 값을 row[field]에 기록(정렬·필터·내보내기 공유) — v1.2.0 | **P2** |
 | [x] | `mergeCells` | `mergeCells: ['field'...]` — 표시 순서 기준 연속 동일 값 세로 병합 (그룹/디테일에서 단절) — v2.0.0 | P3 |
+| [x] | (없음 — 자체 개선. ParamQuery는 원격 페이징만 있고 무한 스크롤은 없음) | **`infiniteScroll: true \| { threshold, pageSize }`** — 바닥 근처에서 다음 페이지를 자동 조회해 **누적**(교체 아님). 서버가 마지막 페이지 플래그(`last`/`hasMore`/`hasNext`)를 주면 그것으로, 없으면 total·수신 건수로 종료 판정. 하단 상태 바로 "불러오는 중 / 마지막 페이지" 표시 + `loadMore()`/`hasMoreRows()` + `rowsAppended`/`lastPageReached` — v2.22.0 | **P2** (사용자 요청) |
 
 ### 2.2 편집 · 검증 · 변경 추적
 
@@ -178,6 +179,52 @@
 
 ### v2.1 — "TreeGrid" (§6 T1~T4)
 - treeData 코어(계층 표시·펼침/접힘·계층 정렬/필터), 체크박스 캐스케이드, 부모 요약, 지연 로딩
+
+### v2.22 — 무한 스크롤 infiniteScroll (사용자 요청)
+
+요청: "바닥에 닿으면 자동 조회 + 서버가 마지막 페이지 구분값을 주면 UX적으로 알 수 있게".
+
+**설계 결정**
+
+- `infiniteScroll: true | { threshold: 200, pageSize }` — `dataSource` 전용. `dataSource`가 없으면 `console.warn` 후 비활성(클라이언트 전량 데이터에는 "자동 조회"할 대상이 없다).
+- **페이저 UI와 배타.** 무한 스크롤이 켜지면 `pagination` 패널을 그리지 않는다 — 같은 화면에서 "페이지 이동"과 "누적 스크롤"은 서로의 상태를 뭉갠다(3페이지를 보다 누적하면 그 "3페이지"가 무슨 의미인지 정의되지 않는다). 다만 **요청 조립에는 페이징이 필요하므로** 내부적으로 `_pagination = true` + `pageMode: 'server'`를 세운다. 함정 13에 따라 `sortMode`/`filterMode`는 그대로 `pageMode`를 상속한다.
+- **교체가 아니라 누적.** `_fetchData({ append: true })` 경로를 새로 만든다. 기존 `_fetchData()`(교체)는 그대로 두고 append 분기만 추가 — 함정 18("공개 정책 경로와 내부 무정책 경로를 가른다")의 연장선.
+- **정렬·필터가 바뀌면 누적을 버린다.** 지금 정렬 변경은 페이지를 유지하는데, 무한 스크롤에서는 "지금까지 쌓은 200행"의 정렬만 바뀌는 게 아니라 서버가 전체를 다시 정렬하므로 **0페이지부터 다시 쌓아야** 한다. 필터는 이미 `_currentPage = 0`을 세우고 있어 누적 초기화만 얹으면 된다.
+
+**마지막 페이지 판정 (핵심)**
+
+순수 함수 `resolveLastPage({ explicit, receivedCount, pageSize, loaded, total })` — 우선순위대로:
+
+1. **명시 플래그**(`explicit`) — 서버가 준 값이 있으면 무조건 그것. 다른 신호로 덮지 않는다.
+2. **수신 0건** — 무한 루프 안전장치. 이게 없으면 "플래그 없음 + total 없음 + 매번 0건"에서 스크롤할 때마다 영원히 요청한다.
+3. **`total` 기지 + `loaded >= total`**.
+4. **`receivedCount < pageSize`** — 관례적 추론.
+5. 그 외 = 더 있음.
+
+플래그 추출도 순수 함수로 분리한다 — `readLastPageFlag(obj) => true | false | null`:
+`last` · `lastPage` · `isLast`(그대로) / `hasMore` · `hasNext`(반전). **Spring Data `Page`의 `last`를 그대로 먹는 게 1순위 목표**(가장 흔한 서버 형태). 응답 본문과 `dataSource.parse` 반환값 **양쪽**에서 찾는다 — parse가 `{ rows, total }`만 만들어도 원본 json의 플래그를 살릴 수 있게.
+
+`parseDataSourceResponse`는 `hasTotal`(총건수를 서버가 실제로 준 것인지)을 함께 반환한다. 지금은 `total`이 없으면 `rows.length`로 채우는데, 그 값을 "기지의 총건수"로 믿으면 **첫 페이지에서 곧바로 `loaded >= total`이 되어 항상 마지막 페이지**가 된다. 규칙 3이 성립하려면 "없어서 채운 값"과 "서버가 준 값"을 구분해야 한다.
+
+**UX (마지막 페이지 알리기)**
+
+- 바디 아래 상태 바 `.dg-infinite-status` — **높이 고정**(상태가 바뀌어도 그리드가 흔들리지 않게). 세 상태: 로딩 중(스피너 + `loadingMore`) / 더 있음(`rowsLoaded`·`rowsLoadedOfTotal`) / 마지막(`noMoreRows`).
+- 평상시에도 누적 건수를 보여주므로 자리를 고정으로 차지할 값을 한다. "몇 건까지 쌓였나"는 무한 스크롤에서 사용자가 가장 자주 잃는 정보다.
+- 로케일 키 4개 추가: `loadingMore` · `noMoreRows` · `rowsLoaded`(`{loaded}`) · `rowsLoadedOfTotal`(`{loaded}`/`{total}`).
+- 상태 문자열 결정도 순수 함수 `resolveInfiniteStatus({ loading, hasMore, loaded, total })` → `{ kind, key, params }` (DOM 없이 테스트).
+- 전면 로딩 오버레이는 **첫 조회에만** 띄운다. 추가 로드마다 오버레이가 덮이면 보고 있던 행이 가려져 무한 스크롤이 아니라 페이지 이동처럼 느껴진다.
+
+**임계값과 되먹임**
+
+- `shouldLoadMore({ scrollTop, clientHeight, scrollHeight, threshold, loading, hasMore, enabled })` 순수 함수. `threshold` 기본 200px.
+- **첫 페이지가 뷰포트를 못 채우는 경우**(행 20개 + 높이 900px)를 반드시 처리한다 — 스크롤이 생기지 않아 scroll 이벤트가 영영 안 오고, 사용자는 "더 있는데 멈춘" 그리드를 본다. append 직후 같은 판정을 다시 돌려 뷰포트가 찰 때까지 이어 받는다(`scrollHeight <= clientHeight`면 바닥 조건이 참이므로 같은 함수로 커버된다).
+- 함정 6: 프리뷰 팬이 숨겨져 있으면 scroll 이벤트가 발화하지 않는다 → 검증은 `dispatchEvent(new Event('scroll'))` + 순수 함수 단위 테스트 병행.
+
+**API**
+
+- `loadMore() => boolean` — 수동 트리거(요청을 시작했으면 true). 스크롤이 없는 레이아웃·"더 보기" 버튼용 탈출구.
+- `hasMoreRows() => boolean`.
+- 이벤트 `rowsAppended` `{ rows, page, loaded, hasMore }` / `lastPageReached` `{ loaded, total }` — 마지막 도달은 **한 번만** 발화(플래그가 false로 넘어가는 전이에서).
 
 ### v2.21 — multiselect 값이 콤마 문자열도 지원 (사용자 제보)
 - 제보: 컬럼 값이 배열이 아니라 콤마 구분 문자열이면 `DataGrid.renderers.multiselect`가 매핑을 못 한다. 확인 결과 `'SEL,TYO'`가 label/value 매핑에서 **코드 그대로 칩 하나**가 됐다.
