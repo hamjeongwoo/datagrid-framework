@@ -1113,8 +1113,7 @@
   flex: none;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  gap: 10px;
   height: 34px;
   padding: 0 var(--dg-cell-horizontal-padding);
   border-top: 1px solid var(--dg-border-color);
@@ -1124,7 +1123,36 @@
   white-space: nowrap;
   overflow: hidden;
 }
-.dg-infinite-status .dg-spinner { width: 13px; height: 13px; border-width: 2px; }
+/* 크기 선택은 고정 폭, 상태 문구가 남는 폭을 먹고 넘치면 흘려보낸다 (BUG-011의 양보 순서) */
+.dg-infinite-page-size {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dg-infinite-page-size select {
+  height: 22px;
+  padding: 0 4px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--dg-foreground-color);
+  background: var(--dg-input-background-color);
+  border: 1px solid var(--dg-input-border-color);
+  border-radius: var(--dg-border-radius);
+  outline: none;
+}
+.dg-infinite-page-size select:disabled { color: var(--dg-disabled-foreground-color); }
+.dg-infinite-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  overflow: hidden;
+}
+.dg-infinite-text > span { overflow: hidden; text-overflow: ellipsis; }
+.dg-infinite-status .dg-spinner { width: 13px; height: 13px; border-width: 2px; flex: none; }
 /* 마지막 페이지 — 평상시 상태와 확실히 구분되도록 강조한다 */
 .dg-infinite-status.dg-infinite-end {
   color: var(--dg-foreground-color);

@@ -325,18 +325,40 @@
     <code class="inline">infiniteScroll</code>의 하단 상태 바. 세 상태 모두 <strong>높이가 같아서</strong>
     로드가 끝나거나 마지막에 닿아도 그리드가 흔들리지 않습니다.
     마지막 상태만 배경·글자색·굵기로 강조합니다.
+    왼쪽은 한 번에 받을 행 수를 바꾸는 선택 UI(페이저가 없으므로 그 자리를 대신합니다)이며
+    로드 중에는 비활성됩니다.
   </p>
   <div class="dg-root specimen">
-    <div class="dg-infinite-status dg-infinite-more"><span>50 rows loaded</span></div>
+    <div class="dg-infinite-status dg-infinite-more">
+      <div class="dg-infinite-page-size">
+        <span>Page size:</span>
+        <select><option>10</option><option selected>25</option><option>50</option></select>
+      </div>
+      <span class="dg-infinite-text"><span>50 rows loaded</span></span>
+    </div>
   </div>
   <div class="dg-root specimen" style="margin-top:12px">
-    <div class="dg-infinite-status dg-infinite-more"><span>50 of 500 rows loaded</span></div>
+    <div class="dg-infinite-status dg-infinite-more">
+      <span class="dg-infinite-text"><span>50 of 500 rows loaded</span></span>
+    </div>
   </div>
   <div class="dg-root specimen" style="margin-top:12px">
-    <div class="dg-infinite-status dg-infinite-loading"><span class="dg-spinner"></span><span>Loading more…</span></div>
+    <div class="dg-infinite-status dg-infinite-loading">
+      <div class="dg-infinite-page-size">
+        <span>Page size:</span>
+        <select disabled><option selected>25</option></select>
+      </div>
+      <span class="dg-infinite-text"><span class="dg-spinner"></span><span>Loading more…</span></span>
+    </div>
   </div>
   <div class="dg-root specimen" style="margin-top:12px">
-    <div class="dg-infinite-status dg-infinite-end"><span>All 500 rows loaded</span></div>
+    <div class="dg-infinite-status dg-infinite-end">
+      <div class="dg-infinite-page-size">
+        <span>Page size:</span>
+        <select><option selected>25</option></select>
+      </div>
+      <span class="dg-infinite-text"><span>All 500 rows loaded</span></span>
+    </div>
   </div>
 
   <!-- Overlays -->

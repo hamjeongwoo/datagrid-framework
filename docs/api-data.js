@@ -22,7 +22,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.22.0',
+  version: '2.23.0',
   updated: '2026-08-09',
 
   sections: [
@@ -446,13 +446,18 @@ window.ApiDocs = {
         {
           name: 'infiniteScroll',
           demo: 'infinite-scroll',
-          type: 'boolean | { threshold?: number, pageSize?: number }',
+          type: 'boolean | { threshold?: number, pageSize?: number, pageSizeSelector?: boolean }',
           default: 'false',
           since: '2.22.0',
           description:
             '무한 스크롤. 바닥에서 <code>threshold</code>(기본 200px) 안으로 들어오면 다음 페이지를 ' +
             '자동으로 조회해 <strong>기존 행 뒤에 이어 붙입니다</strong>(교체가 아닙니다). ' +
             '<code>pageSize</code>는 한 번에 받을 행 수(생략 시 <code>paginationPageSize</code>).<br><br>' +
+            '<strong>크기 변경 UI (2.23.0)</strong> — 상태 바 왼쪽에 크기 선택이 표시됩니다. ' +
+            '선택지는 <code>paginationPageSizeOptions</code>(기본 <code>[10, 20, 50, 100]</code>)이며 ' +
+            '현재 크기가 목록에 없으면 정렬된 자리에 끼워 넣습니다. 바꾸면 <code>setPageSize()</code>가 ' +
+            '호출돼 쌓인 것을 버리고 새 크기로 다시 받습니다(로드 중에는 비활성). ' +
+            '서버 부하 때문에 크기를 고정하려면 <code>pageSizeSelector: false</code>로 끄세요.<br><br>' +
             '<strong><code>dataSource</code>가 필요합니다</strong> — 없으면 <code>console.warn</code> 후 ' +
             '무시됩니다(클라이언트가 이미 전량을 들고 있으면 자동 조회할 대상이 없습니다). ' +
             '켜면 <code>pageMode</code>가 <code>\'server\'</code>로 올라가고 ' +
@@ -479,6 +484,7 @@ window.ApiDocs = {
             "var grid = new DataGrid(el, {\n" +
             "  dataSource: { url: '/api/employees' },   // { rows, last } 또는 { rows, total }\n" +
             '  infiniteScroll: { threshold: 200, pageSize: 25 },\n' +
+            '  paginationPageSizeOptions: [10, 25, 50, 100],   // 상태 바 크기 선택지\n' +
             '});\n' +
             '\n' +
             "grid.on('rowsAppended', function (e) {\n" +
@@ -2258,7 +2264,11 @@ window.ApiDocs = {
           demo: 'pagination',
           group: 'Pagination',
           signature: 'setPageSize(size: number): void',
-          description: '페이지 크기를 변경합니다. 현재 보고 있던 첫 행이 포함된 페이지로 이동합니다.',
+          description:
+            '페이지 크기를 변경합니다. 현재 보고 있던 첫 행이 포함된 페이지로 이동합니다.<br><br>' +
+            '<code>infiniteScroll</code>에서는 <strong>"한 번에 받을 행 수"</strong>가 되며, ' +
+            '쌓인 것을 버리고 새 크기로 0페이지부터 다시 받습니다(스크롤도 맨 위로). ' +
+            '상태 바의 크기 선택 UI가 이 메서드를 호출합니다(2.23.0).',
         },
 
         /* ---- 마스터-디테일 ---- */

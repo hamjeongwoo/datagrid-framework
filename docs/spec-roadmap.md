@@ -59,7 +59,7 @@
 | [x] | `detailModel` + `rowExpand/rowCollapse` (마스터-디테일 행) | `rowDetail: { renderer, height }` + `expandRow()/collapseRow()/toggleRowDetail()/isRowExpanded()` + `rowExpanded`/`rowCollapsed` — 가변 높이 가상화(computeRowTops) — v1.2.0 | **P2** |
 | [x] | `column > formula` (계산 컬럼) | `valueGetter(row)` — 파생 값을 row[field]에 기록(정렬·필터·내보내기 공유) — v1.2.0 | **P2** |
 | [x] | `mergeCells` | `mergeCells: ['field'...]` — 표시 순서 기준 연속 동일 값 세로 병합 (그룹/디테일에서 단절) — v2.0.0 | P3 |
-| [x] | (없음 — 자체 개선. ParamQuery는 원격 페이징만 있고 무한 스크롤은 없음) | **`infiniteScroll: true \| { threshold, pageSize }`** — 바닥 근처에서 다음 페이지를 자동 조회해 **누적**(교체 아님). 서버가 마지막 페이지 플래그(`last`/`hasMore`/`hasNext`)를 주면 그것으로, 없으면 total·수신 건수로 종료 판정. 하단 상태 바로 "불러오는 중 / 마지막 페이지" 표시 + `loadMore()`/`hasMoreRows()` + `rowsAppended`/`lastPageReached` — v2.22.0 | **P2** (사용자 요청) |
+| [x] | (없음 — 자체 개선. ParamQuery는 원격 페이징만 있고 무한 스크롤은 없음) | **`infiniteScroll: true \| { threshold, pageSize }`** — 바닥 근처에서 다음 페이지를 자동 조회해 **누적**(교체 아님). 서버가 마지막 페이지 플래그(`last`/`hasMore`/`hasNext`)를 주면 그것으로, 없으면 total·수신 건수로 종료 판정. 하단 상태 바로 "불러오는 중 / 마지막 페이지" 표시 + 크기 선택 UI(v2.23.0) + `loadMore()`/`hasMoreRows()` + `rowsAppended`/`lastPageReached` — v2.22.0 | **P2** (사용자 요청) |
 
 ### 2.2 편집 · 검증 · 변경 추적
 
@@ -179,6 +179,14 @@
 
 ### v2.1 — "TreeGrid" (§6 T1~T4)
 - treeData 코어(계층 표시·펼침/접힘·계층 정렬/필터), 체크박스 캐스케이드, 부모 요약, 지연 로딩
+
+### v2.23 — 무한 스크롤의 페이지 크기 변경 UI (사용자 요청)
+- 요청: "페이지 사이즈를 초기에 셋팅만 하고 바꿀 UI가 없다." 맞는 지적이고, **페이저를 없앤 대가**였다 — 크기 선택은 원래 페이저 패널에만 있었는데 무한 스크롤이 그 패널을 통째로 대체했다. 기능을 대체할 때 그 안에 딸려 있던 조작까지 같이 사라지지 않았는지 확인해야 했다.
+- 상태 바 왼쪽에 크기 선택을 둔다(`infiniteScroll.pageSizeSelector`, 기본 표시 · `false`로 opt-out). **선택지는 `paginationPageSizeOptions`를 그대로 재사용** — 같은 개념에 옵션 이름을 둘로 늘리지 않는다.
+- `setPageSize()`는 이미 무한 스크롤에서 올바르게 동작했다(`_fetchData`의 비-append 경로가 페이지·hasMore·스크롤을 되돌린다). 새로 만든 건 그 메서드를 부르는 UI뿐이다.
+- **상태 바를 매번 `innerHTML`로 갈아끼우던 걸 "한 번 만들고 값만 갱신"으로 바꿨다.** 백그라운드 추가 로드가 끝날 때마다 DOM이 교체되면 **열어둔 크기 드롭다운이 그 자리에서 닫힌다**(함정 8과 같은 실패 모드). select 요소의 동일성이 유지되는지를 검증 항목으로 뒀다.
+- 로드 중에는 select를 비활성한다 — 방금 시작한 요청과 새 크기가 엇갈리는 창을 없앤다. (함정 9의 "표시 전용에 disabled 금지"와는 반대 경우다. 이건 진짜 조작 요소이고 클릭 경로를 가로막는 자리도 아니다.)
+- 곁다리 수정: 순수 함수 `pageSizeSelectOptions(list, current)` — 현재 크기가 선택지에 없으면 `select.value`가 어디에도 안 걸려 **빈 칸**이 된다(`paginationPageSize: 25` + 기본 목록 `[10,20,50,100]`). 정렬된 자리에 끼워 넣는다. **기존 페이저에도 있던 잠복 버그**라 두 곳이 이 함수를 공유한다.
 
 ### v2.22 — 무한 스크롤 infiniteScroll (사용자 요청)
 

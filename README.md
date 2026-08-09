@@ -58,7 +58,7 @@ python demo/server.py
 | `pagination` | boolean | 페이지네이션 사용 |
 | `paginationPageSize` | number | 페이지 크기 (기본 20) |
 | `paginationPageSizeOptions` | array | 페이지 크기 선택지 |
-| `infiniteScroll` | boolean \| object | 무한 스크롤 `{ threshold, pageSize }` — 바닥 근처에서 다음 페이지를 자동 조회해 **이어 붙임**(교체 아님). `dataSource` 필요, 페이저 UI·`treeData`와 배타. 켜면 `pageMode`가 `'server'`로 올라감. 끝 판정은 서버 플래그(`last`/`lastPage`/`isLast`/`hasMore`/`hasNext`) → `total` → 수신 건수 순. 하단 상태 바가 진행/마지막을 표시 (`loadMore()` / `hasMoreRows()`, `rowsAppended` / `lastPageReached`) |
+| `infiniteScroll` | boolean \| object | 무한 스크롤 `{ threshold, pageSize, pageSizeSelector }` — 바닥 근처에서 다음 페이지를 자동 조회해 **이어 붙임**(교체 아님). `dataSource` 필요, 페이저 UI·`treeData`와 배타. 켜면 `pageMode`가 `'server'`로 올라감. 끝 판정은 서버 플래그(`last`/`lastPage`/`isLast`/`hasMore`/`hasNext`) → `total` → 수신 건수 순. 하단 상태 바가 진행/마지막을 표시하고 **크기 선택 UI**를 제공(선택지는 `paginationPageSizeOptions`, `pageSizeSelector: false`로 끔) (`loadMore()` / `hasMoreRows()`, `rowsAppended` / `lastPageReached`) |
 | `zebra` | boolean | 홀수 행 배경 |
 | `theme` | `'light'` \| `'dark'` | 초기 테마 |
 | `localeText` | object | 그리드가 그리는 UI 문자열(필터 메뉴·페이지네이션·오버레이·요약·aria-label) 교체. 내장 `DataGrid.locales.ko` / `.en`, 지정한 키만 덮어쓰고 나머지는 영어. `{from}`·`{total}`·`{column}`·`{count}` 토큰 치환, `setOptions`로 런타임 전환 |

@@ -3801,6 +3801,9 @@
     없으면 <code class="inline">total</code> → 수신 건수 순으로 추론합니다.
     이 데모 서버(<code class="inline">/api/employees-infinite</code>)는 <strong>총건수를 주지 않고</strong>
     <code class="inline">last</code>만 주므로, 마지막 페이지 표시가 순전히 그 플래그에서 나옵니다.
+    상태 바 왼쪽의 <strong>크기 선택</strong>으로 한 번에 받을 행 수를 바꿀 수 있습니다
+    (<code class="inline">paginationPageSizeOptions</code>가 선택지, 바꾸면 쌓인 것을 버리고 새 크기로 다시 받습니다).
+    끄려면 <code class="inline">infiniteScroll: { pageSizeSelector: false }</code>.
   </p>
   <div class="example-card">
     <div class="example-html">
@@ -3820,6 +3823,8 @@
         dataSource: { url: '/api/employees-infinite' },
         // infiniteScroll을 켜면 pageMode가 'server'로 올라가고 sort/filter도 따라온다
         infiniteScroll: { threshold: 200, pageSize: 25 },
+        // 상태 바 크기 선택의 선택지 (페이저와 같은 옵션을 공유)
+        paginationPageSizeOptions: [10, 25, 50, 100],
         localeText: DataGrid.locales.ko,
         rowNumbers: true,          // 몇 번째 행까지 쌓였는지 눈으로 확인
         columnDefs: [

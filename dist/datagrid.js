@@ -512,7 +512,12 @@
     const opts = options || {};
     const raw = opts.infiniteScroll;
     const warnings = [];
-    if (!raw) return { enabled: false, threshold: INFINITE_DEFAULT_THRESHOLD, pageSize: null, warnings };
+    if (!raw) {
+      return {
+        enabled: false, threshold: INFINITE_DEFAULT_THRESHOLD,
+        pageSize: null, pageSizeSelector: false, warnings,
+      };
+    }
     const cfg = typeof raw === 'object' ? raw : {};
     let enabled = true;
     if (!opts.dataSource) { enabled = false; warnings.push('noDataSource'); }
@@ -524,7 +529,10 @@
       ? cfg.threshold
       : INFINITE_DEFAULT_THRESHOLD;
     const pageSize = typeof cfg.pageSize === 'number' && cfg.pageSize > 0 ? Math.floor(cfg.pageSize) : null;
-    return { enabled, threshold, pageSize, warnings };
+    /* 페이저가 없으니 크기를 바꿀 UI도 사라진다 — 상태 바가 그 자리를 대신하므로 기본 표시.
+     * 서버 부하 때문에 소비자가 크기를 고정하고 싶으면 false로 끈다. */
+    const pageSizeSelector = cfg.pageSizeSelector !== false;
+    return { enabled, threshold, pageSize, pageSizeSelector, warnings };
   }
 
   /**
@@ -580,6 +588,25 @@
     if (typeof c.total === 'number' && c.total >= 0 && (c.loaded || 0) >= c.total) return true;
     if (typeof c.pageSize === 'number' && c.pageSize > 0 && received < c.pageSize) return true;
     return false;
+  }
+
+  /**
+   * 페이지 크기 선택지 목록 — 오름차순 · 중복 제거 · **현재 값 포함 보장**.
+   *
+   * 현재 크기가 목록에 없으면 select의 value가 어디에도 안 걸려 selectedIndex가
+   * -1이 되고 빈 칸이 보인다(paginationPageSize: 25 + 기본 목록 [10,20,50,100]).
+   * 페이저와 무한 스크롤 상태 바가 이 함수를 공유한다.
+   */
+  function pageSizeSelectOptions(list, current) {
+    const out = [];
+    (list || []).forEach(v => {
+      const n = Number(v);
+      if (!isFinite(n) || n <= 0 || out.indexOf(n) !== -1) return;
+      out.push(n);
+    });
+    const cur = Number(current);
+    if (isFinite(cur) && cur > 0 && out.indexOf(cur) === -1) out.push(cur);
+    return out.sort((a, b) => a - b);
   }
 
   /**
@@ -2486,6 +2513,10 @@
       });
       this._infinite = infinite.enabled;
       this._infiniteThreshold = infinite.threshold;
+      this._infinitePageSizeSelector = infinite.enabled && infinite.pageSizeSelector;
+      this._infiniteTextEl = null;
+      this._infiniteSizeSelEl = null;
+      this._infiniteSizeLabelEl = null;
       if (this._infinite) {
         if (infinite.pageSize) this._pageSize = infinite.pageSize;
         this._pagination = true; /* 요청에 page/pageSize를 싣기 위함 — 페이저 UI는 그리지 않는다 */
@@ -2670,11 +2701,23 @@
       this._overlayEl = el('div', 'dg-overlay', root);
       this._overlayEl.hidden = true;
 
-      /* 무한 스크롤은 페이저 대신 하단 상태 바를 쓴다 (둘은 배타) */
+      /* 무한 스크롤은 페이저 대신 하단 상태 바를 쓴다 (둘은 배타).
+       * 안쪽 요소는 여기서 한 번만 만들고 이후에는 값만 갱신한다 — 매번 innerHTML을
+       * 다시 쓰면 백그라운드 추가 로드가 끝날 때 열려 있던 크기 드롭다운이 닫힌다. */
       if (this._infinite) {
-        this._infiniteStatusEl = el('div', 'dg-infinite-status', root);
-        this._infiniteStatusEl.setAttribute('role', 'status');
-        this._infiniteStatusEl.setAttribute('aria-live', 'polite');
+        const bar = el('div', 'dg-infinite-status', root);
+        bar.setAttribute('role', 'status');
+        bar.setAttribute('aria-live', 'polite');
+        this._infiniteStatusEl = bar;
+        if (this._infinitePageSizeSelector) {
+          const wrap = el('div', 'dg-infinite-page-size', bar);
+          this._infiniteSizeLabelEl = el('span', null, wrap);
+          const sel = el('select', null, wrap);
+          sel.addEventListener('change', () => { this.setPageSize(Number(sel.value)); });
+          this._infiniteSizeSelEl = sel;
+          this._infiniteSizeKey = null; /* 지금 그려둔 옵션 목록의 지문 */
+        }
+        this._infiniteTextEl = el('span', 'dg-infinite-text', bar);
       } else if (this._pagination) {
         this._pagingEl = el('div', 'dg-paging-panel', root);
       }
@@ -6818,7 +6861,8 @@
       const sizeLabel = el('span', null, sizeWrap);
       sizeLabel.textContent = this._t('pageSizeLabel');
       const sizeSel = el('select', null, sizeWrap);
-      this._pageSizeOptions.forEach(s => {
+      /* 현재 크기가 목록에 없으면 select가 빈 칸이 되므로 끼워 넣는다 */
+      pageSizeSelectOptions(this._pageSizeOptions, this._pageSize).forEach(s => {
         const opt = el('option', null, sizeSel);
         opt.value = s;
         opt.textContent = s;
@@ -6876,6 +6920,10 @@
       if (this._pageMode === 'server') this._fetchData(); /* 방금 이동한 페이지를 요청해야 한다 */
     }
 
+    /**
+     * 페이지 크기 변경. 무한 스크롤에서는 "한 번에 받을 행 수"가 되며,
+     * 쌓인 것을 버리고 새 크기로 0페이지부터 다시 받는다(_fetchData가 리셋).
+     */
     setPageSize(size) {
       if (!this._pagination) return;
       const firstVisible = this._pageInfo ? this._pageInfo.start : 0;
@@ -6889,8 +6937,11 @@
     /* ---- infinite scroll ---- */
 
     /**
-     * 하단 상태 바 갱신 — "불러오는 중 / N건 불러옴 / 마지막 페이지".
+     * 하단 상태 바 갱신 — "불러오는 중 / N건 불러옴 / 마지막 페이지" + 페이지 크기 선택.
      * 높이는 상태와 무관하게 고정이라 로드가 끝나도 그리드가 흔들리지 않는다.
+     *
+     * 요소를 새로 만들지 않고 값만 바꾼다 — 추가 로드가 끝날 때마다 DOM을 갈아끼우면
+     * 열어둔 크기 드롭다운이 그 자리에서 닫힌다 (함정 8).
      */
     _renderInfiniteStatus() {
       const box = this._infiniteStatusEl;
@@ -6902,9 +6953,37 @@
         total: this._serverTotalKnown ? this._serverTotal : null,
       });
       box.className = `dg-infinite-status dg-infinite-${status.kind}`;
-      box.innerHTML =
-        (status.kind === 'loading' ? '<span class="dg-spinner"></span>' : '') +
-        `<span>${escapeHtml(this._t(status.key, status.params))}</span>`;
+      if (this._infiniteTextEl) {
+        this._infiniteTextEl.innerHTML =
+          (status.kind === 'loading' ? '<span class="dg-spinner"></span>' : '') +
+          `<span>${escapeHtml(this._t(status.key, status.params))}</span>`;
+      }
+      this._syncInfiniteSizeSelect();
+    }
+
+    /** 크기 선택 select의 라벨·옵션·현재 값을 맞춘다 (목록이 그대로면 옵션은 건드리지 않음). */
+    _syncInfiniteSizeSelect() {
+      const sel = this._infiniteSizeSelEl;
+      if (!sel) return;
+      const label = this._t('pageSizeLabel');
+      if (this._infiniteSizeLabelEl.textContent !== label) {
+        this._infiniteSizeLabelEl.textContent = label;
+        sel.setAttribute('aria-label', label);
+      }
+      const sizes = pageSizeSelectOptions(this._pageSizeOptions, this._pageSize);
+      const key = sizes.join(',');
+      if (this._infiniteSizeKey !== key) {
+        this._infiniteSizeKey = key;
+        sel.innerHTML = '';
+        sizes.forEach(s => {
+          const opt = el('option', null, sel);
+          opt.value = s;
+          opt.textContent = s;
+        });
+      }
+      if (Number(sel.value) !== this._pageSize) sel.value = this._pageSize;
+      /* 로드 중 크기를 바꾸면 방금 시작한 요청과 새 크기가 엇갈린다 */
+      sel.disabled = !!(this._loading || this._loadingMore);
     }
 
     /**
@@ -6963,11 +7042,13 @@
         '<div class="dg-overlay-panel"><span class="dg-spinner"></span>' +
         `${escapeHtml(this._t('loading'))}</div>`;
       this._overlayEl.hidden = false;
+      this._renderInfiniteStatus(); /* 상태 바도 로딩 상태를 따라간다 */
     }
 
     hideLoadingOverlay() {
       this._loading = false;
       this._updateOverlay();
+      this._renderInfiniteStatus();
     }
 
     /* ---- remote data source ---- */
@@ -7770,7 +7851,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.22.0';
+  DataGrid.version = '2.23.0';
 
   /**
    * 내장 로케일. `localeText: DataGrid.locales.ko`처럼 통째로 쓰거나,
@@ -7804,6 +7885,7 @@
     resolveDataModes,
     shouldResetPageOnReload,
     resolveInfiniteScroll,
+    pageSizeSelectOptions,
     shouldLoadMore,
     readLastPageFlag,
     resolveLastPage,

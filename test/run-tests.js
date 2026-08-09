@@ -1626,6 +1626,35 @@ suite('resolveInfiniteScroll — 무한 스크롤 옵션 정규화', function ()
     'autoHeight', 'autoHeight는 스크롤이 안 생겨 끝까지 받는다 — 경고');
   assertEq(T.resolveInfiniteScroll({ infiniteScroll: true, domLayout: 'autoHeight' }).warnings.length, 1,
     '비활성이면 추가 경고를 쌓지 않는다 (noDataSource 하나뿐)');
+
+  /* v2.23 — 페이저가 없으니 크기 변경 UI는 상태 바가 대신한다 (기본 표시) */
+  assertEq(on.pageSizeSelector, true, '기본은 크기 선택 표시');
+  assertEq(T.resolveInfiniteScroll({ infiniteScroll: { pageSizeSelector: false }, dataSource: ds }).pageSizeSelector,
+    false, 'false면 숨김');
+  assertEq(T.resolveInfiniteScroll({ infiniteScroll: { pageSizeSelector: 0 }, dataSource: ds }).pageSizeSelector,
+    true, 'false가 아닌 값은 모두 표시 (opt-out만 허용)');
+  assertEq(off.pageSizeSelector, false, '무한 스크롤이 아니면 선택 UI도 없음');
+});
+
+suite('pageSizeSelectOptions — 페이지 크기 선택지', function () {
+  assertEq(T.pageSizeSelectOptions([10, 20, 50, 100], 20), [10, 20, 50, 100], '현재 값이 목록에 있으면 그대로');
+
+  /* 핵심: 현재 값이 목록에 없으면 select가 빈 칸이 된다 (selectedIndex -1) */
+  assertEq(T.pageSizeSelectOptions([10, 20, 50, 100], 25), [10, 20, 25, 50, 100],
+    '현재 값을 정렬된 자리에 끼워 넣는다');
+  assertEq(T.pageSizeSelectOptions([10, 20], 5), [5, 10, 20], '가장 작아도 앞에 들어간다');
+  assertEq(T.pageSizeSelectOptions([10, 20], 500), [10, 20, 500], '가장 커도 뒤에 들어간다');
+
+  assertEq(T.pageSizeSelectOptions([50, 10, 20], 20), [10, 20, 50], '오름차순 정렬');
+  assertEq(T.pageSizeSelectOptions([10, 10, 20], 20), [10, 20], '중복 제거');
+  assertEq(T.pageSizeSelectOptions(['10', '20'], 20), [10, 20], '문자열 숫자도 수용');
+
+  /* 크기로 성립하지 않는 값은 버린다 — 0이 남으면 나눗셈이 무한대가 된다 */
+  assertEq(T.pageSizeSelectOptions([0, -5, 'x', null, 20], 20), [20], '0·음수·비숫자는 제외');
+  assertEq(T.pageSizeSelectOptions([], 25), [25], '목록이 비어도 현재 값은 남는다');
+  assertEq(T.pageSizeSelectOptions(null, 25), [25], 'null 목록 안전');
+  assertEq(T.pageSizeSelectOptions([10, 20], 0), [10, 20], '현재 값이 무효면 끼워 넣지 않는다');
+  assertEq(T.pageSizeSelectOptions(null, null), [], '둘 다 없으면 빈 목록');
 });
 
 suite('shouldLoadMore — 바닥 판정', function () {
