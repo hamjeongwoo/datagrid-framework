@@ -972,8 +972,8 @@ suite('dataSource request/response', function () {
   assertEq(T.parseDataSourceResponse({ rows: [{}], hasMore: true }).last, false, 'hasMore는 반전');
 });
 
-/* ---------------- buildGroupHeaderRuns ---------------- */
-suite('buildGroupHeaderRuns', function () {
+/* ---------------- buildGroupHeaderRows (평면 = 기존 2단 동작) ---------------- */
+suite('buildGroupHeaderRows — 평면 그룹 (2단)', function () {
   var cols = [
     { colId: 'a', field: 'a' },
     { colId: 'b', field: 'b' },
@@ -984,9 +984,11 @@ suite('buildGroupHeaderRuns', function () {
     { headerName: 'AB', children: ['a', 'b'] },
     { headerName: 'D', children: ['d'] },
   ];
-  var runs = T.buildGroupHeaderRuns(cols, groups);
+  var built = T.buildGroupHeaderRows(cols, groups, 2);
+  assertEq(built.depth, 1, '중첩이 없으면 그룹 줄은 하나');
+  assertEq(built.rows.length, 1, 'rows 길이 = depth');
   assertEq(
-    runs.map(function (r) { return { name: r.headerName, ids: r.colIds }; }),
+    built.rows[0].map(function (r) { return { name: r.headerName, ids: r.colIds }; }),
     [
       { name: 'AB', ids: ['a', 'b'] },
       { name: '', ids: ['c'] },
@@ -994,12 +996,21 @@ suite('buildGroupHeaderRuns', function () {
     ],
     'contiguous groups spanned, ungrouped as filler'
   );
+  assertEq(
+    built.rows[0].map(function (r) { return r.kind; }),
+    ['group', 'empty', 'group'],
+    '그룹 없는 구간은 empty'
+  );
+  assertEq(
+    built.rows[0].every(function (r) { return r.span === false; }),
+    true,
+    '한 줄뿐이면 아래로 이어지는 칸이 없다'
+  );
 
   /* 순서가 바뀌어 그룹이 끊기면 스팬도 끊긴다 */
   var reordered = [cols[0], cols[2], cols[1], cols[3]];
-  runs = T.buildGroupHeaderRuns(reordered, groups);
   assertEq(
-    runs.map(function (r) { return r.headerName; }),
+    T.buildGroupHeaderRows(reordered, groups, 2).rows[0].map(function (r) { return r.headerName; }),
     ['AB', '', 'AB', 'D'],
     'non-contiguous same group becomes separate runs'
   );
@@ -1009,16 +1020,183 @@ suite('buildGroupHeaderRuns', function () {
     { colId: 'a', field: 'a', pinned: 'left' },
     { colId: 'b', field: 'b' },
   ];
-  runs = T.buildGroupHeaderRuns(pinnedCols, [{ headerName: 'AB', children: ['a', 'b'] }]);
-  assertEq(runs.length, 2, 'pinned boundary splits run');
-  assertEq(runs[0].pinned, 'left', 'pinned flag carried');
+  var pinnedRuns = T.buildGroupHeaderRows(
+    pinnedCols, [{ headerName: 'AB', children: ['a', 'b'] }], 2
+  ).rows[0];
+  assertEq(pinnedRuns.length, 2, 'pinned boundary splits run');
+  assertEq(pinnedRuns[0].pinned, 'left', 'pinned flag carried');
 
   /* field로도 컬럼을 지칭할 수 있다 */
-  runs = T.buildGroupHeaderRuns([{ colId: 'col-0', field: 'x' }], [{ headerName: 'X', children: ['x'] }]);
-  assertEq(runs[0].headerName, 'X', 'children matched by field');
+  assertEq(
+    T.buildGroupHeaderRows(
+      [{ colId: 'col-0', field: 'x' }], [{ headerName: 'X', children: ['x'] }], 2
+    ).rows[0][0].headerName,
+    'X',
+    'children matched by field'
+  );
 
-  assertEq(T.buildGroupHeaderRuns(cols, []).length, 1, 'no groups → single filler run');
-  assertEq(T.buildGroupHeaderRuns([], groups), [], 'no columns → empty');
+  assertEq(T.buildGroupHeaderRows(cols, [], 2).rows, [], '그룹이 없으면 그룹 줄도 없다');
+  assertEq(T.buildGroupHeaderRows([], groups, 2).rows, [], 'no columns → no rows');
+  assertEq(
+    T.buildGroupHeaderRows(cols, [{ headerName: 'Nope', children: ['zz'] }], 2).depth,
+    0,
+    '어떤 컬럼에도 안 걸리는 그룹은 줄을 만들지 않는다'
+  );
+});
+
+/* ---------------- buildGroupHeaderRows (중첩 = 3단) ---------------- */
+suite('buildGroupHeaderRows — 중첩 그룹 (3단)', function () {
+  var cols = [
+    { colId: 'name', field: 'name' },
+    { colId: 'email', field: 'email' },
+    { colId: 'phone', field: 'phone' },
+    { colId: 'salary', field: 'salary' },
+    { colId: 'note', field: 'note' },
+  ];
+  /* Person > (Identity > name,email) + phone / Pay > salary / note는 그룹 없음 */
+  var groups = [
+    {
+      headerName: 'Person',
+      children: [{ headerName: 'Identity', children: ['name', 'email'] }, 'phone'],
+    },
+    { headerName: 'Pay', children: ['salary'] },
+  ];
+  var built = T.buildGroupHeaderRows(cols, groups, 2);
+  assertEq(built.depth, 2, '중첩이 있으면 그룹 줄 2개');
+  assertEq(built.warnings, [], '2단 중첩은 경고 없음');
+
+  assertEq(
+    built.rows[0].map(function (r) { return { n: r.headerName, ids: r.colIds, span: r.span }; }),
+    [
+      { n: 'Person', ids: ['name', 'email', 'phone'], span: false },
+      { n: 'Pay', ids: ['salary'], span: true },
+      { n: '', ids: ['note'], span: true },
+    ],
+    '윗줄 — 자식 그룹이 있는 Person은 안 이어지고, 없는 Pay·빈칸은 아랫줄로 이어진다'
+  );
+  assertEq(
+    built.rows[1].map(function (r) { return { n: r.headerName, k: r.kind, ids: r.colIds }; }),
+    [
+      { n: 'Identity', k: 'group', ids: ['name', 'email'] },
+      /* Person은 자식 그룹이 있어 아래로 안 이어졌으므로 phone 자리는 몸통이 아니라 빈칸 */
+      { n: '', k: 'empty', ids: ['phone'] },
+      { n: '', k: 'cont', ids: ['salary'] },
+      { n: '', k: 'empty', ids: ['note'] },
+    ],
+    '아랫줄 — 이어진 Pay 밑만 몸통(cont), 나머지는 빈칸(empty)'
+  );
+  /* cont와 empty는 절대 한 런으로 합쳐지면 안 된다 (한쪽은 그룹 몸통, 한쪽은 빈 자리) */
+  assertEq(
+    built.rows[1][2].key !== built.rows[1][3].key,
+    true,
+    'cont와 empty는 서로 다른 런'
+  );
+
+  /* 깊이가 섞인 런은 이어 붙이지 않는다 — 칸 하나에 아래 경계선을 일부만 그릴 수 없다.
+     TOP 밑에 SUB(d)와 그룹 없는 e가 나란히 오는 배치. */
+  var mixed = T.buildGroupHeaderRows(
+    [{ colId: 'd', field: 'd' }, { colId: 'e', field: 'e' }],
+    [{ headerName: 'TOP', children: [{ headerName: 'SUB', children: ['d'] }, 'e'] }],
+    2
+  );
+  assertEq(mixed.rows[0].length, 1, '윗줄은 TOP 하나');
+  assertEq(mixed.rows[0][0].span, false, '깊이가 섞인 런은 아래로 이어지지 않는다');
+  assertEq(
+    mixed.rows[1].map(function (r) { return r.kind; }),
+    ['group', 'empty'],
+    '이어지지 않았으니 e 자리는 몸통(cont)이 아니라 빈칸이어야 한다'
+  );
+
+  /* 상위가 같아도 하위 그룹이 다르면 아랫줄에서 갈라진다 */
+  var twoSubs = T.buildGroupHeaderRows(
+    [{ colId: 'a', field: 'a' }, { colId: 'b', field: 'b' }],
+    [{
+      headerName: 'Top',
+      children: [
+        { headerName: 'L', children: ['a'] },
+        { headerName: 'R', children: ['b'] },
+      ],
+    }],
+    2
+  );
+  assertEq(twoSubs.rows[0].length, 1, '윗줄은 Top 하나로 이어짐');
+  assertEq(
+    twoSubs.rows[1].map(function (r) { return r.headerName; }),
+    ['L', 'R'],
+    '아랫줄은 하위 그룹별로 갈라짐'
+  );
+
+  /* 줄 수는 설정이 아니라 "보이는 컬럼에 실제로 걸린 깊이"를 따른다 —
+     하위 그룹 컬럼을 전부 숨기면 그룹 줄이 하나로 줄어든다 */
+  var subHidden = T.buildGroupHeaderRows(
+    [{ colId: 'phone', field: 'phone' }, { colId: 'salary', field: 'salary' }],
+    groups,
+    2
+  );
+  assertEq(subHidden.depth, 1, '중첩 그룹 컬럼이 안 보이면 그룹 줄이 하나로 줄어든다');
+  assertEq(
+    subHidden.rows[0].map(function (r) { return r.headerName; }),
+    ['Person', 'Pay'],
+    '남은 컬럼의 상위 그룹만 그려진다'
+  );
+
+  /* pinned 경계는 모든 레벨에서 끊는다 */
+  var pin = T.buildGroupHeaderRows(
+    [{ colId: 'a', field: 'a', pinned: 'left' }, { colId: 'b', field: 'b' }],
+    [{ headerName: 'Top', children: [{ headerName: 'Sub', children: ['a', 'b'] }] }],
+    2
+  );
+  assertEq(pin.rows[0].length, 2, 'pinned 경계가 윗줄도 끊는다');
+  assertEq(pin.rows[1].length, 2, 'pinned 경계가 아랫줄도 끊는다');
+});
+
+/* ---------------- normalizeColumnGroups — 깊이 상한과 경고 ---------------- */
+suite('normalizeColumnGroups — 깊이 상한', function () {
+  var deep = [{
+    headerName: 'L1',
+    children: [{
+      headerName: 'L2',
+      children: [{ headerName: 'L3', children: ['x'] }],
+    }],
+  }];
+  var norm = T.normalizeColumnGroups(deep, 2);
+  assertEq(norm.depth, 2, '3중 중첩도 그룹 줄은 2개까지');
+  assertEq(
+    norm.pathOf['x'].map(function (n) { return n.headerName; }),
+    ['L1', 'L2'],
+    '넘치는 L3는 바로 위 그룹으로 접힌다'
+  );
+  assertEq(norm.warnings.length, 1, '접었다는 경고 1회');
+  assertEq(
+    norm.warnings[0].indexOf('2단까지만') !== -1,
+    true,
+    '경고 문구에 상한이 드러난다'
+  );
+
+  /* 경고는 문자열로만 모으고 콘솔에 찍지 않는다 — 여러 번 접혀도 한 번만 */
+  var twoDeep = T.normalizeColumnGroups(
+    [
+      { headerName: 'A', children: [{ headerName: 'A2', children: [{ headerName: 'A3', children: ['p'] }] }] },
+      { headerName: 'B', children: [{ headerName: 'B2', children: [{ headerName: 'B3', children: ['q'] }] }] },
+    ],
+    2
+  );
+  assertEq(twoDeep.warnings.length, 1, '깊이 경고는 중복 없이 한 번');
+
+  /* 잘못된 children 항목 */
+  var bad = T.normalizeColumnGroups([{ headerName: 'X', children: [123, { nope: true }] }], 2);
+  assertEq(bad.warnings.length, 2, '문자열도 그룹도 아닌 항목마다 경고');
+  assertEq(bad.depth, 0, '리프가 하나도 없으면 depth 0');
+
+  /* maxDepth 1을 주면 기존 2단 동작으로 잠긴다 */
+  var capped = T.normalizeColumnGroups(
+    [{ headerName: 'T', children: [{ headerName: 'S', children: ['a'] }] }], 1
+  );
+  assertEq(capped.depth, 1, 'maxDepth 1이면 그룹 줄 하나');
+  assertEq(capped.pathOf['a'].map(function (n) { return n.headerName; }), ['T'], '상위만 남는다');
+
+  assertEq(T.normalizeColumnGroups(null, 2).depth, 0, 'null 안전');
+  assertEq(T.normalizeColumnGroups([], 2).warnings, [], '빈 배열은 경고 없음');
 });
 
 /* ---------------- computeAutoHeights / computeTopsFromHeights ---------------- */

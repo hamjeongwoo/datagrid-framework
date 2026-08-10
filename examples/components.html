@@ -425,6 +425,56 @@
     </div>
   </div>
 
+  <!-- Column group header -->
+  <h2 class="section">Column Group Headers (2단 / 3단)</h2>
+  <p class="section-desc">
+    <code class="inline">columnGroups</code>가 컬럼 헤더 위에 얹는 그룹 줄. 중첩하면 줄이 하나 더 생겨 3단이 됩니다.
+    자식 그룹이 없는 구간(<code class="inline">dg-header-group-cont</code>)은 위 칸의 몸통이라 가로선을 지워
+    한 칸처럼 보이고, 라벨은 두 줄의 가운데에 놓입니다. 어떤 그룹에도 안 속한 구간은
+    <code class="inline">dg-header-group-empty</code>로 비워 둡니다.
+  </p>
+  <div class="dg-root specimen">
+    <div class="dg-header">
+      <!-- 윗줄: Employee는 자식 그룹이 있어 한 줄, Compensation은 없어서 두 줄을 차지한다 -->
+      <div class="dg-header-group-row">
+        <div class="dg-header-group-cell dg-header-group-empty dg-header-group-span" style="width:70px"></div>
+        <div class="dg-header-group-cell" style="width:290px">
+          <span class="dg-header-group-label">Employee</span>
+        </div>
+        <div class="dg-header-group-cell dg-header-group-span" style="width:220px">
+          <span class="dg-header-group-label">Compensation</span>
+        </div>
+      </div>
+      <!-- 아랫줄: Identity/Contact는 실제 그룹, Compensation 아래는 몸통(cont) -->
+      <div class="dg-header-group-row">
+        <div class="dg-header-group-cell dg-header-group-empty" style="width:70px"></div>
+        <div class="dg-header-group-cell" style="width:170px">
+          <span class="dg-header-group-label">Identity</span>
+        </div>
+        <div class="dg-header-group-cell" style="width:120px">
+          <span class="dg-header-group-label">Contact</span>
+        </div>
+        <div class="dg-header-group-cell dg-header-group-cont" style="width:220px"></div>
+      </div>
+      <div class="dg-header-row">
+        <div class="dg-header-cell" style="width:70px">ID</div>
+        <div class="dg-header-cell" style="width:170px">Name</div>
+        <div class="dg-header-cell" style="width:120px">City</div>
+        <div class="dg-header-cell" style="width:120px">Salary</div>
+        <div class="dg-header-cell" style="width:100px">Rating</div>
+      </div>
+    </div>
+    <div class="dg-canvas" style="height:auto">
+      <div class="dg-row">
+        <div class="dg-cell" style="width:70px">1</div>
+        <div class="dg-cell" style="width:170px">Priya Garcia</div>
+        <div class="dg-cell" style="width:120px">Seoul</div>
+        <div class="dg-cell" style="width:120px">$92,400</div>
+        <div class="dg-cell" style="width:100px">4.6</div>
+      </div>
+    </div>
+  </div>
+
   <!-- Live mini grid -->
   <h2 class="section">All Together — Live</h2>
   <p class="section-desc">위 컴포넌트들이 실제 인스턴스에서 조합된 모습.</p>

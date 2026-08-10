@@ -164,13 +164,12 @@
   min-width: 100%;
 }
 
-/* 2단 컬럼 그룹 헤더 (columnGroups) */
+/* 컬럼 그룹 헤더 (columnGroups) — 그룹 줄 1~2개, 컬럼 헤더까지 2~3단 */
 .dg-header-group-row {
   display: flex;
   height: var(--dg-group-header-height);
   width: max-content;
   min-width: 100%;
-  border-bottom: 1px solid var(--dg-border-color);
   background: var(--dg-header-background-color);
 }
 
@@ -183,11 +182,20 @@
   font-size: 12.5px;
   font-weight: 600;
   color: var(--dg-header-foreground-color);
-}
-.dg-header-group-cell:not(.dg-header-group-empty) {
+  /* 경계선은 오른쪽에만 — 양쪽에 긋고 margin-left: -1px로 겹치면 앞선 칸 수만큼
+     위치가 밀려, 칸 수가 다른 두 그룹 줄의 세로선이 서로 어긋난다 */
   border-right: 1px solid var(--dg-border-color);
-  border-left: 1px solid var(--dg-border-color);
-  margin-left: -1px; /* 이웃 스팬과 경계선 중복 방지 */
+  /* 아래 경계선은 칸마다 결정한다 — 아래 줄로 이어지는 칸은 긋지 않아야
+     자식 그룹이 없는 구간이 하나의 큰 칸으로 읽힌다 */
+  border-bottom: 1px solid var(--dg-border-color);
+}
+.dg-header-group-cell:last-child { border-right: none; }
+/* 아래 줄로 이어지는 칸 — 가로선을 지워 위아래가 한 칸으로 보이게 한다 */
+.dg-header-group-cell.dg-header-group-span { border-bottom: none; }
+/* 두 줄을 차지하는 라벨은 블록 가운데로 내린다 (실제 rowspan이 아니므로 직접 보정).
+   50%는 라벨 자기 높이 기준이라 어긋난다 — 줄 높이의 절반이어야 한다. */
+.dg-header-group-span > .dg-header-group-label {
+  transform: translateY(calc(var(--dg-group-header-height) / 2));
 }
 .dg-header-group-cell.dg-pinned-left,
 .dg-header-group-cell.dg-pinned-right {

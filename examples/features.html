@@ -4118,6 +4118,91 @@
     </script>
   </div>
 
+  <!-- ======================================================== 3단 컬럼 그룹 헤더 -->
+  <h2 class="section" id="nested-column-groups">Nested Column Group Headers (3단 헤더)</h2>
+  <p class="section-desc">
+    <code class="inline">columnGroups</code>의 <code class="inline">children</code>에 컬럼 이름 대신
+    <strong>그룹 객체를 다시 넣으면</strong> 그룹 줄이 한 줄 더 생겨 <strong>3단 헤더</strong>가 됩니다.
+    자식 그룹이 없는 구간은 상위 그룹이 <strong>두 줄을 차지</strong>해 라벨이 가운데에 놓입니다 —
+    그래서 깊이가 섞여 있어도 표가 들쭉날쭉해 보이지 않습니다.
+    줄 수는 설정이 아니라 <strong>지금 보이는 컬럼에 실제로 걸린 깊이</strong>로 정해지므로,
+    하위 그룹 컬럼을 전부 숨기면 그 줄이 저절로 사라집니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn" id="ncgToggleSub" type="button">Identity 컬럼 숨기기</button>
+        <button class="tb-btn" id="ncgToggleContact" type="button">Contact 그룹 숨기기</button>
+      </div>
+      <div id="gridNestedGroups" class="grid-wrap-md"></div>
+      <div class="status-line" id="ncgStatus">
+        컬럼 헤더를 드래그해 순서를 바꾸거나 위 버튼으로 컬럼을 숨겨 보세요 — 그룹 줄 수가 따라 바뀝니다.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var ncgStatus = document.getElementById('ncgStatus');
+      var ncgEl = document.getElementById('gridNestedGroups');
+
+      var grid = new DataGrid(ncgEl, {
+        rowData: DemoData.makeEmployees(40, 77),
+        columnGroups: [
+          {
+            headerName: '직원 (Employee)',
+            children: [
+              // 그룹 안의 그룹 — 여기서 3단이 된다
+              { headerName: '신원 (Identity)', children: ['name', 'email'] },
+              { headerName: '연락처 (Contact)', children: ['city'] },
+            ],
+          },
+          {
+            headerName: '보상 (Compensation)',
+            // 자식 그룹이 없으므로 이 라벨이 두 줄을 차지한다
+            children: ['salary', 'rating'],
+          },
+        ],
+        columnDefs: [
+          { field: 'id', headerName: 'ID', width: 70, pinned: 'left' },
+          { field: 'name', headerName: 'Name', width: 150 },
+          { field: 'email', headerName: 'Email', width: 210 },
+          { field: 'city', headerName: 'City', width: 120 },
+          { field: 'salary', headerName: 'Salary', dataType: 'number', format: '$#,##0', width: 120 },
+          { field: 'rating', headerName: 'Rating', dataType: 'number', format: '0.0', width: 100 },
+          // 어떤 그룹에도 안 속한 컬럼 — 그룹 줄에서는 빈 칸으로 남는다
+          { field: 'department', headerName: 'Department', width: 140 },
+        ],
+      });
+
+      function groupRowCount() {
+        return ncgEl.querySelectorAll('.dg-header-group-row').length;
+      }
+
+      var subHidden = false;
+      document.getElementById('ncgToggleSub').addEventListener('click', function () {
+        subHidden = !subHidden;
+        grid.setColumnVisible('name', !subHidden);
+        grid.setColumnVisible('email', !subHidden);
+        this.textContent = subHidden ? 'Identity 컬럼 보이기' : 'Identity 컬럼 숨기기';
+        ncgStatus.textContent = 'Identity ' + (subHidden ? '숨김' : '표시') +
+          ' → 그룹 줄 ' + groupRowCount() + '개 (헤더 ' + (groupRowCount() + 1) + '단)';
+      });
+
+      var contactHidden = false;
+      document.getElementById('ncgToggleContact').addEventListener('click', function () {
+        contactHidden = !contactHidden;
+        grid.setColumnVisible('city', !contactHidden);
+        this.textContent = contactHidden ? 'Contact 그룹 보이기' : 'Contact 그룹 숨기기';
+        // Identity가 남아 있으면 여전히 3단, 둘 다 숨기면 2단으로 내려간다
+        ncgStatus.textContent = 'Contact ' + (contactHidden ? '숨김' : '표시') +
+          ' → 그룹 줄 ' + groupRowCount() + '개 (헤더 ' + (groupRowCount() + 1) + '단)';
+      });
+
+      grid.on('columnMoved', function (e) {
+        ncgStatus.textContent = 'columnMoved: ' + e.colId +
+          ' → 두 줄의 스팬이 모두 재계산되었습니다.';
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

@@ -1523,36 +1523,128 @@
   }
 
   /**
-   * columnGroups 옵션 → 그룹 헤더 행의 스팬 목록.
-   * 표시 컬럼 순서를 따라가며 같은 그룹의 연속 컬럼을 하나의 스팬으로 묶는다.
-   * 그룹이 없는 연속 컬럼도 빈 스팬 하나로 합친다. 고정(pinned) 상태가 다르면
-   * 스팬을 끊어 고정 컬럼 스티키 배치와 어긋나지 않게 한다.
-   * children은 colId 또는 field로 컬럼을 지칭한다.
+   * 그룹 헤더 줄 수 상한. 컬럼 헤더 한 줄까지 합쳐 최대 3단이 된다.
+   * 4단부터는 한 칸이 너무 얕아져 라벨을 못 읽으므로 열어두지 않는다.
    */
-  function buildGroupHeaderRuns(visibleCols, groups) {
-    const groupOf = {};
-    (groups || []).forEach((g, gi) => {
-      (g.children || []).forEach(id => { groupOf[id] = gi; });
-    });
-    const runs = [];
-    visibleCols.forEach(c => {
-      const gi = groupOf[c.colId] !== undefined ? groupOf[c.colId]
-        : groupOf[c.field] !== undefined ? groupOf[c.field]
-        : -1;
-      const pinned = c.pinned === 'left' || c.pinned === 'right' ? c.pinned : null;
-      const last = runs[runs.length - 1];
-      if (last && last.group === gi && last.pinned === pinned) {
-        last.colIds.push(c.colId);
-      } else {
+  const MAX_GROUP_HEADER_DEPTH = 2;
+
+  /**
+   * columnGroups 옵션을 정규화해 "컬럼 → 조상 그룹 경로"를 만든다.
+   * children에는 문자열(colId·field)과 중첩 그룹 객체를 섞어 쓸 수 있다.
+   *
+   * 경로가 maxDepth보다 깊어지면 더 깊은 그룹은 상위 그룹으로 접는다(막지 않고 경고).
+   * 경고는 console에 직접 찍지 않고 배열로 돌려준다 — 그래야 단위 테스트에서
+   * 콘솔이 오염되지 않는다.
+   *
+   * 반환: { pathOf: { colKey: [{ key, headerName }] }, depth, warnings }
+   *   depth는 실제로 필요한 그룹 줄 수(리프가 하나도 안 걸리면 0).
+   */
+  function normalizeColumnGroups(groups, maxDepth) {
+    const limit = maxDepth > 0 ? maxDepth : MAX_GROUP_HEADER_DEPTH;
+    const pathOf = Object.create(null);
+    const warnings = [];
+    let depth = 0;
+    let tooDeep = false;
+
+    function walk(list, ancestors, prefix) {
+      (list || []).forEach((child, i) => {
+        const path = prefix ? prefix + '.' + i : String(i);
+        if (typeof child === 'string') {
+          /* 리프 — 조상이 있어야 그릴 그룹이 있다 */
+          if (child && ancestors.length) {
+            pathOf[child] = ancestors;
+            if (ancestors.length > depth) depth = ancestors.length;
+          }
+          return;
+        }
+        if (!child || typeof child !== 'object' || !Array.isArray(child.children)) {
+          warnings.push(
+            'columnGroups: children 항목은 문자열(colId·field) 또는 ' +
+            '{ headerName, children } 객체여야 합니다.'
+          );
+          return;
+        }
+        let next = ancestors;
+        if (ancestors.length < limit) {
+          next = ancestors.concat([{ key: path, headerName: child.headerName || '' }]);
+        } else if (!tooDeep) {
+          tooDeep = true;
+          warnings.push(
+            'columnGroups: 그룹 헤더는 ' + limit + '단까지만 표시됩니다 — ' +
+            '더 깊은 그룹은 바로 위 그룹으로 접힙니다.'
+          );
+        }
+        walk(child.children, next, path);
+      });
+    }
+    walk(groups, [], '');
+    return { pathOf, depth, warnings };
+  }
+
+  /**
+   * columnGroups 옵션 → 레벨별 그룹 헤더 스팬 목록.
+   * 표시 컬럼 순서를 따라가며 "그 레벨까지의 조상 경로가 같은" 연속 컬럼을 하나의
+   * 스팬으로 묶는다. 그룹이 없는 연속 컬럼도 빈 스팬 하나로 합친다. 고정(pinned)
+   * 상태가 다르면 스팬을 끊어 고정 컬럼 스티키 배치와 어긋나지 않게 한다.
+   *
+   * 각 run의 kind:
+   *   'group' 라벨이 있는 그룹 칸
+   *   'cont'  상위 그룹이 이 레벨까지 내려온 칸 (자식 그룹이 없는 구간)
+   *   'empty' 어떤 그룹에도 안 속한 구간
+   * run.span이 true면 "아래 줄로 이어지는 칸"이라 아래 경계선을 그리지 않고,
+   * 라벨은 두 줄 블록의 가운데로 내린다.
+   *
+   * 반환: { rows: run[][], depth, warnings }
+   */
+  function buildGroupHeaderRows(visibleCols, groups, maxDepth) {
+    const norm = normalizeColumnGroups(groups, maxDepth);
+    /* 줄 수는 설정이 아니라 "지금 보이는 컬럼에 실제로 걸린 깊이"로 정한다.
+       그래야 그룹의 컬럼을 전부 숨기거나 어느 컬럼에도 안 걸리는 그룹을 줘도
+       빈 그룹 줄이 자리만 차지하지 않는다. */
+    const paths = visibleCols.map(c => norm.pathOf[c.colId] || norm.pathOf[c.field] || []);
+    let depth = 0;
+    paths.forEach(p => { if (p.length > depth) depth = p.length; });
+
+    const pathLen = Object.create(null);
+    visibleCols.forEach((c, ci) => { pathLen[c.colId] = paths[ci].length; });
+
+    const rows = [];
+    /* 위 줄의 런이 아래로 이어졌는지 — 이어진 칸 아래만 "몸통"으로 그린다 */
+    let parentSpan = Object.create(null);
+    for (let lv = 0; lv < depth; lv++) {
+      const runs = [];
+      visibleCols.forEach((c, ci) => {
+        const path = paths[ci];
+        const node = path[lv] || null;
+        /* 같은 런이려면 이 레벨까지의 조상이 전부 같아야 한다 */
+        const key = path.slice(0, lv + 1).map(n => n.key).join('|');
+        const pinned = c.pinned === 'left' || c.pinned === 'right' ? c.pinned : null;
+        const last = runs[runs.length - 1];
+        if (last && last.key === key && last.pinned === pinned) {
+          last.colIds.push(c.colId);
+          return;
+        }
         runs.push({
-          group: gi,
-          headerName: gi === -1 ? '' : groups[gi].headerName || '',
+          key,
+          kind: node ? 'group' : (path.length && parentSpan[c.colId] ? 'cont' : 'empty'),
+          headerName: node ? node.headerName : '',
+          span: false,
           colIds: [c.colId],
           pinned,
         });
-      }
-    });
-    return runs;
+      });
+      /* span은 런이 완성된 뒤에 정한다 — 한 런에 깊이가 다른 컬럼이 섞일 수 있고
+         (자식 그룹이 있는 컬럼 + 없는 컬럼이 나란히), 칸 하나는 아래 경계선을
+         일부 구간에만 그릴 수 없다. 런 전체가 여기서 끝날 때만 이어 붙인다. */
+      const nextSpan = Object.create(null);
+      runs.forEach(run => {
+        run.span = lv < depth - 1 && run.colIds.every(id => pathLen[id] <= lv + 1);
+        run.colIds.forEach(id => { nextSpan[id] = run.span; });
+      });
+      parentSpan = nextSpan;
+      rows.push(runs);
+    }
+    return { rows, depth, warnings: norm.warnings };
   }
 
   /**
@@ -3572,34 +3664,50 @@
       label.textContent = col.headerName;
     }
 
-    /* ---- column group header (columnGroups — 2단 헤더) ---- */
+    /* ---- column group header (columnGroups — 그룹 줄 1~2개, 즉 2~3단 헤더) ---- */
 
     _renderGroupHeader() {
-      if (this._groupHeaderRowEl && this._groupHeaderRowEl.parentNode) {
-        this._groupHeaderRowEl.parentNode.removeChild(this._groupHeaderRowEl);
-      }
-      this._groupHeaderRowEl = null;
+      (this._groupHeaderRowEls || []).forEach(row => {
+        if (row.parentNode) row.parentNode.removeChild(row);
+      });
+      this._groupHeaderRowEls = [];
       this._groupHeaderCells = [];
       const groups = this.options.columnGroups;
       if (!groups || groups.length === 0) return;
 
-      const row = el('div', 'dg-header-group-row');
-      row.setAttribute('role', 'row');
-      this._headerEl.insertBefore(row, this._headerEl.firstChild);
-      this._groupHeaderRowEl = row;
-
-      buildGroupHeaderRuns(this._visibleColumns(), groups).forEach(run => {
-        const cell = el('div', 'dg-header-group-cell', row);
-        if (run.group === -1) {
-          cell.classList.add('dg-header-group-empty');
-        } else {
-          const label = el('span', 'dg-header-group-label', cell);
-          label.textContent = run.headerName;
-        }
-        if (run.pinned === 'left') cell.classList.add('dg-pinned-left');
-        if (run.pinned === 'right') cell.classList.add('dg-pinned-right');
-        this._groupHeaderCells.push({ el: cell, colIds: run.colIds, pinned: run.pinned });
+      const built = buildGroupHeaderRows(
+        this._visibleColumns(), groups, MAX_GROUP_HEADER_DEPTH
+      );
+      /* 같은 경고를 refresh마다 다시 찍지 않는다 */
+      built.warnings.forEach(w => {
+        if (!this._groupHeaderWarned) this._groupHeaderWarned = {};
+        if (this._groupHeaderWarned[w]) return;
+        this._groupHeaderWarned[w] = true;
+        console.warn('[DataGrid] ' + w);
       });
+      if (!built.depth) return;
+
+      /* 위 레벨이 먼저 와야 하므로 뒤에서부터 헤더 맨 앞에 끼운다 */
+      for (let lv = built.depth - 1; lv >= 0; lv--) {
+        const row = el('div', 'dg-header-group-row');
+        row.setAttribute('role', 'row');
+        this._headerEl.insertBefore(row, this._headerEl.firstChild);
+        this._groupHeaderRowEls.unshift(row);
+
+        built.rows[lv].forEach(run => {
+          const cell = el('div', 'dg-header-group-cell', row);
+          if (run.kind === 'empty') cell.classList.add('dg-header-group-empty');
+          if (run.kind === 'cont') cell.classList.add('dg-header-group-cont');
+          if (run.span) cell.classList.add('dg-header-group-span');
+          if (run.kind === 'group') {
+            const label = el('span', 'dg-header-group-label', cell);
+            label.textContent = run.headerName;
+          }
+          if (run.pinned === 'left') cell.classList.add('dg-pinned-left');
+          if (run.pinned === 'right') cell.classList.add('dg-pinned-right');
+          this._groupHeaderCells.push({ el: cell, colIds: run.colIds, pinned: run.pinned });
+        });
+      }
     }
 
     /* ---- floating filter row (헤더 아래 인라인 필터) ---- */
@@ -8144,7 +8252,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.25.1';
+  DataGrid.version = '2.26.0';
 
   /**
    * 내장 로케일. `localeText: DataGrid.locales.ko`처럼 통째로 쓰거나,
@@ -8231,7 +8339,8 @@
     deriveTreeCheckStates,
     subtreeFullyChecked,
     computeTreeSummary,
-    buildGroupHeaderRuns,
+    normalizeColumnGroups,
+    buildGroupHeaderRows,
     buildQueryString,
     buildDataSourceRequest,
     parseDataSourceResponse,

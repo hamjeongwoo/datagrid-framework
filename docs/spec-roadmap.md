@@ -90,7 +90,7 @@
 
 | | ParamQuery | 제안 API | 우선순위 |
 |---|---|---|---|
-| [x] | **`column > colModel`** (중첩 컬럼 = 헤더 그룹 2단) | `columnGroups: [{ headerName, children: [colId\|field...] }]` — 연속 컬럼 스팬, pinned 경계 분리 — v1.2.0 | **P2** |
+| [x] | **`column > colModel`** (중첩 컬럼 = 헤더 그룹) | `columnGroups: [{ headerName, children: [colId\|field\|group...] }]` — 연속 컬럼 스팬, pinned 경계 분리 — v1.2.0. `children`에 그룹을 중첩하면 **3단**까지(그룹 줄 최대 2, 초과분은 상위로 접고 `console.warn`) — v2.26.0 | **P2** |
 | [x] | `column > dataType/type` (`string·integer·float·date·bool`) | `column.dataType: 'string'\|'number'\|'date'\|'bool'` — 정렬 비교·필터 종류·기본 정렬(align)·기본 에디터 자동 결정 — v1.1.0 | **P1** |
 | [x] | `column > format` (`#,###.00`, 날짜 포맷) + util `formatNumber` | `column.format: '#,##0.00' \| 'yyyy-MM-dd'` 선언적 포맷 (valueFormatter의 간편판) + `DataGrid.format()` 유틸 — v1.1.0 | **P1** |
 | [x] | `numberCell` (행 번호 컬럼) | `rowNumbers: true` 옵션 (좌측 고정, 표시 순서 기준) — v1.1.0 | **P1** (쉬움) |
@@ -179,6 +179,16 @@
 
 ### v2.1 — "TreeGrid" (§6 T1~T4)
 - treeData 코어(계층 표시·펼침/접힘·계층 정렬/필터), 체크박스 캐스케이드, 부모 요약, 지연 로딩
+
+### v2.26 — 3단 컬럼 그룹 헤더 (사용자 요청)
+- 요청: "Column Group Headers에 3단도 되나? 4단은 사용성이 낮을 것 같으니 1~3단까지." **상한을 열어두지 않고 2줄(= 헤더 3단)로 못박는다** — 4단부터는 한 칸이 34px씩 얕아져 라벨을 읽을 수 없고, N단을 허용하면 "몇 단까지가 정상인가"를 소비자가 판단해야 한다. 넘치는 중첩은 막지 말고 **바로 위 그룹으로 접고 `console.warn`**(§13의 방침 — 명시한 조합은 존중하되 알린다).
+- API는 기존 `children`을 넓히는 쪽으로. 문자열(`colId`·`field`)과 그룹 객체를 **섞어** 넣을 수 있고, 평면 배열은 그대로 depth 1이라 **기존 설정이 한 글자도 안 바뀐다.** 새 옵션(`columnGroupDepth` 같은)을 만들면 같은 개념이 둘로 갈린다.
+- **줄 수는 설정이 아니라 "지금 보이는 컬럼에 실제로 걸린 깊이"로 정한다.** 설정 기준으로 잡으면 하위 그룹 컬럼을 전부 숨겼을 때 빈 그룹 줄이 34px 자리만 차지한다. 단위 테스트를 쓰다가 잡았다(`buildGroupHeaderRows([], groups)`가 빈 줄을 하나 내놨다).
+- 순수 함수 `normalizeColumnGroups(groups, maxDepth)`(컬럼 → 조상 경로, 경고는 **배열로 반환** — §13) + `buildGroupHeaderRows(cols, groups, maxDepth)`(레벨별 스팬). `_test` 노출. 기존 `buildGroupHeaderRuns`를 대체한다.
+- **자식 그룹이 없는 구간은 상위 그룹이 두 줄을 차지한다.** 진짜 `rowspan`이 아니라 아래 줄에 몸통 칸(`dg-header-group-cont`)을 두고 가로선을 지우는 방식 — 그룹 헤더는 flex 행이고 pinned가 `position: sticky`라 absolute 배치나 CSS Grid로 못 바꾼다. 라벨은 `translateY(calc(var(--dg-group-header-height) / 2))`로 내려 두 줄의 가운데에 맞춘다(`translateY(50%)`는 **라벨 자기 높이** 기준이라 어긋난다 — 검증에서 8px 차이로 잡혔다).
+- **경계선을 오른쪽에만 긋는다.** 기존엔 좌우에 긋고 `margin-left: -1px`로 겹쳐 없앴는데, 그러면 칸의 위치가 **앞선 칸 수만큼** 밀린다. 한 줄일 땐 안 보이지만 줄마다 칸 수가 다르면 두 줄의 세로선이 어긋난다(검증에서 1px 밀림으로 확인).
+- **한 스팬에 깊이가 다른 컬럼이 섞이면 이어 붙이지 않는다** — 칸 하나에 아래 경계선을 일부 구간만 그릴 수 없기 때문. 처음엔 런의 첫 컬럼만 보고 `span`을 정했다가, "자식 그룹이 있는 컬럼 + 없는 컬럼"이 나란한 배치에서 **선을 그어 놓고 그 아래를 몸통으로 그리는** 모순이 나왔다(브라우저 검증에서 발견 — 단위 테스트는 그 상태를 정답으로 적어두고 있었다).
+- 데모: features.html `#nested-column-groups` — 깊이가 섞인 배치 + 컬럼 숨김 버튼으로 그룹 줄 수가 따라 바뀌는 것을 보여준다. components.html에 2단/3단 정적 견본 추가.
 
 ### v2.25.1 — Enter가 방금 고른 항목을 되돌리던 버그 ([BUG-014](bug-reports/2026-08-10-014-multiselect-enter-undoes-selection.md), 사용자 제보)
 - 제보: "팝업 에디터에서 multiselect에 아이템을 선택 후 엔터를 누르면 적용이 안 돼."

@@ -31,7 +31,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.25.1',
+  version: '2.26.0',
   updated: '2026-08-10',
 
   sections: [
@@ -748,17 +748,59 @@ window.ApiDocs = {
         {
           name: 'columnGroups',
           demo: 'column-groups',
-          type: '{ headerName: string, children: string[] }[]',
+          type: '{ headerName: string, children: (string | group)[] }[]',
           since: '1.2.0',
           description:
-            '헤더 위에 2단 그룹 스팬 행을 추가합니다. <code>children</code>은 <code>colId</code> 또는 ' +
-            '<code>field</code>로 컬럼을 지칭하며, <strong>연속으로 배치된</strong> 같은 그룹 컬럼이 ' +
-            '하나의 스팬으로 묶입니다(드래그로 떨어뜨리면 스팬도 갈라짐). 그룹에 속하지 않은 컬럼 위는 ' +
-            '빈 스팬으로 채워지고, 고정(pinned) 컬럼 경계에서는 스팬이 끊깁니다. ' +
-            '높이는 <code>--dg-group-header-height</code> 토큰으로 조절합니다.',
+            '<p>컬럼 헤더 위에 그룹 스팬 줄을 얹습니다. <code>children</code>은 <code>colId</code> 또는 ' +
+            '<code>field</code>로 컬럼을 지칭하며, <strong>연속으로 배치된</strong> 같은 그룹 컬럼이 하나의 ' +
+            '스팬으로 묶입니다(드래그로 떨어뜨리면 스팬도 갈라짐). 그룹에 속하지 않은 컬럼 위는 빈 스팬으로 ' +
+            '채워지고, 고정(pinned) 컬럼 경계에서는 스팬이 끊깁니다.</p>' +
+            '<p><code>children</code>에 컬럼 이름 대신 <strong>그룹 객체를 다시 넣으면</strong> 그룹 줄이 한 ' +
+            '줄 더 생겨 <strong>3단 헤더</strong>가 됩니다(v2.26 — ' +
+            '<a href="../examples/features.html#nested-column-groups" target="_blank" rel="noopener">' +
+            '3단 데모 ↗</a>). 줄 높이는 ' +
+            '<a href="#theming--dg-group-header-height"><code>--dg-group-header-height</code></a> 토큰으로 ' +
+            '조절합니다.</p>',
+          notes: [
+            {
+              title: '그룹 줄은 최대 2줄 — 헤더 3단까지',
+              body:
+                '<p>더 깊게 중첩하면 넘치는 그룹은 <strong>바로 위 그룹으로 접히고</strong> ' +
+                '<code>console.warn</code>이 한 번 뜹니다(막지는 않습니다). 4단부터는 한 칸이 너무 얕아져 ' +
+                '라벨을 읽을 수 없기 때문입니다.</p>',
+            },
+            {
+              title: '줄 수는 설정이 아니라 보이는 컬럼이 정합니다',
+              body:
+                '<p>중첩 그룹에 속한 컬럼을 전부 숨기면(<code>hide</code> · ' +
+                '<a href="#api-methods-setColumnVisible"><code>setColumnVisible()</code></a>) 그 줄이 ' +
+                '저절로 사라져 2단으로 내려갑니다. 어떤 컬럼에도 안 걸리는 그룹을 줘도 빈 줄이 자리를 ' +
+                '차지하지 않습니다.</p>',
+            },
+            {
+              title: '자식 그룹이 없는 구간은 두 줄을 차지합니다',
+              body:
+                '<p>3단에서 하위 그룹이 없는 그룹은 아래 줄까지 이어져 <strong>한 칸</strong>으로 그려지고 ' +
+                '라벨이 두 줄의 가운데에 놓입니다 — 깊이가 섞여 있어도 표가 들쭉날쭉해 보이지 않습니다.</p>' +
+                '<p>단, <strong>한 스팬 안에 자식 그룹이 있는 컬럼과 없는 컬럼이 섞이면</strong> 이어 붙이지 ' +
+                '않습니다(칸 하나에 아래 경계선을 일부 구간만 그릴 수 없기 때문). 이때 하위 그룹이 없는 쪽 ' +
+                '아래는 빈 칸으로 남습니다.</p>',
+            },
+          ],
           example:
+            "// 2단 — 평면 (기존 그대로)\n" +
             "columnGroups: [\n" +
             "  { headerName: 'Person', children: ['name', 'email'] },\n" +
+            "  { headerName: 'Compensation', children: ['salary', 'rating'] },\n" +
+            ']\n' +
+            '\n' +
+            '// 3단 — children에 그룹 객체를 중첩 (v2.26)\n' +
+            'columnGroups: [\n' +
+            "  { headerName: 'Employee', children: [\n" +
+            "      { headerName: 'Identity', children: ['name', 'email'] },\n" +
+            "      { headerName: 'Contact',  children: ['city', 'phone'] },\n" +
+            '  ] },\n' +
+            "  // 자식 그룹이 없으므로 이 라벨이 두 줄을 차지한다\n" +
             "  { headerName: 'Compensation', children: ['salary', 'rating'] },\n" +
             ']',
         },
