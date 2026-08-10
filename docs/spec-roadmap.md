@@ -180,6 +180,19 @@
 ### v2.1 — "TreeGrid" (§6 T1~T4)
 - treeData 코어(계층 표시·펼침/접힘·계층 정렬/필터), 체크박스 캐스케이드, 부모 요약, 지연 로딩
 
+### v2.25 — 검색형 multiselect (사용자 요청)
+- 요청: "multiselect에도 검색이 되는지 확인 → lazy까지 지원, 표시는 칩으로." 확인 결과 `editorSearch` 분기가 `editorType === 'select'`에만 걸려 있었고, `multiselect` 분기가 **그보다 위에 있어** 옵션이 에러도 경고도 없이 무시됐다.
+- **새 분기를 파지 않고 기존 searchselect 분기를 `multi` 플래그로 일반화한다.** 두 위젯의 공통부(질의·디바운스·최신 질의 판별·label 캐시·위치 결정·폼 접힘·focusout)가 분기부보다 훨씬 크다 — 따로 두면 이후 수정이 한쪽에만 반영된다. 위에 있는 비검색 `multiselect` 분기에는 `&& !col.editorSearch` 가드를 세트로 넣는다(이게 빠지면 아래 분기에 도달하지 못한다 — 실제로 첫 구현에서 그렇게 됐다).
+- **선택 상태의 진실은 DOM이 아니라 배열(`msPicked`)이다.** 비검색 multiselect는 체크박스를 순회해 값을 모으는데, 검색형은 필터로 가려진 항목이 목록에서 사라지고 lazy면 질의마다 통째로 갈리므로 그 방식은 **안 보이는 선택을 조용히 유실**한다.
+- 칩 줄을 검색창 **위**에 둔다 — 목록이 어떻게 바뀌어도 "지금 무엇이 골라져 있는지"가 같은 자리에 남는다. 칩은 셀 표시(`renderers.multiselect`)와 같은 `.dg-tag.dg-tag-plain`이라 편집 중과 편집 후의 모양이 같다. 옵션 안 체크박스는 표시 전용(`pointer-events: none` — BUG-006, `disabled` 금지).
+- `Enter`는 **활성 항목 토글**(커밋은 Tab·바깥 클릭). 커밋에 쓰면 첫 선택에서 편집이 닫혀 두 번째를 고를 수 없다. 활성 항목이 없을 때만 버블시켜 커밋으로 넘긴다.
+- 저장 순서는 **고른 순서**(칩 순서). 비검색 multiselect의 "editorOptions 순서" 규칙은 lazy에 **전체 옵션 목록이라는 것이 없어** 적용할 수 없다. 값 표현의 타입 보존(배열↔콤마 문자열)은 기존 규약 그대로.
+- 폼(popupEditor)에서는 **접히는 콤보박스**. v2.16에서 multiselect를 폼에서 펼쳐 둔 이유가 "고른 값을 보여줄 자리가 없어서"였는데 칩 줄이 그 자리를 대신한다.
+- 내장 렌더러 `renderers.multiselect`가 `params.optionLabels`(lazy label 캐시)를 보도록 확장 — 이전엔 lazy로 고른 값이 셀에서 원시 코드로 표시됐다. 캐시 조회는 `hasOwnProperty` 기준으로 바꿨다(`'toString'` 같은 값이 `Object.prototype`에 걸려 함수가 label로 새던 경로 — 단일 값 렌더러에도 있던 문제).
+- **곁들여 고친 것: 폼 안 콤보박스 목록이 스크롤 컨테이너(`.dg-popup-body`, `overflow: auto`)에 잘리는 문제.** 아래 공간이 모자라면 위로 펴고, 어느 쪽으로도 안 담기면 남은 공간에 맞춰 `max-height`를 줄여 목록 안에서 스크롤한다(`clippingRect` 헬퍼). 기존 단일 값 검색형 select에도 있던 문제인데, 칩 줄로 컨트롤이 높아지는 multiselect에서 훨씬 잘 드러난다.
+- 순수 함수 `toggleMultiValue` · `multiValueIndex` · `lookupOptionLabelsWith` 추가, `_test` 노출.
+- 데모: features.html `#searchable-multiselect` — 인라인 카드(정적 + lazy, 배열/콤마 문자열 값 각각) + 팝업 폼 카드.
+
 ### v2.24 — dataSource.autoLoad (사용자 요청)
 - 요청: "최초에 조회를 할 건지 말 건지 옵션. 기본은 true." 검색 조건을 받은 뒤 조회하는 화면에서 생성 직후의 조건 없는 전체 조회가 낭비였다.
 - **위치를 `dataSource` 안으로.** dataSource 없이는 의미가 없는 옵션이고, `request`/`parse`/`headers`/`paramsFormat`이 이미 거기 모여 있다. 최상위 옵션을 늘리지 않는다.
@@ -447,6 +460,7 @@ popupEditor: {
 - 키보드: ↑/↓ 옵션 이동, Enter 선택+커밋, 옵션 클릭 즉시 커밋(전파 차단 — editOnSingleClick 재진입 방지), Esc 취소. 옵션을 고르지 않으면 미커밋.
 - `DataGrid.renderers.searchselect(options?)` — 짝꿍 렌더러. select 렌더러와 동일 + lazy로 고른 값은 그리드가 유지하는 컬럼별 value→label 캐시로 표시 (cellRenderer params에 `optionLabels` 추가).
 - 데모: features.html 카드에 editOnSingleClick 토글 체크박스 포함 (클릭 한 번 편집과 조합 테스트).
+- v2.25에서 `editor: 'multiselect'`로 확장 (칩 표시 — 위 v2.25 항목 참조).
 
 ### v2.2 — select 에디터 label/value (사용자 요청)
 - `editorOptions`가 문자열 배열 외에 `{ label, value }` 객체 배열 지원 — 드롭다운은 label 표시, 커밋은 value(원본 타입 보존). 셀에는 저장된 value가 표시된다.

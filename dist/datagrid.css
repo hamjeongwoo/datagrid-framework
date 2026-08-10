@@ -755,6 +755,59 @@
 }
 .dg-searchselect-msg.dg-error { color: var(--dg-invalid-color); }
 
+/* 검색형 multiselect (editor: 'multiselect' + editorSearch) — 칩 줄 + 체크리스트.
+   칩은 셀 표시(renderers.multiselect)와 같은 .dg-tag.dg-tag-plain을 써서 편집 중과
+   편집 후의 모양이 같다. 새 토큰은 만들지 않는다(전부 기존 토큰 재사용). */
+.dg-searchselect-multi {
+  /* 패널 대신 **목록만** 스크롤한다 — 패널이 스크롤하면 칩 줄이 위로 밀려나가
+     "지금 무엇이 골라져 있는지"가 사라진다 */
+  max-height: none;
+  overflow: visible;
+}
+.dg-searchselect-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-height: 68px;
+  overflow: auto;
+  margin-bottom: 4px;
+}
+/* hidden 속성이 display: flex에 지므로 명시적으로 되돌린다 */
+.dg-searchselect-chips[hidden] { display: none; }
+.dg-searchselect-chip {
+  gap: 2px;
+  padding-right: 4px;
+}
+.dg-searchselect-chip-remove {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--dg-secondary-foreground-color);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.dg-searchselect-chip-remove:hover {
+  background: var(--dg-row-hover-color);
+  color: var(--dg-foreground-color);
+}
+.dg-searchselect-multi-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* 옵션 안의 체크박스는 상태 표시 전용 — 클릭은 항상 옵션 행이 받는다.
+   disabled를 쓰면 체크박스 자리가 클릭 사각지대가 된다 (BUG-006). */
+.dg-searchselect-multi-option .dg-checkbox {
+  flex: none;
+  pointer-events: none;
+}
+
 /* ==========================================================================
    Row grouping + summary rows
    ========================================================================== */
@@ -1416,7 +1469,10 @@
 
 /* 셀 앵커 패널(multiselect/radio)은 폼 안에서 흐름대로 펼친다 —
    절대 위치로 두면 아래 필드를 덮는다. 이 둘은 펼쳐진 채로 현재 상태
-   (체크·선택)를 그대로 보여주므로 접을 이유가 없다. */
+   (체크·선택)를 그대로 보여주므로 접을 이유가 없다.
+   단 **검색형** multiselect(editorSearch)는 여기 해당하지 않는다 — 클래스가
+   .dg-editor-searchselect라 아래 콤보박스 규칙을 타고, 칩 줄이 현재 상태를
+   보여주므로 접혀도 정보가 사라지지 않는다. */
 .dg-popup .dg-editor-multiselect,
 .dg-popup .dg-editor-radio {
   position: static;
@@ -1469,6 +1525,7 @@
   display: flex;
   position: absolute;
   top: calc(100% + 2px);
+  bottom: auto;
   left: 0;
   right: 0;
   z-index: 31;
@@ -1478,6 +1535,13 @@
   border: 1px solid var(--dg-border-color);
   border-radius: var(--dg-wrapper-border-radius);
   box-shadow: var(--dg-menu-shadow);
+}
+/* 폼 바디는 스크롤 컨테이너(overflow: auto)라 그 밖으로 나간 목록을 그리지 않는다 —
+   아래 공간이 모자라면 위로 편다. 칩 줄이 붙는 multiselect는 컨트롤이 더 높아
+   목록이 아래로 밀리기 쉬우므로 특히 중요하다. */
+.dg-searchselect-collapsible.dg-searchselect-up.dg-searchselect-open .dg-searchselect-list {
+  top: auto;
+  bottom: calc(100% + 2px);
 }
 
 .dg-popup-footer {

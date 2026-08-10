@@ -3952,6 +3952,169 @@
     </script>
   </div>
 
+  <!-- ======================================================== 검색형 multiselect -->
+  <h2 class="section" id="searchable-multiselect">Searchable Multiselect Editor (multiselect + editorSearch)</h2>
+  <p class="section-desc">
+    <code class="inline">editor: 'multiselect'</code>에도 <code class="inline">editorSearch</code>를 줄 수 있습니다 (v2.25).
+    스키마는 검색형 select와 <strong>동일</strong>합니다 — <code class="inline">true</code>면 정적
+    <code class="inline">editorOptions</code>를 로컬 필터하고, <code class="inline">{ fetch(query) }</code>면
+    질의마다 비동기로 목록을 불러옵니다. 고른 값은 <strong>칩</strong>으로 검색창 위에 상시 표시되므로,
+    필터로 목록에서 가려지거나 lazy 질의로 목록이 통째로 갈려도 지금 무엇이 골라져 있는지 사라지지 않습니다.
+    칩의 <code class="inline">×</code> 또는 항목 재클릭으로 해제하고, <strong>Enter는 활성 항목 토글</strong>입니다
+    (커밋은 Tab·바깥 클릭). 저장 순서는 <strong>고른 순서</strong>이며,
+    원본이 배열이면 배열로 · 콤마 문자열이면 콤마 문자열로 되돌려 커밋합니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div id="gridMsSearch" class="grid-wrap-md"></div>
+      <div class="status-line" id="msSearchStatus">
+        Skills는 정적 목록 검색(editorSearch: true, 값은 배열), Regions는 lazy 검색(fetch + 250ms 지연, 값은 콤마 문자열)입니다.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var SKILLS = [
+        'JavaScript', 'TypeScript', 'React', 'Vue', 'Svelte', 'Angular',
+        'Node.js', 'Deno', 'Python', 'Django', 'FastAPI', 'Go',
+        'Rust', 'Java', 'Spring', 'Kotlin', 'Swift', 'C#',
+        'PostgreSQL', 'MySQL', 'Redis', 'Kafka', 'Docker', 'Kubernetes',
+      ];
+      /* lazy 검색용 "서버" 데이터 — value는 코드, label은 사람이 읽는 이름.
+         정적 editorOptions가 없으므로 칩·셀 표시는 label 캐시가 담당한다. */
+      var REGION_DB = [
+        'apac-kr/Korea (APAC)', 'apac-jp/Japan (APAC)', 'apac-sg/Singapore (APAC)',
+        'apac-au/Australia (APAC)', 'apac-in/India (APAC)', 'apac-vn/Vietnam (APAC)',
+        'emea-de/Germany (EMEA)', 'emea-fr/France (EMEA)', 'emea-uk/United Kingdom (EMEA)',
+        'emea-es/Spain (EMEA)', 'emea-nl/Netherlands (EMEA)', 'emea-se/Sweden (EMEA)',
+        'emea-tr/Turkey (EMEA)', 'emea-pl/Poland (EMEA)',
+        'amer-us-east/US East (AMER)', 'amer-us-west/US West (AMER)',
+        'amer-ca/Canada (AMER)', 'amer-br/Brazil (AMER)', 'amer-mx/Mexico (AMER)',
+      ].map(function (s) {
+        var p = s.split('/');
+        return { value: p[0], label: p[1] };
+      });
+
+      var status = document.getElementById('msSearchStatus');
+      var rows = DemoData.makeEmployees(40, 11);
+      rows.forEach(function (r, i) {
+        r.skills = [SKILLS[i % SKILLS.length], SKILLS[(i * 5 + 3) % SKILLS.length]]; // 배열 값
+        r.regions = i % 3 === 0 ? 'apac-kr,emea-de' : 'amer-us-east';                // 콤마 문자열 값
+      });
+
+      // lazy 검색 — 실제로는 fetch(...)로 서버에 질의한다. 여기서는 지연만 흉내낸다.
+      function searchRegions(query) {
+        var q = String(query || '').trim().toLowerCase();
+        return new Promise(function (resolve) {
+          setTimeout(function () {
+            resolve(REGION_DB.filter(function (o) {
+              return !q || o.label.toLowerCase().indexOf(q) !== -1 ||
+                o.value.toLowerCase().indexOf(q) !== -1;
+            }).slice(0, 8));   // 서버가 상위 N건만 준다고 가정
+          }, 250);
+        });
+      }
+
+      var grid = new DataGrid(document.getElementById('gridMsSearch'), {
+        rowData: rows,
+        editable: true,
+        columnDefs: [
+          { field: 'name', headerName: 'Name', width: 150 },
+          { field: 'skills', headerName: 'Skills (정적 검색)', flex: 1,
+            editor: 'multiselect', editorOptions: SKILLS, editorSearch: true,
+            cellRenderer: DataGrid.renderers.multiselect() },
+          { field: 'regions', headerName: 'Regions (lazy 검색)', flex: 1,
+            editor: 'multiselect',
+            editorSearch: { fetch: searchRegions, debounce: 200, minLength: 0 },
+            // 정적 목록이 없으므로 렌더러가 label 캐시를 봐야 코드가 아니라 이름이 뜬다
+            cellRenderer: DataGrid.renderers.multiselect() },
+        ],
+      });
+
+      grid.on('cellValueChanged', function (e) {
+        var v = e.newValue;
+        status.textContent = e.colDef.field + ' → ' +
+          (Array.isArray(v) ? '[' + v.join(', ') + '] (배열 유지)' : '"' + v + '" (콤마 문자열 유지)') +
+          ' — ' + (Array.isArray(v) ? v.length : String(v).split(',').filter(Boolean).length) + '개 선택';
+      });
+    </script>
+  </div>
+
+  <p class="section-desc">
+    팝업 폼(<code class="inline">popupEditor</code>)에서는 <strong>접히는 콤보박스</strong>가 됩니다 —
+    평소엔 칩 줄과 검색창만 보이고 클릭·타이핑할 때만 목록이 떠서 다른 필드를 덮습니다.
+    검색이 없는 일반 <code class="inline">multiselect</code>가 폼에서 항상 펼쳐지는 이유는 "고른 값을 보여줄 자리가
+    없어서"인데, 칩 줄이 그 자리를 대신하므로 접어도 정보가 사라지지 않습니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn primary" id="msFormOpenBtn" type="button">첫 행 폼으로 편집</button>
+      </div>
+      <div id="gridMsSearchForm" class="grid-wrap-md"></div>
+      <div class="status-line" id="msFormStatus">
+        행을 더블클릭하거나 버튼을 누르면 폼이 열립니다. Skills·Regions 필드가 칩 콤보박스입니다.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var FORM_SKILLS = [
+        'JavaScript', 'TypeScript', 'React', 'Vue', 'Node.js', 'Python',
+        'Go', 'Rust', 'Java', 'Kotlin', 'PostgreSQL', 'Redis',
+        'Kafka', 'Docker', 'Kubernetes', 'Terraform',
+      ];
+      var FORM_REGIONS = [
+        'apac-kr/Korea (APAC)', 'apac-jp/Japan (APAC)', 'apac-sg/Singapore (APAC)',
+        'emea-de/Germany (EMEA)', 'emea-fr/France (EMEA)', 'emea-uk/United Kingdom (EMEA)',
+        'amer-us-east/US East (AMER)', 'amer-ca/Canada (AMER)', 'amer-br/Brazil (AMER)',
+      ].map(function (s) {
+        var p = s.split('/');
+        return { value: p[0], label: p[1] };
+      });
+
+      var formStatus = document.getElementById('msFormStatus');
+      var formRows = DemoData.makeEmployees(12, 31);
+      formRows.forEach(function (r, i) {
+        r.skills = [FORM_SKILLS[i % FORM_SKILLS.length]];
+        r.regions = ['apac-kr'];
+      });
+
+      function searchFormRegions(query) {
+        var q = String(query || '').trim().toLowerCase();
+        return new Promise(function (resolve) {
+          setTimeout(function () {
+            resolve(FORM_REGIONS.filter(function (o) {
+              return !q || o.label.toLowerCase().indexOf(q) !== -1;
+            }));
+          }, 200);
+        });
+      }
+
+      var formGrid = new DataGrid(document.getElementById('gridMsSearchForm'), {
+        rowData: formRows,
+        editable: true,
+        popupEditor: { title: '직원 편집', columns: 2, width: 560 },
+        columnDefs: [
+          { field: 'name', headerName: 'Name', width: 150 },
+          { field: 'department', headerName: 'Department', width: 140 },
+          { field: 'skills', headerName: 'Skills', flex: 1,
+            editor: 'multiselect', editorOptions: FORM_SKILLS, editorSearch: true,
+            cellRenderer: DataGrid.renderers.multiselect() },
+          { field: 'regions', headerName: 'Regions', flex: 1,
+            editor: 'multiselect', editorSearch: { fetch: searchFormRegions },
+            cellRenderer: DataGrid.renderers.multiselect() },
+        ],
+      });
+
+      document.getElementById('msFormOpenBtn').addEventListener('click', function () {
+        formGrid.openEditPopup(formRows[0]);
+      });
+
+      formGrid.on('popupFieldChanged', function (e) {
+        var v = e.newValue;
+        formStatus.textContent = '폼 필드 ' + e.colDef.field + ' 변경 → ' +
+          (Array.isArray(v) ? '[' + v.join(', ') + ']' : '"' + v + '"') + ' (Save를 눌러야 행에 반영됩니다)';
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

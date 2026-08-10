@@ -22,7 +22,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.24.0',
+  version: '2.25.0',
   updated: '2026-08-09',
 
   sections: [
@@ -885,6 +885,7 @@ window.ApiDocs = {
           ['searchMinLength', 'Type {count}+ characters', '{count}자 이상 입력하세요', 'editorSearch minLength 안내'],
           ['noResults', 'No results', '결과 없음', 'editorSearch 결과 없음'],
           ['loadFailed', 'Load failed', '불러오기 실패', 'editorSearch fetch 실패'],
+          ['removeChipLabel', 'Remove {label}', '{label} 제거', '검색형 multiselect 칩의 × 버튼 aria-label (v2.25)'],
           ['statusColumnHeader', 'Status', '상태', 'statusColumn 헤더 기본값'],
           ['statusAdded', 'New', '신규', 'statusColumn 신규 행 태그'],
           ['statusUpdated', 'Updated', '수정', 'statusColumn 수정 행 태그'],
@@ -1584,6 +1585,9 @@ window.ApiDocs = {
             '검색 입력이 있는 옵션 패널로 바뀝니다 (v2.3.0). ' +
             '<code>\'multiselect\'</code>(v2.2.0)는 셀 아래에 체크리스트 패널을 펼치고 ' +
             '<code>editorOptions</code> 순서로 커밋합니다 — 내용이 같으면 커밋하지 않습니다. ' +
+            "multiselect도 <a href='#column-defs-editorSearch'><code>editorSearch</code></a>를 받습니다 " +
+            "(v2.25 — <a href='../examples/features.html#searchable-multiselect'>데모 ↗</a>): " +
+            '검색창 + 체크리스트가 되고 고른 값은 칩으로 표시되며, 이때는 <strong>고른 순서</strong>로 커밋합니다. ' +
             '<strong>값 표현은 배열과 콤마 구분 문자열을 모두 받습니다</strong>(v2.21) — ' +
             '<code>[\'js\', \'css\']</code>와 <code>"js,css"</code>(항목 앞뒤 공백 허용)가 같은 값이고, ' +
             '읽기·표시·편집·변경 판정이 모두 두 표현을 동일하게 다룹니다. ' +
@@ -1663,24 +1667,39 @@ window.ApiDocs = {
           default: 'undefined',
           since: '2.3.0',
           description:
-            "<code>editor: 'select'</code>를 네이티브 셀렉트 대신 <strong>검색 입력이 있는 옵션 패널</strong>로 " +
-            '바꿉니다. <code>true</code>면 정적 <code>editorOptions</code>를 로컬에서 필터하고(label 또는 ' +
+            "<code>editor: 'select'</code>(단일 선택)와 <code>editor: 'multiselect'</code>(다중 선택, v2.25)를 " +
+            '<strong>검색 입력이 있는 옵션 패널</strong>로 바꿉니다. ' +
+            '<code>true</code>면 정적 <code>editorOptions</code>를 로컬에서 필터하고(label 또는 ' +
             '문자열화한 value 부분 일치, 대소문자 무관), <code>fetch(query, row, col) =&gt; Promise&lt;options&gt;</code>를 ' +
             '주면 질의마다 비동기로 목록을 불러옵니다 (lazy 검색 — 반환 형식은 <code>editorOptions</code>와 동일). ' +
             '<code>debounce</code>(기본 250ms)는 입력 멈춤 후 fetch까지의 지연, <code>minLength</code>(기본 0)는 ' +
             'fetch를 시작할 최소 글자 수, <code>placeholder</code>(기본 "Search…")는 검색 입력의 플레이스홀더입니다. ' +
-            '<kbd>↑</kbd>/<kbd>↓</kbd>로 옵션 이동, <kbd>Enter</kbd>로 선택·커밋, 옵션 클릭은 즉시 커밋, ' +
-            '<kbd>Esc</kbd>는 취소합니다. 옵션을 고르지 않고 닫으면 값이 바뀌지 않으며, fetch 실패 시 ' +
-            '<code>console.error</code> 후 "Load failed"가 표시됩니다(이전 응답이 늦게 도착해도 최신 질의만 반영). ' +
-            "lazy로 고른 값의 label 표시는 짝꿍 렌더러 <a href='#renderers-searchselect'>" +
-            '<code>renderers.searchselect()</code></a>가 담당합니다.',
+            '옵션을 고르지 않고 닫으면 값이 바뀌지 않으며, fetch 실패 시 ' +
+            '<code>console.error</code> 후 "Load failed"가 표시됩니다(이전 응답이 늦게 도착해도 최신 질의만 반영).<br>' +
+            '<strong>select</strong> — <kbd>↑</kbd>/<kbd>↓</kbd> 이동, <kbd>Enter</kbd>로 선택·커밋, ' +
+            '옵션 클릭은 즉시 커밋, <kbd>Esc</kbd>는 취소. lazy로 고른 값의 label 표시는 짝꿍 렌더러 ' +
+            "<a href='#renderers-searchselect'><code>renderers.searchselect()</code></a>가 담당합니다.<br>" +
+            "<strong>multiselect</strong> (<a href='../examples/features.html#searchable-multiselect'>데모 ↗</a>) — " +
+            '고른 값이 <strong>칩</strong>으로 검색창 위에 상시 표시되므로, 필터로 목록에서 가려지거나 ' +
+            'lazy 질의로 목록이 통째로 갈려도 선택이 사라지지 않습니다(선택 상태를 DOM이 아니라 별도로 들고 있습니다). ' +
+            '칩의 <code>×</code> 또는 항목 재클릭으로 해제하고, <kbd>Enter</kbd>는 <strong>활성 항목 토글</strong>입니다 ' +
+            '— 커밋은 <kbd>Tab</kbd>·바깥 클릭이 담당합니다(활성 항목이 없을 때의 <kbd>Enter</kbd>는 커밋). ' +
+            '저장 순서는 <strong>고른 순서</strong>이며(검색이 없는 multiselect의 "editorOptions 순서"와 다릅니다 — ' +
+            'lazy에는 전체 목록이라는 것이 없습니다), 값 표현은 원본을 따라 배열이면 배열 · 콤마 문자열이면 ' +
+            '콤마 문자열로 되돌려 커밋합니다. 셀 표시는 ' +
+            "<a href='#renderers-multiselect'><code>renderers.multiselect()</code></a>가 같은 label 캐시를 봅니다.",
           example:
             "{ field: 'city', editor: 'select',\n" +
             '  editorSearch: {\n' +
             '    minLength: 1, debounce: 300,\n' +
             "    fetch: function (query) { return fetch('/api/cities?q=' + query).then(r => r.json()); },\n" +
             '  },\n' +
-            '  cellRenderer: DataGrid.renderers.searchselect() }',
+            '  cellRenderer: DataGrid.renderers.searchselect() }\n' +
+            '\n' +
+            '// 다중 선택 + 검색 (v2.25) — 고른 값은 칩으로 표시된다\n' +
+            "{ field: 'regions', editor: 'multiselect',\n" +
+            "  editorSearch: { fetch: function (q) { return fetch('/api/regions?q=' + q).then(r => r.json()); } },\n" +
+            '  cellRenderer: DataGrid.renderers.multiselect() }',
         },
         {
           name: 'suppressCopy',
@@ -3211,12 +3230,17 @@ window.ApiDocs = {
             '<strong>배열과 콤마 구분 문자열을 모두 받습니다</strong>(v2.21) — ' +
             '<code>[\'js\',\'css\']</code>와 <code>"js,css"</code>·<code>"js, css"</code>가 같은 결과를 냅니다. ' +
             '<code>options</code>를 생략하면 그 컬럼의 <code>editorOptions</code>를 사용하고, ' +
-            '목록에 없는 값은 문자열 그대로 칩이 되며 빈 배열·빈 문자열·null은 빈 셀입니다. ' +
-            'label은 HTML 이스케이프됩니다.',
+            '빈 배열·빈 문자열·null은 빈 셀입니다. label은 HTML 이스케이프됩니다. ' +
+            "정적 목록에 없는 값은 <strong>lazy 검색(<a href='#column-defs-editorSearch'><code>editorSearch." +
+            'fetch</code></a>)으로 고를 당시의 label 캐시</strong>를 보고(v2.25 — 단일 값 쪽 ' +
+            "<a href='#renderers-searchselect'><code>searchselect</code></a>와 같은 출처), " +
+            '캐시에도 없으면 값 그대로 칩이 됩니다. 컬럼 재구성(<code>setColumns</code> 등) 후에는 ' +
+            '캐시가 비므로 그런 값은 원시 값으로 폴백합니다.',
           example:
             "cellRenderer: DataGrid.renderers.multiselect()\n" +
             "// ['js','css'] → 'JavaScript' 'CSS' 칩\n" +
-            "// 'js,css'     → 같은 결과 (콤마 문자열도 매핑된다)",
+            "// 'js,css'     → 같은 결과 (콤마 문자열도 매핑된다)\n" +
+            '// editorSearch.fetch로 고른 값도 코드가 아니라 label로 표시된다 (v2.25)',
         },
         {
           name: 'checkbox',

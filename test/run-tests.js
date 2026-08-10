@@ -376,6 +376,64 @@ suite('lookupOptionLabels', function () {
   assertEq(l(opts, '3'), ['레벨3'], '문자열로 들어온 숫자 값도 매칭');
 });
 
+/* v2.25 — lazy 검색(editorSearch.fetch)으로 고른 값은 정적 editorOptions에 없다.
+ * 고를 당시에 기억해 둔 label 캐시를 봐야 셀에 코드가 아니라 이름이 뜬다. */
+suite('lookupOptionLabelsWith (label 캐시 폴백)', function () {
+  var l = T.lookupOptionLabelsWith;
+  var opts = [{ label: 'JS', value: 'js' }, { label: '레벨3', value: 3 }];
+  var cache = { seoul: '서울', 7: '레벨7' };
+
+  assertEq(l(opts, ['js'], cache), ['JS'], '정적 옵션이 캐시보다 우선');
+  assertEq(l(opts, ['seoul'], cache), ['서울'], '옵션에 없으면 캐시에서 label');
+  assertEq(l(opts, ['js', 'seoul'], cache), ['JS', '서울'], '옵션 + 캐시 혼합, 순서 유지');
+  assertEq(l(opts, ['tokyo'], cache), ['tokyo'], '캐시에도 없으면 값 그대로');
+  assertEq(l(opts, ['seoul'], null), ['seoul'], '캐시가 null이면 값 그대로');
+  assertEq(l(opts, 'seoul,js', cache), ['서울', 'JS'], '콤마 문자열도 캐시를 탄다');
+  assertEq(l(opts, [7], cache), ['레벨7'], '숫자 값은 String 키로 캐시 조회');
+  assertEq(l(opts, ['7'], cache), ['레벨7'], '문자열로 들어온 숫자도 같은 캐시 항목');
+  assertEq(l(opts, [], cache), [], '빈 배열 → 빈 배열');
+  assertEq(l(opts, ['js', null], cache), ['JS'], 'null 항목은 건너뛴다');
+  /* 캐시에 상속 프로퍼티가 있어도 값으로 새지 않아야 한다 */
+  assertEq(l(opts, ['toString'], cache), ['toString'], '프로토타입 프로퍼티는 캐시 히트가 아니다');
+
+  /* 기존 lookupOptionLabels는 캐시 없는 래퍼 — 동작이 그대로여야 한다 */
+  assertEq(T.lookupOptionLabels(opts, ['js', 'seoul']), ['JS', 'seoul'], '래퍼는 캐시를 보지 않는다');
+});
+
+/* v2.25 — 검색형 multiselect의 선택 토글. 선택 상태는 DOM이 아니라 이 배열이 진실이라,
+ * 필터로 가려진 항목이 목록에서 사라져도 선택이 유실되지 않는다. */
+suite('multiValueIndex / toggleMultiValue', function () {
+  var idx = T.multiValueIndex;
+  var t = T.toggleMultiValue;
+
+  assertEq(idx(['a', 'b'], 'b'), 1, '엄격 일치');
+  assertEq(idx(['a', 'b'], 'c'), -1, '없으면 -1');
+  assertEq(idx([1, 2], '2'), 1, '문자열 폴백 (콤마 문자열에서 온 값)');
+  assertEq(idx(['1', '2'], 2), 1, '반대 방향 폴백');
+  assertEq(idx('a,b', 'b'), 1, '콤마 문자열도 배열로 정규화');
+  assertEq(idx([], 'a'), -1, '빈 목록');
+  assertEq(idx(null, 'a'), -1, 'null 목록');
+  assertEq(idx(['a'], null), -1, 'null 값은 매칭하지 않는다');
+
+  assertEq(t([], 'a'), ['a'], '빈 목록에 추가');
+  assertEq(t(['a'], 'b'), ['a', 'b'], '새 값은 **뒤에** 붙는다 (고른 순서 = 칩 순서)');
+  assertEq(t(['a', 'b'], 'a'), ['b'], '있으면 제거');
+  assertEq(t(['a', 'b', 'c'], 'b'), ['a', 'c'], '가운데 제거 시 나머지 순서 유지');
+  assertEq(t(['a'], 'a'), [], '마지막 하나 제거 → 빈 배열');
+  assertEq(t([1, 2], '2'), [1], '느슨한 비교로 제거 (타입이 달라도 같은 항목)');
+  assertEq(t('a,b', 'c'), ['a', 'b', 'c'], '콤마 문자열 입력도 배열을 반환');
+  assertEq(t(null, 'a'), ['a'], 'null 입력');
+
+  /* 원본 불변 — 위젯이 이전 상태를 들고 비교할 수 있어야 한다 */
+  var src = ['a', 'b'];
+  t(src, 'a');
+  t(src, 'c');
+  assertEq(src, ['a', 'b'], '원본 배열은 변형되지 않는다');
+
+  /* 왕복: 두 번 토글하면 제자리 (단, 순서는 뒤로 밀린다 — 칩이 그렇게 보인다) */
+  assertEq(t(t(['a', 'b'], 'a'), 'a'), ['b', 'a'], '토글 왕복은 값 집합을 되돌리고 순서는 최신순');
+});
+
 /* ---------------- floating filter model ---------------- */
 suite('buildFloatingFilterModel', function () {
   var f = T.buildFloatingFilterModel;

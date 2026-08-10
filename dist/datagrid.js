@@ -25,6 +25,22 @@
       .replace(/'/g, '&#39;');
   }
 
+  /**
+   * 요소를 잘라내는 가장 가까운 스크롤/클립 조상의 rect (없으면 뷰포트).
+   * absolute로 띄우는 목록이 어디까지 보일 수 있는지 판단하는 데 쓴다 —
+   * `overflow: auto`인 조상은 그 밖으로 나간 자손을 그리지 않는다.
+   */
+  function clippingRect(node) {
+    let cur = node && node.parentElement;
+    while (cur && cur !== document.body && cur !== document.documentElement) {
+      const cs = getComputedStyle(cur);
+      if (cs.overflowY !== 'visible' || cs.overflowX !== 'visible') return cur.getBoundingClientRect();
+      cur = cur.parentElement;
+    }
+    const h = (global.innerHeight || document.documentElement.clientHeight || 0);
+    return { top: 0, bottom: h };
+  }
+
   function el(tag, className, parent) {
     const node = document.createElement(tag);
     if (className) node.className = className;
@@ -117,11 +133,12 @@
     groupTotal: 'Total',
     rowCount: '({count})',
 
-    /* 검색형 select 에디터 (editorSearch) */
+    /* 검색형 select/multiselect 에디터 (editorSearch) */
     searchPlaceholder: 'Search…',
     searchMinLength: 'Type {count}+ characters',
     noResults: 'No results',
     loadFailed: 'Load failed',
+    removeChipLabel: 'Remove {label}',
 
     /* 상태 컬럼 (statusColumn) — statusColumn 설정이 있으면 그쪽이 우선 */
     statusColumnHeader: 'Status',
@@ -189,6 +206,7 @@
     searchMinLength: '{count}자 이상 입력하세요',
     noResults: '결과 없음',
     loadFailed: '불러오기 실패',
+    removeChipLabel: '{label} 제거',
 
     statusColumnHeader: '상태',
     statusAdded: '신규',
@@ -985,12 +1003,69 @@
    * 목록에서 못 찾은 값은 문자열 그대로, null/undefined 항목은 건너뛴다.
    */
   function lookupOptionLabels(options, values) {
+    return lookupOptionLabelsWith(options, values, null);
+  }
+
+  /**
+   * `lookupOptionLabels` + value→label 캐시 폴백.
+   * lazy 검색(editorSearch.fetch)으로 고른 값은 정적 editorOptions에 없으므로,
+   * 고를 당시에 기억해 둔 label을 본다 (단일 값 쪽 `renderers.searchselect`와 같은 출처).
+   * cache는 `{ [String(value)]: label }` 평면 맵. 캐시에도 없으면 값 그대로.
+   */
+  function lookupOptionLabelsWith(options, values, cache) {
     const out = [];
     normalizeMultiValue(values).forEach(v => {
       if (v === null || v === undefined) return;
       const label = lookupOptionLabel(options, v);
-      out.push(label !== null ? label : String(v));
+      if (label !== null) { out.push(label); return; }
+      const cached = cachedOptionLabel(cache, v);
+      out.push(cached !== null ? cached : String(v));
     });
+    return out;
+  }
+
+  /**
+   * value→label 캐시 조회 (없으면 null).
+   * `in`이나 `!== undefined`로 보면 `'toString'`·`'constructor'` 같은 값이
+   * Object.prototype의 프로퍼티에 걸려 함수가 label로 새어 나온다 — 자기 소유 키만 본다.
+   */
+  function cachedOptionLabel(cache, value) {
+    if (!cache || value === null || value === undefined) return null;
+    const key = String(value);
+    return Object.prototype.hasOwnProperty.call(cache, key) ? cache[key] : null;
+  }
+
+  /**
+   * 다중 값 목록에서 value의 위치 (없으면 -1).
+   * 엄격 일치를 먼저 보고 문자열화 폴백 — 콤마 문자열에서 온 `'1'`과 옵션의 숫자 `1`은
+   * 같은 항목이다 (`lookupOptionLabel`과 같은 규약).
+   */
+  function multiValueIndex(list, value) {
+    const cur = normalizeMultiValue(list);
+    let i;
+    for (i = 0; i < cur.length; i++) {
+      if (cur[i] === value) return i;
+    }
+    if (value === null || value === undefined) return -1;
+    for (i = 0; i < cur.length; i++) {
+      if (cur[i] !== null && cur[i] !== undefined && String(cur[i]) === String(value)) return i;
+    }
+    return -1;
+  }
+
+  /**
+   * 다중 선택 토글 — 이미 있으면 빼고, 없으면 **맨 뒤에 붙인다**.
+   * 새 배열을 반환하고 원본은 건드리지 않는다.
+   * 검색형 multiselect는 이 순서(= 고른 순서, 칩이 보이는 순서)를 그대로 커밋한다.
+   * lazy 검색에는 "전체 옵션 목록"이 존재하지 않아 비검색 multiselect의
+   * "editorOptions 순서로 커밋" 규칙을 적용할 수 없기 때문이다.
+   */
+  function toggleMultiValue(list, value) {
+    const cur = normalizeMultiValue(list);
+    const idx = multiValueIndex(cur, value);
+    if (idx === -1) return cur.concat([value]);
+    const out = cur.slice();
+    out.splice(idx, 1);
     return out;
   }
 
@@ -5343,6 +5418,8 @@
      *   `editingClass` container에 붙일 편집 상태 클래스 ·
      *   `flipPanel(panel)` 셀 앵커 패널 위치 결정(팝업은 no-op) ·
      *   `onInput()` 사용자 입력 발생 · `onPick()` 옵션 확정 선택 ·
+     *   `onChange()` 값이 바뀌었지만 **아직 확정은 아님** (검색형 multiselect의 항목
+     *   토글 — onPick으로 통지하면 인라인이 첫 선택에서 커밋하고 닫힌다) ·
      *   `isClosed()` 늦게 도착한 비동기 콜백 판별 · `autoFocus` (기본 true)
      * @returns {object|null} `{ editorType, input, getValue, invalidEl, destroy }`.
      *   커스텀 에디터 init이 실패하면 null (호출자가 폴백을 결정).
@@ -5352,6 +5429,7 @@
       const flipPanelUp = h.flipPanel || (() => {});
       const onInput = h.onInput || (() => {});
       const onPick = h.onPick || (() => {});
+      const onChange = h.onChange || (() => {});
       const isClosed = h.isClosed || (() => false);
       const autoFocus = h.autoFocus !== false;
       /* 셀 앵커 패널을 "항상 펼친 패널"이 아니라 "접혔다 펴지는 콤보박스"로 만든다.
@@ -5444,8 +5522,10 @@
           return picked ? picked.__dgValue : value; /* 아무것도 안 고르면 이전 값 유지 */
         };
         invalidEl = cellEl;
-      } else if (editorType === 'multiselect') {
-        /* 체크리스트 패널 — 값은 배열, editorOptions 순서로 커밋 */
+      } else if (editorType === 'multiselect' && !col.editorSearch) {
+        /* 체크리스트 패널 — 값은 배열, editorOptions 순서로 커밋.
+         * editorSearch가 있으면 아래 검색형 분기가 맡는다 — 이 분기가 위에 있으므로
+         * 여기서 걸러내지 않으면 옵션이 조용히 무시된다(v2.25 이전의 동작). */
         const msOptions = normalizeEditorOptions(col.editorOptions);
         const msCurrent = normalizeMultiValue(value);
         const panel = el('div', 'dg-editor-multiselect', cellEl);
@@ -5476,21 +5556,32 @@
           return denormalizeMultiValue(out, value);
         };
         invalidEl = cellEl;
-      } else if (editorType === 'select' && col.editorSearch) {
-        /* 검색형 select — 검색 입력 + 옵션 목록 패널에서 단일 선택.
+      } else if ((editorType === 'select' || editorType === 'multiselect') && col.editorSearch) {
+        /* 검색형 select / multiselect — 검색 입력 + 옵션 목록 패널.
          * editorSearch: true      → 정적 editorOptions를 로컬 필터
-         * editorSearch: { fetch } → 질의마다 비동기 로드 (lazy 검색) */
+         * editorSearch: { fetch } → 질의마다 비동기 로드 (lazy 검색)
+         *
+         * 두 위젯은 질의 실행·디바운스·최신 질의 판별·label 캐시·위치 결정·폼 접힘을
+         * 전부 공유하고, 갈리는 곳(선택 상태·클릭 동작·칩 줄·Enter)만 multi로 나눈다. */
+        const multi = editorType === 'multiselect';
         const ssCfg = col.editorSearch === true ? {} : col.editorSearch;
         const ssFetch = typeof ssCfg.fetch === 'function' ? ssCfg.fetch : null;
         const ssDebounce = ssCfg.debounce !== undefined ? ssCfg.debounce : 250;
         const ssMinLength = ssCfg.minLength || 0;
         let ssPicked = value; /* 옵션을 고르기 전에는 원래 값 유지 → 무변경이면 미커밋 */
+        /* 다중 선택의 진실은 DOM이 아니라 이 배열이다 — 검색형은 필터로 가려진 항목이
+         * 목록에서 사라지고(lazy면 질의마다 통째로 갈린다), 체크박스를 순회해 값을
+         * 모으는 비검색 multiselect 방식을 쓰면 안 보이는 선택이 조용히 유실된다. */
+        let msPicked = multi ? normalizeMultiValue(value).slice() : [];
         let ssShown = [];
         let ssActive = -1;
         let ssSeq = 0;
         let ssTimer = null;
-        const ssPanel = el('div', 'dg-editor-searchselect', cellEl);
+        const ssPanel = el('div', `dg-editor-searchselect${multi ? ' dg-searchselect-multi' : ''}`, cellEl);
         ssPanel.tabIndex = -1;
+        /* 칩 줄 — 고른 값을 상시 보여준다. 목록보다 위에 두어 필터·질의로 목록이
+         * 바뀌어도 "지금 무엇이 골라져 있는지"가 항상 같은 자리에 남는다. */
+        const msChips = multi ? el('div', 'dg-searchselect-chips', ssPanel) : null;
         const ssInput = document.createElement('input');
         ssInput.type = 'text';
         ssInput.className = 'dg-searchselect-input';
@@ -5506,22 +5597,46 @@
           const fromOptions = lookupOptionLabel(col.editorOptions, v);
           if (fromOptions !== null) return fromOptions;
           const cached = this._searchSelectLabels && this._searchSelectLabels[col.colId];
-          if (cached && cached[String(v)] !== undefined) return cached[String(v)];
-          return String(v);
+          const hit = cachedOptionLabel(cached, v);
+          return hit !== null ? hit : String(v);
         };
         /* 콤보박스 모드: 접힘이 기본이고 입력창은 "검색어"가 아니라 "현재 값"을 보여준다 */
         const ssOpen = () => {
           if (!collapsible) return;
           ssPanel.classList.add('dg-searchselect-open');
+          ssFlipList();
+        };
+        /* 폼 안의 목록은 스크롤 컨테이너(.dg-popup-body)에 잘린다 — 아래 공간이
+         * 모자라고 위가 더 넉넉하면 위로 편다 (셀 앵커 패널의 flipPanel과 같은 방침).
+         * 칩 줄이 있는 multiselect는 컨트롤이 더 높아 목록이 아래로 밀리기 쉽다. */
+        const ssFlipList = () => {
+          if (!collapsible) return;
+          /* 자연 높이로 되돌려 놓고 재야 이전 측정에 갇히지 않는다 */
+          ssPanel.classList.remove('dg-searchselect-up');
+          ssList.style.maxHeight = '';
+          const listH = ssList.offsetHeight || 0;
+          if (!listH) return; /* 접혀 있으면 잴 것이 없다 (열 때 다시 부른다) */
+          const bounds = clippingRect(ssPanel);
+          const pr = ssPanel.getBoundingClientRect();
+          const below = bounds.bottom - pr.bottom - 4;
+          const above = pr.top - bounds.top - 4;
+          const up = below < listH && above > below;
+          if (up) ssPanel.classList.add('dg-searchselect-up');
+          /* 어느 쪽으로도 다 못 담으면 남은 공간에 맞춰 줄이고 목록 안에서 스크롤한다 —
+           * 잘려서 아예 안 보이는 것보다 짧아도 보이는 편이 낫다. */
+          const room = up ? above : below;
+          if (room < listH) ssList.style.maxHeight = `${Math.max(room, 72)}px`;
         };
         const ssCollapse = () => {
           if (!collapsible) return;
           ssPanel.classList.remove('dg-searchselect-open');
-          ssInput.value = ssLabelOf(ssPicked); /* 고르지 않고 친 검색어는 되돌린다 */
+          /* 고르지 않고 친 검색어는 되돌린다. 단일 값은 입력창이 곧 값 표시이지만,
+           * 다중 값은 칩 줄이 그 역할을 하므로 입력창에 남길 것이 없다 → 비운다. */
+          ssInput.value = multi ? '' : ssLabelOf(ssPicked);
         };
         if (collapsible) {
           ssPanel.classList.add('dg-searchselect-collapsible');
-          ssInput.value = ssLabelOf(value);
+          ssInput.value = multi ? '' : ssLabelOf(value);
           /* 목록은 **사용자가 조작할 때만** 편다. focus에 걸면 팝업이 열리면서
            * 주는 프로그래매틱 포커스만으로 드롭다운이 펼쳐진다. */
           ssInput.addEventListener('focus', () => { ssInput.select(); });
@@ -5546,6 +5661,18 @@
         /* 옵션 mousedown이 검색 입력의 포커스를 빼앗으면 focusout 커밋이
          * 클릭보다 먼저 달린다 — 포커스 이동 자체를 막는다 */
         ssList.addEventListener('mousedown', e => { e.preventDefault(); });
+        if (multi) {
+          /* 칩 × 도 같은 이유로 포커스를 뺏으면 안 된다 (인라인은 focusout = 커밋) */
+          msChips.addEventListener('mousedown', e => { e.preventDefault(); });
+          msChips.addEventListener('click', e => {
+            /* 커밋 후 캔버스로 버블돼 editOnSingleClick이 편집을 재시작하는 경로 차단
+             * (BUG-005 계열 — 목록 클릭과 같은 이유) */
+            e.stopPropagation();
+            const rm = e.target.closest('.dg-searchselect-chip-remove');
+            if (!rm) return;
+            msToggle({ value: rm.__dgValue });
+          });
+        }
         /* lazy로 알게 된 value→label을 컬럼별로 기억 — 짝꿍 렌더러가
          * 정적 editorOptions에 없는 값도 label로 표시할 수 있게 */
         const ssCacheLabel = o => {
@@ -5553,6 +5680,46 @@
           const all = this._searchSelectLabels || (this._searchSelectLabels = {});
           const bucket = all[col.colId] || (all[col.colId] = {});
           bucket[String(o.value)] = o.label;
+        };
+        /* 칩 줄 다시 그리기. 선택이 없으면 줄 자체를 감춘다(빈 여백이 남지 않게). */
+        const msRenderChips = () => {
+          if (!multi) return;
+          msChips.innerHTML = '';
+          msChips.hidden = msPicked.length === 0;
+          msPicked.forEach(v => {
+            const label = ssLabelOf(v);
+            const chip = el('span', 'dg-tag dg-tag-plain dg-searchselect-chip', msChips);
+            chip.appendChild(document.createTextNode(label));
+            const rm = el('button', 'dg-searchselect-chip-remove', chip);
+            rm.type = 'button';
+            rm.tabIndex = -1;
+            rm.__dgValue = v;
+            rm.textContent = '×';
+            rm.setAttribute('aria-label', this._t('removeChipLabel', { label }));
+          });
+        };
+        /* 목록을 다시 그리지 않고 체크 표시만 맞춘다 (질의 결과는 그대로 두고 토글) */
+        const msSyncChecks = () => {
+          if (!multi) return;
+          ssList.querySelectorAll('.dg-searchselect-option').forEach((optEl, i) => {
+            const cb = optEl.querySelector('input');
+            if (cb && ssShown[i]) cb.checked = multiValueIndex(msPicked, ssShown[i].value) !== -1;
+          });
+        };
+        /* 선택 토글 — 상태 갱신 → 칩/체크 표시 → 소비자 통지.
+         * **인라인의 onPick(= 즉시 커밋 + 닫기)은 부르지 않는다.** 여러 개를 골라야
+         * 하는 위젯이라 첫 선택에서 편집이 끝나 버린다 (커밋은 blur/Enter/Tab 담당). */
+        const msToggle = o => {
+          const next = toggleMultiValue(msPicked, o.value);
+          /* label 캐시는 **추가할 때만** 갱신한다 — 해제 경로의 o에는 목록에서 온
+           * 진짜 label이 없다(칩 × 버튼이 출처). 그대로 캐시에 쓰면 오염된다. */
+          if (next.length > msPicked.length) ssCacheLabel(o);
+          msPicked = next;
+          msRenderChips();
+          msSyncChecks();
+          flipPanelUp(ssPanel);
+          ssFlipList();
+          onChange();
         };
         const ssSetActive = i => {
           if (!ssShown.length) return;
@@ -5571,6 +5738,7 @@
           ssList.innerHTML = '';
           el('div', `dg-searchselect-msg${cls ? ` ${cls}` : ''}`, ssList).textContent = text;
           flipPanelUp(ssPanel);
+          ssFlipList();
         };
         /* autoFirst: 검색 결과면 첫 항목을 활성으로 (빈 질의의 초기 목록은
          * 현재 값 항목만 활성 — Enter가 엉뚱한 첫 옵션을 고르지 않게) */
@@ -5582,6 +5750,20 @@
           opts.forEach((o, i) => {
             const optEl = el('div', 'dg-searchselect-option', ssList);
             optEl.dataset.idx = i;
+            if (multi) {
+              optEl.classList.add('dg-searchselect-multi-option');
+              const cb = document.createElement('input');
+              cb.type = 'checkbox';
+              cb.className = 'dg-checkbox';
+              /* 표시 전용 — disabled를 쓰면 그 자리가 클릭 사각지대가 된다(BUG-006).
+               * pointer-events 차단으로 클릭은 항상 옵션 div가 받는다 → 네이티브
+               * change와 우리 click 핸들러가 겹쳐 이중 토글되는 경로도 사라진다. */
+              cb.tabIndex = -1;
+              cb.checked = multiValueIndex(msPicked, o.value) !== -1;
+              optEl.appendChild(cb);
+              optEl.appendChild(document.createTextNode(o.label));
+              return; /* 다중 선택에는 "현재 값" 하나가 없다 → autoFirst만 적용 */
+            }
             optEl.textContent = o.label;
             const isCurrent = o.value === ssPicked ||
               (ssPicked !== null && ssPicked !== undefined && String(o.value) === String(ssPicked));
@@ -5589,7 +5771,21 @@
           });
           if (ssActive === -1 && autoFirst) ssActive = 0;
           if (ssActive !== -1) ssSetActive(ssActive);
+          /* lazy 검색에서 **이미 고른 값의 label을 뒤늦게 알게 되는** 경우 —
+           * 편집 진입 시점엔 정적 목록도 캐시도 없어 칩이 코드로 뜨지만, 첫 질의
+           * 결과에 그 값이 들어 있으면 이름을 알 수 있다. 캐시에 넣고 칩을 다시 그린다
+           * (셀 표시도 같은 캐시를 보므로 커밋 후 셀까지 이름으로 바뀐다). */
+          if (multi && ssFetch) {
+            let learned = false;
+            opts.forEach(o => {
+              if (multiValueIndex(msPicked, o.value) === -1) return;
+              ssCacheLabel(o);
+              learned = true;
+            });
+            if (learned) msRenderChips();
+          }
           flipPanelUp(ssPanel);
+          ssFlipList();
         };
         const ssRunQuery = q => {
           if (!ssFetch) {
@@ -5622,6 +5818,11 @@
           if (!optEl) return;
           const o = ssShown[Number(optEl.dataset.idx)];
           if (!o) return;
+          if (multi) {
+            /* 목록은 열어 둔다 — 연달아 더 고를 수 있어야 한다 */
+            msToggle(o);
+            return;
+          }
           ssPicked = o.value;
           ssCacheLabel(o);
           /* 콤보박스 모드에서는 고른 값을 입력창에 남기고 목록을 접는다.
@@ -5641,6 +5842,15 @@
           if (e.key === 'ArrowDown') { e.preventDefault(); ssOpen(); ssSetActive(ssActive + 1); }
           else if (e.key === 'ArrowUp') { e.preventDefault(); ssSetActive(ssActive - 1); }
           else if (e.key === 'Enter' && ssActive >= 0 && ssShown[ssActive]) {
+            if (multi) {
+              /* 다중 선택에서 Enter는 **토글**이다. 커밋에 쓰면 첫 선택에서 편집이
+               * 닫혀 두 번째 항목을 고를 수 없다. 활성 항목이 없을 때만 그대로
+               * 버블시켜(이 분기에 안 들어와서) 셀 커밋으로 넘긴다. */
+              e.stopPropagation();
+              e.preventDefault();
+              msToggle(ssShown[ssActive]);
+              return;
+            }
             /* 선택만 반영 — 커밋은 셀로 버블된 Enter를 공용 핸들러가 처리 */
             ssPicked = ssShown[ssActive].value;
             ssCacheLabel(ssShown[ssActive]);
@@ -5655,6 +5865,7 @@
           }
         });
         markEditing();
+        msRenderChips();
         ssRunQuery('');
         flipPanelUp(ssPanel);
         cleanup = () => {
@@ -5662,7 +5873,9 @@
           unmarkEditing();
         };
         if (autoFocus) ssInput.focus();
-        getValue = () => ssPicked;
+        /* 다중 값은 원본이 쓰던 표현(배열/콤마 문자열)으로 되돌려 커밋한다 —
+         * 편집 한 번으로 컬럼의 값 타입이 바뀌지 않게 (비검색 multiselect와 동일 규약) */
+        getValue = multi ? () => denormalizeMultiValue(msPicked, value) : () => ssPicked;
         invalidEl = cellEl;
       } else {
         if (editorType === 'select') {
@@ -6159,10 +6372,13 @@
       } else {
         const widget = this._createEditorWidget(inputWrap, f.editCol, p.values[f.field], p.row, {
           flipPanel: () => {},          /* 폼 안에서는 패널이 흐름대로 펼쳐진다 (CSS) */
-          collapsible: true,            /* 검색형 select는 접히는 콤보박스로 */
+          collapsible: true,            /* 검색형 select/multiselect는 접히는 콤보박스로 */
           autoFocus: false,             /* 포커스는 _popupFocus가 한 곳에만 준다 */
           onInput: () => { this._popupClearError(f.field); },
           onPick: () => { this._popupFieldChanged(f); },
+          /* 검색형 multiselect의 항목 토글 — 표시 전용 체크박스라 네이티브 change가
+           * 안 오고, 칩 × 제거는 애초에 폼 이벤트를 발화하지 않는다 */
+          onChange: () => { this._popupFieldChanged(f); },
           isClosed: () => !this._popup || this._popup.closed,
         });
         if (widget) {
@@ -6362,6 +6578,7 @@
           autoFocus: false,
           onInput: () => { this._popupClearError(field); },
           onPick: () => { this._popupFieldChanged(f); },
+          onChange: () => { this._popupFieldChanged(f); },
           isClosed: () => !this._popup || this._popup.closed,
         });
         if (next) p.widgets[field] = next;
@@ -7789,11 +8006,7 @@
     return params => {
       let label = lookupOptionLabel(
         options || (params.colDef && params.colDef.editorOptions), params.value);
-      if (label === null && params.optionLabels &&
-          params.value !== null && params.value !== undefined &&
-          String(params.value) in params.optionLabels) {
-        label = params.optionLabels[String(params.value)];
-      }
+      if (label === null) label = cachedOptionLabel(params.optionLabels, params.value);
       if (label !== null) return escapeHtml(label);
       const v = params.formatted;
       return v === null || v === undefined ? '' : escapeHtml(String(v));
@@ -7845,12 +8058,16 @@
     searchselect: optionLabelRenderer,
     /**
      * multiselect 에디터 짝꿍 — 값 배열을 label 칩 목록으로 표시.
-     * 목록에 없는 값은 문자열 그대로 칩이 되고, 빈 배열/null은 빈 셀.
+     * 배열과 콤마 구분 문자열을 모두 받는다(v2.21).
+     * 정적 editorOptions에 없는 값은 lazy 검색(editorSearch.fetch)으로 고를 당시의
+     * label 캐시를 보고(v2.25 — 단일 값 쪽 `searchselect`와 같은 출처),
+     * 캐시에도 없으면 값 그대로 칩이 된다. 빈 배열/null은 빈 셀.
      */
     multiselect(options) {
       return params => {
-        const labels = lookupOptionLabels(
-          options || (params.colDef && params.colDef.editorOptions), params.value);
+        const labels = lookupOptionLabelsWith(
+          options || (params.colDef && params.colDef.editorOptions),
+          params.value, params.optionLabels);
         return labels.map(l => `<span class="dg-tag dg-tag-plain">${escapeHtml(l)}</span>`).join(' ');
       };
     },
@@ -7876,7 +8093,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.24.0';
+  DataGrid.version = '2.25.0';
 
   /**
    * 내장 로케일. `localeText: DataGrid.locales.ko`처럼 통째로 쓰거나,
@@ -7929,6 +8146,9 @@
     filterEditorOptions,
     lookupOptionLabel,
     lookupOptionLabels,
+    lookupOptionLabelsWith,
+    multiValueIndex,
+    toggleMultiValue,
     isCheckedValue,
     normalizeMultiValue,
     denormalizeMultiValue,

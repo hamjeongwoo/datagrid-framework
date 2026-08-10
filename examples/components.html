@@ -254,6 +254,49 @@
     </div>
   </div>
 
+  <!-- Searchable multiselect editor panel -->
+  <h2 class="section">Searchable Multiselect Editor Panel</h2>
+  <p class="section-desc">
+    <code class="inline">editor: 'multiselect'</code> + <code class="inline">editorSearch</code> (v2.25).
+    고른 값이 검색창 <strong>위</strong>에 칩으로 상시 표시되므로, 필터로 목록에서 가려진 선택도 눈에 남습니다
+    (아래 왼쪽 견본의 <code class="inline">CSS</code>·<code class="inline">Python</code>은 목록에 없지만 칩으로 남아 있습니다).
+    칩은 <code class="inline">renderers.multiselect()</code>와 같은 <code class="inline">dg-tag-plain</code>이라
+    편집 중과 편집 후의 모양이 같습니다. 목록의 체크박스는 <strong>표시 전용</strong>이라
+    <code class="inline">pointer-events: none</code>이고, 클릭은 항상 옵션 행이 받습니다.
+  </p>
+  <div class="gallery-row dg-root" style="align-items:flex-start">
+    <div class="dg-editor-searchselect dg-searchselect-multi" style="position:static;min-width:220px">
+      <div class="dg-searchselect-chips">
+        <span class="dg-tag dg-tag-plain dg-searchselect-chip">JavaScript<button type="button" class="dg-searchselect-chip-remove" tabindex="-1">×</button></span>
+        <span class="dg-tag dg-tag-plain dg-searchselect-chip">CSS<button type="button" class="dg-searchselect-chip-remove" tabindex="-1">×</button></span>
+        <span class="dg-tag dg-tag-plain dg-searchselect-chip">Python<button type="button" class="dg-searchselect-chip-remove" tabindex="-1">×</button></span>
+      </div>
+      <input class="dg-searchselect-input" placeholder="Search…" value="ja">
+      <div class="dg-searchselect-list">
+        <div class="dg-searchselect-option dg-searchselect-multi-option dg-active"><input type="checkbox" class="dg-checkbox" tabindex="-1" checked>JavaScript</div>
+        <div class="dg-searchselect-option dg-searchselect-multi-option"><input type="checkbox" class="dg-checkbox" tabindex="-1">Java</div>
+      </div>
+    </div>
+    <div class="dg-editor-searchselect dg-searchselect-multi" style="position:static;min-width:220px">
+      <div class="dg-searchselect-chips" hidden></div>
+      <input class="dg-searchselect-input" placeholder="Search…">
+      <div class="dg-searchselect-list">
+        <div class="dg-searchselect-option dg-searchselect-multi-option"><input type="checkbox" class="dg-checkbox" tabindex="-1">Go</div>
+        <div class="dg-searchselect-option dg-searchselect-multi-option"><input type="checkbox" class="dg-checkbox" tabindex="-1">Rust</div>
+        <div class="dg-searchselect-option dg-searchselect-multi-option"><input type="checkbox" class="dg-checkbox" tabindex="-1">Kotlin</div>
+      </div>
+    </div>
+    <div class="dg-editor-searchselect dg-searchselect-multi" style="position:static;min-width:220px">
+      <div class="dg-searchselect-chips">
+        <span class="dg-tag dg-tag-plain dg-searchselect-chip">Korea (APAC)<button type="button" class="dg-searchselect-chip-remove" tabindex="-1">×</button></span>
+      </div>
+      <input class="dg-searchselect-input" placeholder="지역 검색…" value="em">
+      <div class="dg-searchselect-list">
+        <div class="dg-searchselect-msg dg-error">Load failed</div>
+      </div>
+    </div>
+  </div>
+
   <!-- Tags -->
   <h2 class="section">Tag / Badge Cell Renderer</h2>
   <p class="section-desc"><code class="inline">DataGrid.renderers.tag(colorMap)</code> — 상태 값을 색상 배지로 표시. 점 없는 <code class="inline">dg-tag-plain</code>은 <code class="inline">renderers.multiselect()</code>의 label 칩입니다.</p>

@@ -109,9 +109,9 @@ python demo/server.py
 | `aggFunc` | `'sum'` \| `'avg'` \| `'min'` \| `'max'` \| `'count'` 또는 커스텀 함수 `(values, ctx) => any` — 그룹 행 · 전체 요약 · 트리 부모 노드에 같은 규칙으로 적용. `ctx = { rows, field, colDef, parent }`이고 `parent`는 트리 요약에서만 부모 행(그룹·전체합계는 `null`). 반환 `null`이면 셀을 비움. 커스텀 결과에는 `valueFormatter`가 적용되지 않는다. 필터 적용 후 행으로 매번 재계산되므로 "이름 (자손 수)" 같은 표시가 필터를 따라간다 |
 | `filter` | `'text'` \| `'number'` \| `'set'` (`true` = text) |
 | `editable` | 더블클릭/Enter로 인라인 편집 — `editor` 선언 시 생략 가능 (명시적 `false`가 우선) |
-| `editor` | `'text'` \| `'number'` \| `'date'` \| `'datetime'` \| `'select'` \| `'multiselect'` \| `'radio'` \| `'checkbox'` 또는 `{ init, getValue, destroy }` 커스텀 객체. 생략 시 `dataType`이 `number`/`date`면 그에 맞는 에디터.<br>`multiselect`의 값은 **배열과 콤마 구분 문자열을 모두** 받는다 — `['js','css']`와 `'js,css'`(항목 공백 허용)가 같은 값이고 표시·편집·변경 판정이 동일하다. 커밋은 **그 행이 원래 쓰던 표현을 유지**하며(배열→배열, 문자열→콤마 문자열), 원본이 `null`/빈 값이면 콤마 문자열이 기본. 구분자는 `,` 고정이라 옵션 값에 콤마가 들어가면 배열로 저장해야 한다 |
+| `editor` | `'text'` \| `'number'` \| `'date'` \| `'datetime'` \| `'select'` \| `'multiselect'` \| `'radio'` \| `'checkbox'` 또는 `{ init, getValue, destroy }` 커스텀 객체. 생략 시 `dataType`이 `number`/`date`면 그에 맞는 에디터. `select`·`multiselect`는 [`editorSearch`](#컬럼-정의)로 검색형이 된다.<br>`multiselect`의 값은 **배열과 콤마 구분 문자열을 모두** 받는다 — `['js','css']`와 `'js,css'`(항목 공백 허용)가 같은 값이고 표시·편집·변경 판정이 동일하다. 커밋은 **그 행이 원래 쓰던 표현을 유지**하며(배열→배열, 문자열→콤마 문자열), 원본이 `null`/빈 값이면 콤마 문자열이 기본. 구분자는 `,` 고정이라 옵션 값에 콤마가 들어가면 배열로 저장해야 한다 |
 | `editorOptions` | select/multiselect/radio 선택지 — `['a', 'b']` 또는 `[{ label: '한국', value: 'kr' }]` (label 표시, value 저장·타입 보존). checkbox는 `{ checked: 'Y', unchecked: 'N' }` 매핑. date/datetime은 `{ min, max, step, valueType }` |
-| `editorSearch` | select를 검색 패널로 — `true`(정적 목록 로컬 필터) 또는 `{ fetch(query) => Promise<options>, debounce, minLength, placeholder }` (lazy 검색) |
+| `editorSearch` | select·multiselect를 검색 패널로 — `true`(정적 목록 로컬 필터) 또는 `{ fetch(query) => Promise<options>, debounce, minLength, placeholder }` (lazy 검색).<br>`multiselect`에 주면(v2.25) 검색창 + 체크리스트가 되고 **고른 값이 칩으로 상시 표시**된다 — 필터로 목록에서 가려지거나 lazy 질의로 목록이 갈려도 선택이 유실되지 않는다. 칩의 `×`/항목 재클릭으로 해제, `Enter`는 **활성 항목 토글**(커밋은 `Tab`·바깥 클릭). 이때 저장 순서는 `editorOptions` 순서가 아니라 **고른 순서**다 (lazy에는 전체 목록이 없다) |
 | `validator(value, row)` | `true` 또는 오류 메시지 반환 — 거부 시 커밋 차단 + 빨간 표시 |
 | `required` | 필수 컬럼 — 표시 + 검증을 함께 켠다. 그리드 표시는 **비어 있는 셀**에만 붙는 오른쪽 위 모서리 마커 하나(`trackChanges`의 왼쪽 위 주황 마커와 자리·색 분리). 헤더에는 표식을 두지 않고, `*`는 팝업 폼 라벨에만. 빈 값 커밋은 인라인·팝업·붙여넣기·`updateRows`에서 모두 거부(`localeText.requiredValue`). `0`·`false`는 유효한 값. `editor`와 같이 편집 의도로 해석되어 `editable` 생략 시 true. 그리드를 잠그면 표시도 사라짐. `validator`보다 먼저 검사 |
 | `popupEditor` | 팝업 폼 안에서만 적용되는 컬럼 오버레이 — `false`(폼에서 제외) 또는 `{ label, hint, hide, readonly, order, span, editor, editorOptions, editorSearch, validator, required, buttons, before(ctx), after(ctx) }`. `hide`/`readonly`는 컬럼의 `hide`/`editable`을 덮어쓰므로 "그리드엔 숨기고 폼에서만 편집"도 가능. 필드 버튼도 `onLoad(ctx)`를 지원하며 푸터 버튼보다 먼저 호출됨. 그리드 셀 표시는 그대로 |
@@ -141,7 +141,7 @@ cellRenderer: DataGrid.renderers.progress()   // 0–100 진행 바
 cellRenderer: DataGrid.renderers.select()     // 저장된 value를 editorOptions의 label로 표시
 cellRenderer: DataGrid.renderers.radio()      // select와 동일 (radio 에디터 짝꿍)
 cellRenderer: DataGrid.renderers.searchselect() // select와 동일 + lazy 검색으로 고른 값도 label로 (editorSearch 짝꿍)
-cellRenderer: DataGrid.renderers.multiselect() // 다중 값을 label 칩 목록으로 (배열·콤마 문자열 모두)
+cellRenderer: DataGrid.renderers.multiselect() // 다중 값을 label 칩 목록으로 (배열·콤마 문자열 모두, lazy 검색으로 고른 값도 label)
 cellRenderer: DataGrid.renderers.checkbox()   // 값을 체크박스 모양으로 (표시 전용, Y/N·0/1 매핑 지원)
 ```
 
