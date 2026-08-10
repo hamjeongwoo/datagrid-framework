@@ -7,6 +7,22 @@
 <link rel="stylesheet" href="../dist/datagrid.css">
 <link rel="stylesheet" href="../demo/demo.css">
 <style>
+  /* ---- docs 로컬 토큰 (프레임워크 토큰 아님 — 문서 페이지 전용) ---- */
+  body {
+    --doc-code-bg: rgba(24, 29, 31, 0.055);
+    --doc-rule: rgba(24, 29, 31, 0.09);
+    --doc-note-bg: rgba(24, 29, 31, 0.028);
+    --doc-warn: #b26a00;
+    --doc-warn-bg: rgba(240, 160, 0, 0.09);
+  }
+  body.dark {
+    --doc-code-bg: rgba(255, 255, 255, 0.1);
+    --doc-rule: rgba(255, 255, 255, 0.13);
+    --doc-note-bg: rgba(255, 255, 255, 0.04);
+    --doc-warn: #f0b429;
+    --doc-warn-bg: rgba(240, 180, 41, 0.1);
+  }
+
   /* ---- docs layout ---- */
   .docs-layout {
     display: grid;
@@ -86,16 +102,20 @@
     scroll-margin-top: 12px;
   }
   .api-section:first-child > h2 { border-top: none; margin-top: 0; padding-top: 0; }
-  .api-section .intro { color: var(--page-muted); max-width: 800px; line-height: 1.65; }
+  .api-section .intro { color: var(--page-muted); max-width: 760px; line-height: 1.75; }
+  .api-section .intro p { margin: 0 0 10px; }
+  .api-section .intro p:last-child { margin-bottom: 0; }
+  /* 본문 인라인 코드는 조용하게 — 강조색은 링크에만 남긴다 */
   .api-section .intro code, .api-entry code {
-    background: rgba(33, 150, 243, 0.1);
-    color: var(--page-accent);
+    background: var(--doc-code-bg);
+    color: inherit;
     border-radius: 4px;
     padding: 1px 5px;
     font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
     font-size: 12.5px;
   }
   .api-section .intro a, .api-entry a { color: var(--page-accent); }
+  .api-section .intro a code, .api-entry a code { color: inherit; }
 
   .api-group-label {
     font-size: 11.5px;
@@ -151,7 +171,75 @@
   }
   .api-default { font-size: 12px; color: var(--page-muted); }
   .api-default code { background: none; padding: 0; color: inherit; }
-  .api-entry-desc { margin: 8px 0 0; line-height: 1.65; max-width: 800px; }
+  .api-entry-desc { margin: 10px 0 0; line-height: 1.75; max-width: 760px; }
+  .api-entry-desc p { margin: 0 0 10px; }
+  .api-entry-desc > :last-child { margin-bottom: 0; }
+  .api-entry-desc ul, .api-entry-desc ol { margin: 0 0 10px; padding-left: 20px; }
+  .api-entry-desc li { margin: 3px 0; }
+
+  /* ---- 하위 속성 표 (entry.props) ---- */
+  .api-block-title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--page-muted);
+    margin: 18px 0 6px;
+  }
+  .api-props table { border-collapse: collapse; width: 100%; max-width: 760px; }
+  .api-props th, .api-props td {
+    text-align: left;
+    vertical-align: top;
+    padding: 9px 0;
+    border-top: 1px solid var(--doc-rule);
+    line-height: 1.7;
+    font-weight: 400;
+    font-size: 13.5px;
+  }
+  .api-props tr:first-child th, .api-props tr:first-child td { border-top: none; }
+  .api-props th { width: 210px; padding-right: 18px; }
+  @media (max-width: 700px) {
+    .api-props th, .api-props td { display: block; width: auto; padding: 0; }
+    .api-props th { border-top: 1px solid var(--doc-rule); padding-top: 10px; }
+    .api-props td { padding: 2px 0 10px; }
+  }
+  .api-props th > code {
+    font-weight: 700;
+    background: none;
+    padding: 0;
+    font-size: 13px;
+  }
+  .api-props-type, .api-props-meta {
+    display: block;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--page-muted);
+  }
+  .api-props-type { font-family: ui-monospace, Consolas, monospace; margin-top: 2px; }
+  .api-props td > :last-child { margin-bottom: 0; }
+  .api-props td p { margin: 0 0 6px; }
+
+  /* ---- 보조 설명 블록 (entry.notes) ---- */
+  .api-note { margin: 16px 0 0; max-width: 760px; line-height: 1.75; }
+  .api-note-title {
+    font-size: 13.5px;
+    font-weight: 700;
+    margin: 0 0 4px;
+    color: var(--page-fg);
+  }
+  .api-note p { margin: 0 0 8px; }
+  .api-note > :last-child, .api-note-body > :last-child { margin-bottom: 0; }
+  .api-note ul, .api-note ol { margin: 0 0 8px; padding-left: 20px; }
+  .api-note li { margin: 3px 0; }
+  .api-note.warn, .api-note.tip {
+    padding: 12px 14px;
+    border-radius: 8px;
+    border-left: 3px solid var(--doc-rule);
+    background: var(--doc-note-bg);
+  }
+  .api-note.warn { border-left-color: var(--doc-warn); background: var(--doc-warn-bg); }
+  .api-note.warn .api-note-title { color: var(--doc-warn); }
+
   .api-signature {
     font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
     font-size: 12.5px;
@@ -163,14 +251,23 @@
   /* .api-example / .copy-btn / .hl-* 스타일은 demo/demo.css(공용)에 있습니다 */
   .api-entry .api-example { margin: 12px 0 2px; }
 
-  .api-table { border-collapse: collapse; margin: 12px 0; width: 100%; max-width: 640px; }
+  .api-table { border-collapse: collapse; margin: 12px 0; width: 100%; max-width: 760px; }
   .api-table th, .api-table td {
     text-align: left;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--page-border);
-    font-size: 13px;
+    vertical-align: top;
+    padding: 9px 14px 9px 0;
+    border-bottom: 1px solid var(--doc-rule);
+    font-size: 13.5px;
+    line-height: 1.7;
   }
-  .api-table th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--page-muted); }
+  .api-table th {
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--page-muted);
+    border-bottom-color: var(--page-border);
+  }
   kbd {
     font-family: ui-monospace, Consolas, monospace;
     font-size: 11.5px;
@@ -245,6 +342,41 @@
     );
   }
 
+  /* entry.props — 객체형 옵션의 하위 속성을 산문 대신 표로 */
+  function propsBlock(props, title) {
+    var html = '<div class="api-props">' +
+      '<div class="api-block-title">' + esc(title || '속성') + '</div><table><tbody>';
+    props.forEach(function (p) {
+      var meta = [];
+      if (p.default !== undefined) meta.push('기본 ' + p.default);
+      if (p.since) meta.push('v' + p.since);
+      html += '<tr><th scope="row"><code>' + esc(p.name) + '</code>' +
+        (p.type ? '<span class="api-props-type">' + esc(p.type) + '</span>' : '') +
+        (meta.length ? '<span class="api-props-meta">' + esc(meta.join(' · ')) + '</span>' : '') +
+        '</th><td>' + (p.description || '') + '</td></tr>';
+    });
+    return html + '</tbody></table></div>';
+  }
+
+  /* entry.notes — 주제별 보조 설명. variant: 'warn' | 'tip'이면 콜아웃 박스 */
+  function notesBlock(notes) {
+    return notes.map(function (n) {
+      return '<div class="api-note' + (n.variant ? ' ' + esc(n.variant) : '') + '">' +
+        (n.title ? '<div class="api-note-title">' + esc(n.title) + '</div>' : '') +
+        '<div class="api-note-body">' + n.body + '</div></div>';
+    }).join('');
+  }
+
+  /* 검색 대상 텍스트 — description 밖으로 옮긴 내용도 검색되어야 한다 */
+  function entryText(e) {
+    var parts = [e.name, e.description || '', e.signature || '', e.type || '', e.payload || ''];
+    (e.props || []).forEach(function (p) {
+      parts.push(p.name, p.type || '', p.description || '');
+    });
+    (e.notes || []).forEach(function (n) { parts.push(n.title || '', n.body); });
+    return parts.join(' ').toLowerCase();
+  }
+
   /* ------------------------------------------------------------------
    * Render
    * ---------------------------------------------------------------- */
@@ -300,7 +432,9 @@
       }
       bodyHtml += '</div>';
       if (e.signature) bodyHtml += '<div class="api-signature">' + esc(e.signature) + '</div>';
-      if (e.description) bodyHtml += '<p class="api-entry-desc">' + e.description + '</p>';
+      if (e.description) bodyHtml += '<div class="api-entry-desc">' + e.description + '</div>';
+      if (e.props) bodyHtml += propsBlock(e.props, e.propsTitle);
+      if (e.notes) bodyHtml += notesBlock(e.notes);
       if (e.example) bodyHtml += exampleBlock(e.example);
       bodyHtml += '</article>';
     });
@@ -352,8 +486,7 @@
         var id = entryId(section, e);
         var entryEl = document.getElementById(id);
         var navLink = navSection.querySelector('a[href="#' + id + '"]');
-        var hay = (e.name + ' ' + (e.description || '') + ' ' + (e.signature || '') + ' ' + (e.type || '')).toLowerCase();
-        var match = !q || sectionMatch || hay.indexOf(q) !== -1;
+        var match = !q || sectionMatch || entryText(e).indexOf(q) !== -1;
         entryEl.style.display = match ? '' : 'none';
         if (navLink) navLink.classList.toggle('docs-nav-hidden', !match);
         if (match) visibleEntries++;

@@ -14,16 +14,25 @@
  *
  * 엔트리 공통 필드:
  *   name        : API 이름 (앵커 id로도 사용됨)
- *   description : 설명 (HTML 허용 — <code>, <a href="#..."> 등)
+ *   description : 요점 설명 (HTML 허용 — 여러 문단이면 <p>로 나눈다. <br><br> 금지)
+ *   props       : 하위 속성 표. [{ name, type, default, since, description }]
+ *                 객체형 옵션의 키나 유니온 타입의 각 값을 산문 대신 표로 보여준다.
+ *                 propsTitle로 표 제목을 바꿀 수 있다 (기본 '속성').
+ *   notes       : 주제별 보조 설명. [{ title, body, variant }]
+ *                 variant 'warn'(주의) / 'tip'이면 콜아웃 박스, 없으면 소제목 + 본문.
  *   example     : 코드 예제 (문자열, JS로 하이라이팅)
  *   since       : 도입 버전 (생략 시 1.0.0)
  *   demo        : examples/features.html의 데모 카드 앵커 id (있으면 "예제 ↗"
  *                 링크 배지 표시 — 앵커는 features.html의 <h2 class="section" id>)
+ *
+ * 렌더 순서: 헤드(배지/타입/기본값) → description → props → notes → example
+ * 긴 설명은 description에 몰지 말고 props/notes로 나눈다. 내부 링크(#앵커)의
+ * id 규칙은 api.html의 entryId()를 참고 — section.id + '-' + name(비단어→'-').
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
   version: '2.25.1',
-  updated: '2026-08-09',
+  updated: '2026-08-10',
 
   sections: [
 
@@ -180,47 +189,119 @@ window.ApiDocs = {
           default: 'false',
           since: '2.16.0',
           description:
-            '행 전체를 <strong>폼에서</strong> 편집합니다. 인라인 셀 편집을 대체하는 것이 아니라 ' +
-            '켜면 편집 트리거가 폼을 여는 방식이며, 폼의 각 필드는 <strong>컬럼 정의를 그대로 ' +
-            '재사용</strong>합니다(<code>editor</code> · <code>editorOptions</code> · ' +
-            '<code>editorSearch</code> · <code>dataType</code> · <code>validator</code> · ' +
-            '라벨은 <code>headerName</code>). 편집 불가 컬럼은 읽기 전용으로 표시되고, ' +
-            '내장 컬럼(행 번호 · 상태 · 디테일 토글 · 체크박스)은 제외됩니다.<br>' +
-            '<strong>폼에서 달라지는 위젯:</strong> 검색형 select(<code>editorSearch</code>)는 셀에서는 ' +
-            '"펼쳐진 패널 + 고르면 즉시 커밋"이지만, 폼에서는 <strong>접히는 콤보박스</strong>가 됩니다 — ' +
-            '입력창이 현재 값의 label을 보여주고 클릭·타이핑할 때만 목록이 펼쳐집니다. ' +
-            '<code>multiselect</code>/<code>radio</code>는 펼친 채로 현재 상태를 그대로 보여주므로 ' +
-            '접지 않습니다.<br>' +
-            '<code>position</code>: <code>\'center\'</code>(기본) | <code>\'left\'</code> | ' +
-            '<code>\'right\'</code>(슬라이드 패널) · <code>width</code>(기본 420) · ' +
-            '<code>columns</code>: 1 | 2 (<strong>폭이 모자라면 자동으로 1열</strong>로 떨어지고, ' +
-            '더 좁아지면 라벨이 입력 위로 올라갑니다 — 기준은 ' +
-            '<code>--dg-popup-field-min</code> 토큰) · <code>title</code>: string | (row) => string · ' +
-            '<code>trigger</code>: <code>\'dblclick\'</code>(기본) | <code>\'none\'</code>(API로만) · ' +
-            '<code>fields</code>: 표시할 field 목록(순서도 결정) · ' +
-            '<code>instantUpdate</code> · <code>closeOnBackdrop</code> · ' +
-            '<code>buttons</code>: 문자열 <code>\'save\'</code>/<code>\'cancel\'</code>/<code>\'close\'</code>는 ' +
-            '내장 버튼, 객체는 <code>{ key, text, variant, title, disabled, onClick(ctx), onLoad(ctx) }</code>이며 ' +
-            '<strong>배열 순서가 배치 순서</strong>입니다. ' +
-            '<code>onLoad</code>는 폼이 <strong>완전히 만들어진 직후 한 번</strong> 호출되어(v2.18) ' +
-            '행 값을 보고 버튼 문구·잠금을 정하거나 필드·값을 초기화하는 자리입니다 — ' +
-            '<code>ctx.buttonEl</code>로 버튼 DOM을 직접 만질 수 있고, ' +
-            '호출 순서는 <strong>DOM 순서</strong>(필드 버튼 → 푸터 버튼)이며 모든 필드가 이미 존재하므로 ' +
-            '다른 필드도 안전하게 건드릴 수 있습니다. ' +
-            '<code>disabled</code>를 함께 선언하면 그 결과가 <code>onLoad</code>의 수동 지정을 덮으므로, ' +
-            '로드 시점에만 잠그려면 <code>onLoad</code>에서 <code>ctx.buttonEl.disabled</code>만 쓰세요. ' +
-            '내장 버튼은 동작이 고정이라 콜백을 받지 않습니다 ' +
-            '(<a href="../examples/features.html#popup-button-onload" target="_blank" rel="noopener">' +
-            'onLoad 데모 ↗</a>).<br>' +
-            '<strong>커밋 규약:</strong> 기본은 폼에 모았다가 Save에서 <strong>변경된 필드만 일괄 ' +
-            '커밋</strong>하고 Cancel/Esc/바깥클릭은 전부 폐기합니다. ' +
-            '<code>instantUpdate: true</code>면 필드를 확정할 때마다 즉시 행에 반영되고, ' +
-            '<strong>Cancel은 팝업을 연 시점으로 롤백</strong>합니다. 어느 쪽이든 실제 커밋 시 ' +
-            '<code>cellValueChanged</code> · <code>rowValueChanged</code>가 그대로 발생하므로 ' +
-            '기존 핸들러가 계속 동작합니다.<br>' +
-            '컬럼마다 다르게 꾸미려면 ' +
-            '<a href="#column-defs-popupEditor"><code>column.popupEditor</code></a>를 쓰세요. ' +
-            '<code>setOptions({ popupEditor })</code>로 런타임 변경 가능합니다.',
+            '<p>행 전체를 <strong>폼에서</strong> 편집합니다. 인라인 셀 편집을 대체하는 것이 아니라, ' +
+            '켜면 편집 트리거가 폼을 여는 방식입니다.</p>' +
+            '<p>폼의 각 필드는 <strong>컬럼 정의를 그대로 재사용</strong>합니다 — ' +
+            '<code>editor</code> · <code>editorOptions</code> · <code>editorSearch</code> · ' +
+            '<code>dataType</code> · <code>validator</code>를 쓰고 라벨은 <code>headerName</code>입니다. ' +
+            '편집 불가 컬럼은 읽기 전용으로 표시되고, 내장 컬럼(행 번호 · 상태 · 디테일 토글 · ' +
+            '체크박스)은 제외됩니다.</p>' +
+            '<p>컬럼마다 폼에서만 다르게 꾸미려면 ' +
+            '<a href="#column-defs-popupEditor"><code>column.popupEditor</code></a>를, ' +
+            '런타임 변경은 <code>setOptions({ popupEditor })</code>를 쓰세요.</p>',
+          props: [
+            {
+              name: 'position',
+              type: "'center' | 'left' | 'right'",
+              default: "'center'",
+              description: '중앙 모달 또는 좌·우 슬라이드 패널. 모르는 값은 <code>\'center\'</code>로 떨어집니다.',
+            },
+            {
+              name: 'width',
+              type: 'number',
+              default: '420',
+              description: '팝업 폭(px).',
+            },
+            {
+              name: 'columns',
+              type: '1 | 2',
+              default: '1',
+              description:
+                '필드 배치 열 수. <strong>폭이 모자라면 자동으로 1열</strong>로 떨어지고, ' +
+                '더 좁아지면 라벨이 입력 위로 올라갑니다 — 기준은 ' +
+                '<a href="#theming--dg-popup-field-min"><code>--dg-popup-field-min</code></a> 토큰입니다.',
+            },
+            {
+              name: 'title',
+              type: 'string | (row) => string',
+              description: '헤더 제목. 생략하면 <code>localeText.popupEditTitle</code>을 씁니다.',
+            },
+            {
+              name: 'trigger',
+              type: "'dblclick' | 'none'",
+              default: "'dblclick'",
+              description:
+                '<code>\'none\'</code>이면 <a href="#api-methods-openEditPopup"><code>openEditPopup()</code></a>' +
+                '으로만 열립니다 — 더블클릭은 인라인 편집 그대로 남습니다.',
+            },
+            {
+              name: 'fields',
+              type: 'string[]',
+              description: '표시할 field 목록이자 표시 순서. 생략하면 컬럼 순서를 따릅니다.',
+            },
+            {
+              name: 'instantUpdate',
+              type: 'boolean',
+              default: 'false',
+              description: '필드를 확정할 때마다 즉시 행에 반영합니다 — 아래 <em>커밋 규약</em> 참고.',
+            },
+            {
+              name: 'closeOnBackdrop',
+              type: 'boolean',
+              default: 'true',
+              description: '바깥(백드롭) 클릭으로 닫습니다. 끄더라도 헤더 닫기 버튼과 <kbd>Esc</kbd>는 남습니다.',
+            },
+            {
+              name: 'buttons',
+              type: "Array<'save' | 'cancel' | 'close' | object>",
+              default: "['save', 'cancel']",
+              description:
+                '<strong>배열 순서가 곧 배치 순서</strong>입니다. 문자열은 내장 버튼이고, 객체는 ' +
+                '<code>{ key, text, variant, title, disabled, onClick(ctx), onLoad(ctx) }</code> 형식의 ' +
+                '커스텀 버튼입니다. 빈 배열은 "버튼 없음"으로 존중됩니다.',
+            },
+          ],
+          notes: [
+            {
+              title: '폼에서 달라지는 위젯',
+              body:
+                '<p>검색형 select(<code>editorSearch</code>)는 셀에서는 "펼쳐진 패널 + 고르면 즉시 커밋"이지만, ' +
+                '폼에서는 <strong>접히는 콤보박스</strong>가 됩니다 — 입력창이 현재 값의 label을 보여주고 ' +
+                '클릭·타이핑할 때만 목록이 펼쳐집니다. <code>multiselect</code>/<code>radio</code>는 ' +
+                '펼친 채로 현재 상태를 그대로 보여주므로 접지 않습니다.</p>',
+            },
+            {
+              title: '커밋 규약',
+              body:
+                '<p>기본은 폼에 모았다가 Save에서 <strong>변경된 필드만 일괄 커밋</strong>하고, ' +
+                'Cancel · <kbd>Esc</kbd> · 바깥클릭은 전부 폐기합니다.</p>' +
+                '<p><code>instantUpdate: true</code>면 필드를 확정할 때마다 즉시 행에 반영되고, ' +
+                '<strong>Cancel은 팝업을 연 시점으로 롤백</strong>합니다.</p>' +
+                '<p>어느 쪽이든 실제 커밋 시 <a href="#events-cellValueChanged"><code>cellValueChanged</code></a> · ' +
+                '<a href="#events-rowValueChanged"><code>rowValueChanged</code></a>가 그대로 발생하므로 ' +
+                '기존 핸들러가 계속 동작합니다.</p>',
+            },
+            {
+              title: 'buttons.onLoad — 폼이 만들어진 직후 (v2.18)',
+              body:
+                '<p>폼이 <strong>완전히 만들어진 직후 한 번</strong> 호출됩니다. 행 값을 보고 버튼 문구·잠금을 ' +
+                '정하거나 필드 값을 초기화하는 자리입니다 — <code>ctx.buttonEl</code>로 버튼 DOM을 직접 ' +
+                '만질 수 있습니다.</p>' +
+                '<p>호출 순서는 <strong>DOM 순서</strong>(필드 버튼 → 푸터 버튼)이고 그 시점에 모든 필드가 ' +
+                '이미 존재하므로 다른 필드도 안전하게 건드릴 수 있습니다. 내장 버튼은 동작이 고정이라 ' +
+                '콜백을 받지 않습니다 ' +
+                '(<a href="../examples/features.html#popup-button-onload" target="_blank" rel="noopener">' +
+                'onLoad 데모 ↗</a>).</p>',
+            },
+            {
+              variant: 'warn',
+              title: 'disabled와 onLoad를 함께 쓸 때',
+              body:
+                '<p><code>disabled</code>를 함께 선언하면 그 결과가 <code>onLoad</code>의 수동 지정을 ' +
+                '덮습니다. 로드 시점에만 잠그려면 <code>disabled</code> 없이 <code>onLoad</code>에서 ' +
+                '<code>ctx.buttonEl.disabled</code>만 쓰세요.</p>',
+            },
+          ],
           example:
             'popupEditor: {\n' +
             "  position: 'right',        // 오른쪽에서 슬라이드\n" +
@@ -422,32 +503,96 @@ window.ApiDocs = {
           type: '{ url, method?, params?, autoLoad?, request?, parse?, headers?, paramsFormat?, paramsSerializer? }',
           since: '1.2.0',
           description:
-            '원격 데이터 소스. <code>fetch</code>로 <code>url</code>을 호출해 행을 불러옵니다. ' +
-            '<code>method</code> 기본은 GET(파라미터를 쿼리스트링으로, POST면 JSON body로), ' +
-            '<code>autoLoad</code>는 생성 시 자동 조회 여부(기본 <code>true</code> — 아래 참고, since 2.24.0), ' +
-            '<code>params</code>는 항상 포함할 고정 파라미터(객체 또는 함수), ' +
-            '<code>request(state)</code>는 기본 파라미터 매핑을 서버 스펙으로 대체하는 훅(since 2.5.0), ' +
-            '<code>parse(json)</code>은 응답을 <code>{ rows, total }</code>로 바꾸는 훅' +
-            '(기본: 배열 또는 <code>{ rows, total }</code> 그대로), ' +
-            '<code>headers</code>는 인증 토큰 등 요청 헤더(객체 또는 함수, since 2.5.0), ' +
-            "<code>paramsFormat</code>은 중첩 파라미터 표기(<code>'dot'</code> 기본 · " +
-            "<code>'bracket'</code>, since 2.11.0), " +
-            '<code>paramsSerializer(params)</code>는 GET 쿼리스트링 생성을 통째로 대체하는 훅' +
-            '(since 2.10.0)입니다. ' +
-            '로딩 중 오버레이가 표시되고 실패 시 <code>dataLoadError</code> 이벤트가 발생합니다. ' +
-            '<code>reloadData()</code>로 다시 불러오고 <code>setDataSource()</code>로 교체합니다.<br><br>' +
-            '<strong><code>autoLoad: false</code> (2.24.0)</strong> — 그리드가 <strong>스스로 첫 조회를 하지 ' +
-            '않습니다.</strong> 검색 조건을 받은 뒤에 조회하는 화면, 비싼 쿼리, 탭이 열릴 때까지 미루는 ' +
-            '경우에 씁니다. 데이터 소스를 끄는 게 아니라 <strong>"자동"만 끄는 것</strong>이라 ' +
-            '<code>reloadData()</code> · <code>loadMore()</code> 같은 명시적 호출은 그대로 동작하고, ' +
-            '정렬·필터·페이지 이동에 따른 자동 재조회도 <strong>한 번이라도 조회한 뒤부터는</strong> ' +
-            '평소처럼 동작합니다. <code>rowData</code>를 함께 주면 첫 조회 전까지 그 데이터가 보입니다. ' +
-            '<code>setDataSource()</code>도 새 소스가 <code>autoLoad: false</code>면 교체만 하고 ' +
-            '조회하지 않습니다 — "이 소스는 그리드가 스스로 부르지 않는다"가 생성 시점에만 적용되면 ' +
-            '반쪽짜리가 되기 때문입니다. <code>infiniteScroll</code>과 함께 쓰면 첫 조회 전까지는 ' +
-            '스크롤로도 자동 조회되지 않고, 그 상태의 <code>loadMore()</code>는 이어받기가 아니라 ' +
-            '<strong>첫 페이지</strong>를 불러옵니다.<br><br>' +
-            '<strong>단계별 레시피는 <a href="#remote-data-guide">Remote Data Source 가이드</a> 참고.</strong>',
+            '<p>원격 데이터 소스. <code>fetch</code>로 <code>url</code>을 호출해 행을 불러옵니다. ' +
+            '로딩 중에는 오버레이가 표시되고, 실패하면 ' +
+            '<a href="#events-dataLoadError"><code>dataLoadError</code></a> 이벤트가 발생합니다. ' +
+            '<a href="#api-methods-reloadData"><code>reloadData()</code></a>로 다시 불러오고 ' +
+            '<a href="#api-methods-setDataSource"><code>setDataSource()</code></a>로 교체합니다.</p>' +
+            '<p><strong>단계별 레시피는 <a href="#remote-data-guide">Remote Data Source 가이드</a>를 ' +
+            '참고하세요.</strong></p>',
+          props: [
+            {
+              name: 'url',
+              type: 'string',
+              description: '요청 대상 주소.',
+            },
+            {
+              name: 'method',
+              type: "'GET' | 'POST'",
+              default: "'GET'",
+              description: 'GET이면 파라미터가 쿼리스트링으로, POST면 JSON body로 나갑니다.',
+            },
+            {
+              name: 'autoLoad',
+              type: 'boolean',
+              default: 'true',
+              since: '2.24.0',
+              description: '생성 시 자동 조회 여부 — 아래 <em>autoLoad: false가 끄는 것</em> 참고.',
+            },
+            {
+              name: 'params',
+              type: 'object | () => object',
+              description: '항상 포함할 고정 파라미터.',
+            },
+            {
+              name: 'request',
+              type: '(state) => object',
+              since: '2.5.0',
+              description:
+                '기본 파라미터 매핑을 서버 스펙으로 <strong>대체</strong>하는 훅 ' +
+                '(<a href="#remote-data-guide-Step-3-request">가이드 Step 3</a>).',
+            },
+            {
+              name: 'parse',
+              type: '(json) => { rows, total }',
+              description:
+                '응답을 <code>{ rows, total }</code>로 바꾸는 훅. 기본은 배열 또는 ' +
+                '<code>{ rows, total }</code>를 그대로 씁니다 ' +
+                '(<a href="#remote-data-guide-Step-2-parse">가이드 Step 2</a>).',
+            },
+            {
+              name: 'headers',
+              type: 'object | () => object',
+              since: '2.5.0',
+              description: '인증 토큰 등 요청 헤더.',
+            },
+            {
+              name: 'paramsFormat',
+              type: "'dot' | 'bracket'",
+              default: "'dot'",
+              since: '2.11.0',
+              description:
+                '중첩 파라미터 표기 — <code>page.selectPage=1</code> 또는 ' +
+                '<code>page[selectPage]=1</code>.',
+            },
+            {
+              name: 'paramsSerializer',
+              type: '(params) => string',
+              since: '2.10.0',
+              description: 'GET 쿼리스트링 생성을 통째로 대체하는 훅.',
+            },
+          ],
+          notes: [
+            {
+              title: 'autoLoad: false가 끄는 것 (2.24.0)',
+              body:
+                '<p>그리드가 <strong>스스로 첫 조회를 하지 않습니다.</strong> 검색 조건을 받은 뒤에 ' +
+                '조회하는 화면, 비싼 쿼리, 탭이 열릴 때까지 미루는 경우에 씁니다.</p>' +
+                '<p>데이터 소스를 끄는 게 아니라 <strong>"자동"만 끄는 것</strong>이라 ' +
+                '<code>reloadData()</code> · <code>loadMore()</code> 같은 명시적 호출은 그대로 동작하고, ' +
+                '정렬·필터·페이지 이동에 따른 자동 재조회도 <strong>한 번이라도 조회한 뒤부터는</strong> ' +
+                '평소처럼 동작합니다. <code>rowData</code>를 함께 주면 첫 조회 전까지 그 데이터가 ' +
+                '보입니다.</p>' +
+                '<ul>' +
+                '<li><code>setDataSource()</code>도 새 소스가 <code>autoLoad: false</code>면 교체만 하고 ' +
+                '조회하지 않습니다 — "이 소스는 그리드가 스스로 부르지 않는다"가 생성 시점에만 적용되면 ' +
+                '반쪽짜리가 되기 때문입니다.</li>' +
+                '<li><a href="#grid-options-infiniteScroll"><code>infiniteScroll</code></a>과 함께 쓰면 ' +
+                '첫 조회 전까지는 스크롤로도 자동 조회되지 않고, 그 상태의 <code>loadMore()</code>는 ' +
+                '이어받기가 아니라 <strong>첫 페이지</strong>를 불러옵니다.</li>' +
+                '</ul>',
+            },
+          ],
           example:
             "dataSource: {\n" +
             "  url: '/api/employees',\n" +
@@ -467,36 +612,81 @@ window.ApiDocs = {
           default: 'false',
           since: '2.22.0',
           description:
-            '무한 스크롤. 바닥에서 <code>threshold</code>(기본 200px) 안으로 들어오면 다음 페이지를 ' +
-            '자동으로 조회해 <strong>기존 행 뒤에 이어 붙입니다</strong>(교체가 아닙니다). ' +
-            '<code>pageSize</code>는 한 번에 받을 행 수(생략 시 <code>paginationPageSize</code>).<br><br>' +
-            '<strong>크기 변경 UI (2.23.0)</strong> — 상태 바 왼쪽에 크기 선택이 표시됩니다. ' +
-            '선택지는 <code>paginationPageSizeOptions</code>(기본 <code>[10, 20, 50, 100]</code>)이며 ' +
-            '현재 크기가 목록에 없으면 정렬된 자리에 끼워 넣습니다. 바꾸면 <code>setPageSize()</code>가 ' +
-            '호출돼 쌓인 것을 버리고 새 크기로 다시 받습니다(로드 중에는 비활성). ' +
-            '서버 부하 때문에 크기를 고정하려면 <code>pageSizeSelector: false</code>로 끄세요.<br><br>' +
-            '<strong><code>dataSource</code>가 필요합니다</strong> — 없으면 <code>console.warn</code> 후 ' +
-            '무시됩니다(클라이언트가 이미 전량을 들고 있으면 자동 조회할 대상이 없습니다). ' +
-            '켜면 <code>pageMode</code>가 <code>\'server\'</code>로 올라가고 ' +
-            '<code>sortMode</code>/<code>filterMode</code>도 따라옵니다(명시하면 그 값이 우선).<br><br>' +
-            '<strong>페이저 UI와 배타입니다</strong> — 대신 하단 상태 바가 ' +
-            '"불러오는 중 / N건 불러옴 / 마지막 페이지"를 표시합니다(높이 고정이라 상태가 바뀌어도 ' +
-            '그리드가 흔들리지 않습니다). <code>setPage()</code>는 무한 스크롤에서 동작하지 않고, ' +
-            '<code>treeData</code>와도 함께 쓸 수 없습니다.<br><br>' +
-            '<strong>마지막 페이지 판정</strong>은 다음 순서입니다. ' +
-            '① 서버가 준 플래그 — 응답(또는 <code>parse</code> 반환값)의 <code>last</code> · ' +
-            '<code>lastPage</code> · <code>isLast</code>가 <code>true</code>이거나 ' +
-            '<code>hasMore</code> · <code>hasNext</code>가 <code>false</code>면 마지막입니다 ' +
-            '(Spring Data <code>Page</code>의 <code>last</code>가 그대로 동작합니다). ' +
-            '② 수신 0건. ③ 응답에 <code>total</code>이 있고 누적이 그에 도달. ' +
-            '④ 받은 건수가 요청한 <code>pageSize</code>보다 적을 때. ' +
-            '플래그를 주면 <strong>끝을 확인하려고 빈 페이지를 한 번 더 요청하지 않습니다.</strong><br><br>' +
-            '정렬·필터가 바뀌거나 <code>reloadData()</code>를 호출하면 누적을 버리고 0페이지부터 ' +
-            '다시 쌓습니다(스크롤도 맨 위로). 추가 로드 중에는 전면 로딩 오버레이를 띄우지 않습니다 — ' +
-            '보고 있던 행이 매번 가려지면 페이지 이동처럼 느껴지기 때문입니다.<br><br>' +
-            '<strong>주의:</strong> <code>domLayout: \'autoHeight\'</code>는 바디가 내용만큼 자라 ' +
-            '스크롤이 생기지 않으므로 마지막 페이지까지 연달아 불러옵니다(경고 표시). ' +
-            '그리드가 화면에 없거나 높이가 0이면 바닥을 판정할 수 없어 자동 조회하지 않습니다.',
+            '<p>바닥에서 <code>threshold</code> 안으로 들어오면 다음 페이지를 자동으로 조회해 ' +
+            '<strong>기존 행 뒤에 이어 붙입니다</strong>(교체가 아닙니다).</p>' +
+            '<p>정렬·필터가 바뀌거나 <a href="#api-methods-reloadData"><code>reloadData()</code></a>를 ' +
+            '호출하면 누적을 버리고 0페이지부터 다시 쌓습니다(스크롤도 맨 위로). 추가 로드 중에는 전면 ' +
+            '로딩 오버레이를 띄우지 않습니다 — 보고 있던 행이 매번 가려지면 페이지 이동처럼 느껴지기 ' +
+            '때문입니다.</p>',
+          props: [
+            {
+              name: 'threshold',
+              type: 'number',
+              default: '200',
+              description: '바닥까지 남은 거리(px)가 이 값 안으로 들어오면 다음 페이지를 요청합니다.',
+            },
+            {
+              name: 'pageSize',
+              type: 'number',
+              default: 'paginationPageSize',
+              description: '한 번에 받을 행 수.',
+            },
+            {
+              name: 'pageSizeSelector',
+              type: 'boolean',
+              default: 'true',
+              since: '2.23.0',
+              description:
+                '<p>상태 바 왼쪽의 크기 선택 UI. 선택지는 <code>paginationPageSizeOptions</code>' +
+                '(기본 <code>[10, 20, 50, 100]</code>)이며, 현재 크기가 목록에 없으면 정렬된 자리에 ' +
+                '끼워 넣습니다. 바꾸면 <code>setPageSize()</code>가 호출돼 쌓인 것을 버리고 새 크기로 ' +
+                '다시 받습니다(로드 중에는 비활성).</p>' +
+                '<p>서버 부하 때문에 크기를 고정하려면 <code>false</code>로 끄세요.</p>',
+            },
+          ],
+          notes: [
+            {
+              title: '전제 — dataSource와 모드 상속',
+              body:
+                '<p><a href="#grid-options-dataSource"><code>dataSource</code></a>가 ' +
+                '<strong>필요합니다</strong>. 없으면 <code>console.warn</code> 후 무시됩니다 — ' +
+                '클라이언트가 이미 전량을 들고 있으면 자동 조회할 대상이 없습니다.</p>' +
+                '<p>켜면 <code>pageMode</code>가 <code>\'server\'</code>로 올라가고 ' +
+                '<a href="#grid-options-sortMode"><code>sortMode</code></a>/<code>filterMode</code>도 ' +
+                '따라옵니다(명시하면 그 값이 우선).</p>',
+            },
+            {
+              title: '페이저 UI와 배타적입니다',
+              body:
+                '<p>대신 하단 상태 바가 "불러오는 중 / N건 불러옴 / 마지막 페이지"를 표시합니다 ' +
+                '(높이가 고정이라 상태가 바뀌어도 그리드가 흔들리지 않습니다).</p>' +
+                '<p><code>setPage()</code>는 무한 스크롤에서 동작하지 않고, ' +
+                '<a href="#grid-options-treeData"><code>treeData</code></a>와도 함께 쓸 수 없습니다.</p>',
+            },
+            {
+              title: '마지막 페이지 판정 순서',
+              body:
+                '<ol>' +
+                '<li><strong>서버가 준 플래그</strong> — 응답(또는 <code>parse</code> 반환값)의 ' +
+                '<code>last</code> · <code>lastPage</code> · <code>isLast</code>가 <code>true</code>이거나 ' +
+                '<code>hasMore</code> · <code>hasNext</code>가 <code>false</code>면 마지막입니다 ' +
+                '(Spring Data <code>Page</code>의 <code>last</code>가 그대로 동작합니다).</li>' +
+                '<li>수신 0건.</li>' +
+                '<li>응답에 <code>total</code>이 있고 누적이 그에 도달.</li>' +
+                '<li>받은 건수가 요청한 <code>pageSize</code>보다 적을 때.</li>' +
+                '</ol>' +
+                '<p>플래그를 주면 <strong>끝을 확인하려고 빈 페이지를 한 번 더 요청하지 ' +
+                '않습니다.</strong></p>',
+            },
+            {
+              variant: 'warn',
+              title: '바닥을 판정할 수 없는 레이아웃',
+              body:
+                '<p><a href="#grid-options-domLayout"><code>domLayout: \'autoHeight\'</code></a>는 바디가 ' +
+                '내용만큼 자라 스크롤이 생기지 않으므로 마지막 페이지까지 연달아 불러옵니다(경고 표시). ' +
+                '그리드가 화면에 없거나 높이가 0이면 바닥을 판정할 수 없어 자동 조회하지 않습니다.</p>',
+            },
+          ],
           example:
             "var grid = new DataGrid(el, {\n" +
             "  dataSource: { url: '/api/employees' },   // { rows, last } 또는 { rows, total }\n" +
@@ -518,23 +708,36 @@ window.ApiDocs = {
           default: "pageMode를 따름 (pageMode 기본값은 'client')",
           since: '1.2.0',
           description:
-            '정렬 수행 주체. <code>\'server\'</code>면 클라이언트 정렬을 건너뛰고 정렬이 바뀔 때마다 ' +
-            '<code>dataSource</code>를 다시 호출하며 <code>sort</code> 파라미터(sortModel JSON)를 보냅니다. ' +
-            '<code>filterMode</code>(<code>filter</code>/<code>quickFilter</code> 파라미터)와 ' +
-            '<code>pageMode</code>(<code>page</code>/<code>pageSize</code> 파라미터, 응답 <code>total</code>로 ' +
-            '페이지네이션 계산)도 같은 방식입니다.<br><br>' +
-            '<strong>기본값 상속 (2.13.0부터)</strong> — <code>sortMode</code>와 <code>filterMode</code>를 ' +
-            '적지 않으면 <code>pageMode</code>를 따릅니다(<code>pageMode</code>의 기본값은 ' +
-            '<code>\'client\'</code>이므로 원격 데이터를 안 쓰면 종전과 동일). 서버 페이징에서는 ' +
-            '클라이언트가 <strong>현재 한 페이지만</strong> 들고 있어서, 클라이언트 정렬은 그 페이지 안에서만 ' +
-            '정렬되면서 헤더에는 전체 정렬처럼 표시되고, 클라이언트 필터는 페이지를 걸러내는데 총 건수는 ' +
-            '서버 값이라 "1–20 / 10,000"이라 써놓고 7행만 나오는 식으로 어긋나기 때문입니다.<br><br>' +
-            '상속은 <strong><code>pageMode</code> → <code>sortMode</code>/<code>filterMode</code> 단방향</strong>입니다. ' +
-            '반대 조합(<code>sortMode: \'server\'</code> + <code>pageMode: \'client\'</code> — 서버가 정렬된 전체를 ' +
-            '주고 클라이언트가 페이징)은 정상이므로 <code>pageMode</code>를 끌어올리지 않습니다. ' +
-            '<code>pageMode: \'server\'</code>에 <code>sortMode: \'client\'</code>를 명시하면 ' +
-            '("현재 페이지 안에서만 정렬"이 의도일 수 있으므로) 그대로 존중하되 ' +
-            '<code>console.warn</code>으로 알립니다.',
+            '<p>정렬 수행 주체. <code>\'server\'</code>면 클라이언트 정렬을 건너뛰고, 정렬이 바뀔 때마다 ' +
+            '<a href="#grid-options-dataSource"><code>dataSource</code></a>를 다시 호출하며 ' +
+            '<code>sort</code> 파라미터(sortModel JSON)를 보냅니다.</p>' +
+            '<p><code>filterMode</code>(<code>filter</code>/<code>quickFilter</code> 파라미터)와 ' +
+            '<code>pageMode</code>(<code>page</code>/<code>pageSize</code> 파라미터, 응답 ' +
+            '<code>total</code>로 페이지네이션 계산)도 같은 방식입니다.</p>',
+          notes: [
+            {
+              title: '기본값 상속 (2.13.0부터)',
+              body:
+                '<p><code>sortMode</code>와 <code>filterMode</code>를 적지 않으면 <code>pageMode</code>를 ' +
+                '따릅니다. <code>pageMode</code>의 기본값이 <code>\'client\'</code>이므로 원격 데이터를 안 ' +
+                '쓰면 종전과 동일합니다.</p>' +
+                '<p>서버 페이징에서는 클라이언트가 <strong>현재 한 페이지만</strong> 들고 있습니다. ' +
+                '그래서 클라이언트 정렬은 그 페이지 안에서만 정렬되면서 헤더에는 전체 정렬처럼 표시되고, ' +
+                '클라이언트 필터는 페이지를 걸러내는데 총 건수는 서버 값이라 "1–20 / 10,000"이라 써놓고 ' +
+                '7행만 나오는 식으로 어긋납니다.</p>',
+            },
+            {
+              title: '상속은 단방향입니다',
+              body:
+                '<p><strong><code>pageMode</code> → <code>sortMode</code>/<code>filterMode</code></strong> ' +
+                '방향으로만 흐릅니다. 반대 조합(<code>sortMode: \'server\'</code> + ' +
+                '<code>pageMode: \'client\'</code> — 서버가 정렬된 전체를 주고 클라이언트가 페이징)은 ' +
+                '정상이므로 <code>pageMode</code>를 끌어올리지 않습니다.</p>' +
+                '<p><code>pageMode: \'server\'</code>에 <code>sortMode: \'client\'</code>를 명시하면 ' +
+                '"현재 페이지 안에서만 정렬"이 의도일 수 있으므로 그대로 존중하되 ' +
+                '<code>console.warn</code>으로 알립니다.</p>',
+            },
+          ],
           example:
             "pageMode: 'server',   // sortMode·filterMode도 자동으로 'server'\n" +
             'pagination: true,\n' +
@@ -610,7 +813,7 @@ window.ApiDocs = {
           default: "'normal'",
           since: '2.0.0',
           description:
-            '그리드 높이를 무엇이 결정할지 고릅니다.' +
+            '<p>그리드 높이를 무엇이 결정할지 고릅니다.</p>' +
             '<table class="api-table"><thead><tr><th>값</th><th>높이</th><th>쓰는 곳</th></tr></thead><tbody>' +
             "<tr><td><code>'normal'</code> (기본)</td><td><code>height: 100%</code> — 컨테이너 높이를 따름</td>" +
             '<td>컨테이너 높이가 <strong>확정</strong>된 경우(px·vh 등)</td></tr>' +
@@ -618,19 +821,32 @@ window.ApiDocs = {
             '— 데이터 양과 무관하게 고정</td><td><code>flex: 1</code>·grid 등 <strong>CSS가 높이를 계산</strong>해 주는 레이아웃</td></tr>' +
             "<tr><td><code>'autoHeight'</code></td><td>내용 높이만큼 늘어남</td>" +
             '<td>컨테이너에 높이를 안 주고 싶을 때 (<strong>세로 가상화 비활성</strong> — 소량 데이터 전용)</td></tr>' +
-            '</tbody></table>' +
-            "<strong><code>'fill'</code>이 필요한 이유:</strong> <code>'normal'</code>의 " +
-            '<code>height: 100%</code>는 컨테이너 높이가 확정일 때만 동작합니다. 컨테이너가 ' +
-            '<code>flex: 1</code> 항목이면 자동 최소 크기(<code>min-height: auto</code>)가 내용에 밀려 ' +
-            '커지므로 <strong>행이 많을수록 그리드가 부모를 넘어 늘어나고</strong>, 높이가 불확정인 부모에서는 ' +
-            '<code>100%</code>가 아예 풀리지 않아 <strong>데이터가 없을 때 쪼그라듭니다</strong>. ' +
-            "<code>'fill'</code>은 그리드를 흐름 밖(<code>position: absolute; inset: 0</code>)으로 빼서 " +
-            '행 수가 컨테이너 높이에 영향을 주지 못하게 합니다 — 넘치는 행은 본문이 스크롤합니다. ' +
-            '<strong>전제:</strong> 컨테이너에 해결된 높이가 있어야 하며' +
-            '(높이가 <code>auto</code>인 컨테이너라면 <code>0</code>이 됩니다), ' +
-            '컨테이너가 <code>position: static</code>이면 그리드가 <code>relative</code>로 올립니다' +
-            '(<code>destroy()</code>에서 되돌립니다 — 직접 지정한 값은 건드리지 않습니다). ' +
-            '컨테이너 padding 안쪽이 아니라 <strong>테두리 안쪽 전체</strong>를 채웁니다.',
+            '</tbody></table>',
+          notes: [
+            {
+              title: "'fill'이 필요한 이유",
+              body:
+                '<p><code>\'normal\'</code>의 <code>height: 100%</code>는 컨테이너 높이가 확정일 때만 ' +
+                '동작합니다. 컨테이너가 <code>flex: 1</code> 항목이면 자동 최소 크기' +
+                '(<code>min-height: auto</code>)가 내용에 밀려 커지므로 <strong>행이 많을수록 그리드가 ' +
+                '부모를 넘어 늘어나고</strong>, 높이가 불확정인 부모에서는 <code>100%</code>가 아예 풀리지 ' +
+                '않아 <strong>데이터가 없을 때 쪼그라듭니다</strong>.</p>' +
+                '<p><code>\'fill\'</code>은 그리드를 흐름 밖(<code>position: absolute; inset: 0</code>)으로 ' +
+                '빼서 행 수가 컨테이너 높이에 영향을 주지 못하게 합니다 — 넘치는 행은 본문이 ' +
+                '스크롤합니다.</p>',
+            },
+            {
+              title: "'fill'의 전제",
+              body:
+                '<ul>' +
+                '<li>컨테이너에 해결된 높이가 있어야 합니다 — 높이가 <code>auto</code>인 컨테이너라면 ' +
+                '<code>0</code>이 됩니다.</li>' +
+                '<li>컨테이너가 <code>position: static</code>이면 그리드가 <code>relative</code>로 ' +
+                '올립니다(<code>destroy()</code>에서 되돌립니다 — 직접 지정한 값은 건드리지 않습니다).</li>' +
+                '<li>컨테이너 padding 안쪽이 아니라 <strong>테두리 안쪽 전체</strong>를 채웁니다.</li>' +
+                '</ul>',
+            },
+          ],
           example:
             '// 부모가 flex:1 로 높이를 잡아주는 레이아웃\n' +
             '// <div style="display:flex; flex-direction:column; height:100vh">\n' +
@@ -673,22 +889,91 @@ window.ApiDocs = {
           type: 'object',
           since: '2.1.0',
           description:
-            '계층 데이터를 트리로 표시합니다. nested 형식(각 행의 <code>childrenField</code> 배열이 자식, 기본 ' +
-            '<code>children</code>)과 flat 형식(<code>parentIdField</code> + <code>idField</code>로 계층 구성)을 ' +
-            '모두 지원합니다. <code>treeField</code> 컬럼(생략 시 첫 데이터 컬럼)에 들여쓰기(<code>indent</code>px, 기본 20)와 ' +
-            '펼침 토글이 그려지고, <code>defaultExpandLevel</code>(기본 0, <code>-1</code> = 전부) 깊이까지 펼친 채 시작합니다. ' +
-            '정렬은 형제끼리, 필터는 매치된 노드의 조상을 유지하며 동작합니다(<code>filterKeepChildren: false</code>로 ' +
-            '매치된 부모의 자손 표시를 끌 수 있음). <code>pagination</code>/<code>groupBy</code>와는 함께 쓸 수 없습니다. ' +
-            '트리 모드에서 <code>checkboxSelection</code> 컬럼은 3상태 캐스케이드 체크박스가 됩니다 — ' +
-            '부모 체크 시 자손 전체가 <strong>행 선택</strong>되고 자식 일부만 선택되면 부모가 ' +
-            '<code>indeterminate</code>로 표시됩니다. <code>cascade</code>(기본 true)로 연동을 끄고 ' +
-            '<code>checkboxDisabled(row)</code>로 조건부 비활성(캐스케이드 제외)을 제어하며, 조회/조작/이벤트는 ' +
-            '선택 API(<code>getSelectedRows()</code>·<code>selectAll()/deselectAll()</code>·' +
-            '<code>beforeSelectionChange</code>/<code>selectionChanged</code>)를 그대로 씁니다. ' +
-            '<code>summary: true</code>는 <code>column.aggFunc</code> 컬럼에서 부모 행에 자손 리프 집계를 ' +
-            '표시합니다(표시 전용, 필터 반영). <code>fetchChildren(row) =&gt; Promise</code>는 첫 펼침 때 자식을 ' +
-            '비동기 로드합니다(nested 형식 전용, <code>hasChildren(row)</code>로 로드 전 토글 표시 결정, ' +
-            '실패 시 <code>dataLoadError</code> 후 재시도 가능).',
+            '<p>계층 데이터를 트리로 표시합니다. <strong>nested 형식</strong>(각 행의 ' +
+            '<code>childrenField</code> 배열이 자식)과 <strong>flat 형식</strong>' +
+            '(<code>parentIdField</code> + <code>idField</code>로 계층 구성)을 모두 지원합니다.</p>' +
+            '<p>정렬은 형제끼리, 필터는 매치된 노드의 조상을 유지하며 동작합니다. ' +
+            '<a href="#grid-options-pagination"><code>pagination</code></a>/' +
+            '<a href="#grid-options-groupBy"><code>groupBy</code></a>와는 함께 쓸 수 없습니다.</p>',
+          props: [
+            {
+              name: 'treeField',
+              type: 'string',
+              default: '첫 데이터 컬럼',
+              description: '들여쓰기와 펼침 토글을 그릴 컬럼.',
+            },
+            {
+              name: 'childrenField',
+              type: 'string',
+              default: "'children'",
+              description: 'nested 형식에서 자식 배열이 들어 있는 필드.',
+            },
+            {
+              name: 'parentIdField · idField',
+              type: 'string',
+              description: 'flat 형식에서 계층을 구성할 두 필드.',
+            },
+            {
+              name: 'indent',
+              type: 'number',
+              default: '20',
+              description: '깊이 한 단계당 들여쓰기(px).',
+            },
+            {
+              name: 'defaultExpandLevel',
+              type: 'number',
+              default: '0',
+              description: '시작할 때 펼쳐 둘 깊이. <code>-1</code>이면 전부 펼칩니다.',
+            },
+            {
+              name: 'filterKeepChildren',
+              type: 'boolean',
+              default: 'true',
+              description: '<code>false</code>면 매치된 부모의 자손 표시를 끕니다.',
+            },
+            {
+              name: 'cascade',
+              type: 'boolean',
+              default: 'true',
+              description: '체크박스 캐스케이드 — 아래 <em>3상태 체크박스</em> 참고.',
+            },
+            {
+              name: 'checkboxDisabled',
+              type: '(row) => boolean',
+              description: '조건부로 체크박스를 비활성화합니다(캐스케이드 대상에서도 제외).',
+            },
+            {
+              name: 'summary',
+              type: 'boolean',
+              default: 'false',
+              description:
+                '<a href="#column-defs-aggFunc"><code>column.aggFunc</code></a> 컬럼에서 부모 행에 자손 ' +
+                '리프 집계를 표시합니다(표시 전용이며 필터를 반영합니다).',
+            },
+            {
+              name: 'fetchChildren',
+              type: '(row) => Promise',
+              description:
+                '첫 펼침 때 자식을 비동기로 불러옵니다(nested 형식 전용). ' +
+                '<code>hasChildren(row)</code>로 로드 전 토글 표시를 정하고, 실패하면 ' +
+                '<a href="#events-dataLoadError"><code>dataLoadError</code></a> 후 재시도할 수 있습니다.',
+            },
+          ],
+          notes: [
+            {
+              title: '3상태 체크박스',
+              body:
+                '<p>트리 모드에서 <a href="#column-defs-checkboxSelection"><code>checkboxSelection</code></a> ' +
+                '컬럼은 캐스케이드 체크박스가 됩니다 — 부모를 체크하면 자손 전체가 <strong>행 선택</strong>되고, ' +
+                '자식 일부만 선택되면 부모가 <code>indeterminate</code>로 표시됩니다.</p>' +
+                '<p>조회·조작·이벤트는 기존 선택 API를 그대로 씁니다 — ' +
+                '<a href="#api-methods-getSelectedRows"><code>getSelectedRows()</code></a> · ' +
+                '<a href="#api-methods-selectAll"><code>selectAll()</code></a>/' +
+                '<code>deselectAll()</code> · ' +
+                '<a href="#events-beforeSelectionChange"><code>beforeSelectionChange</code></a>/' +
+                '<a href="#events-selectionChanged"><code>selectionChanged</code></a>.</p>',
+            },
+          ],
           example:
             "treeData: {\n  treeField: 'name',\n  indent: 20,\n  defaultExpandLevel: 1,\n  cascade: true,   // checkboxSelection 컬럼과 함께 쓰면 3상태 캐스케이드\n  // flat 형식이면: parentIdField: 'parentId', idField: 'id'\n},\ncolumnDefs: [\n  { checkboxSelection: true, width: 44 },\n  { field: 'name', headerName: 'Name', flex: 1 },\n],",
         },
@@ -1041,23 +1326,34 @@ window.ApiDocs = {
           demo: 'remote-data-server-spec',
           since: '2.5.0',
           description:
-            '서버가 <code>offset/limit</code>, <code>orderBy=field:dir</code> 같은 다른 파라미터를 쓰면 ' +
-            '<code>request(state)</code>로 기본 매핑을 <strong>대체</strong>합니다. <code>state</code>는 ' +
-            '<code>{ page, pageSize, sortModel, filterModel, quickFilter, sortMode, filterMode, pageMode }</code> ' +
-            '읽기 전용 스냅샷이고, 반환한 객체가 요청 파라미터가 됩니다(<code>params</code> 고정 파라미터 위에 병합). ' +
-            '값이 <code>undefined</code>인 키는 생략되므로 조건부 파라미터를 깔끔하게 표현할 수 있습니다. ' +
-            '예외가 나면 <code>console.error</code> 후 기본 매핑으로 폴백합니다. ' +
-            '<strong>병합 우선순위:</strong> <code>params</code>와 같은 키를 반환하면 <code>request</code>가 ' +
-            '이깁니다(나중에 병합). 단 <code>undefined</code> 반환은 "생략"이지 "삭제"가 아니므로 ' +
-            '<code>params</code>가 준 키를 지우지는 못합니다 — 조건부 제거는 <code>params</code> 쪽에서 하세요. ' +
-            '<strong>직렬화:</strong> GET에서 <strong>중첩 객체·배열도 그대로 반환할 수 있습니다</strong>(v2.10.0). ' +
-            '표기는 <a href="#remote-data-guide-Step-3-1-paramsFormat-paramsSerializer">' +
-            '<code>paramsFormat</code></a>이 정하며 기본은 점 표기입니다: ' +
-            '<code>{ page: { selectPage: 1 } }</code> → <code>page.selectPage=1</code>. ' +
-            '<code>Date</code>는 ISO 문자열, <code>null</code>은 빈 값(<code>key=</code>)이 됩니다. ' +
-            '(v2.9.0까지는 값에 <code>String()</code>이 걸려 중첩 구조가 ' +
-            '<code>[object Object]</code>로 뭉개졌습니다 — BUG-009.) POST는 body 전체가 ' +
-            '<code>JSON.stringify</code>되므로 예나 지금이나 중첩 구조가 온전히 나갑니다.',
+            '<p>서버가 <code>offset/limit</code>, <code>orderBy=field:dir</code> 같은 다른 파라미터를 쓰면 ' +
+            '<code>request(state)</code>로 기본 매핑을 <strong>대체</strong>합니다.</p>' +
+            '<p><code>state</code>는 <code>{ page, pageSize, sortModel, filterModel, quickFilter, ' +
+            'sortMode, filterMode, pageMode }</code> 읽기 전용 스냅샷이고, 반환한 객체가 요청 파라미터가 ' +
+            '됩니다. 값이 <code>undefined</code>인 키는 생략되므로 조건부 파라미터를 깔끔하게 표현할 수 ' +
+            '있습니다. 예외가 나면 <code>console.error</code> 후 기본 매핑으로 폴백합니다.</p>',
+          notes: [
+            {
+              title: 'params와의 병합 우선순위',
+              body:
+                '<p><code>params</code> 고정 파라미터 위에 병합되므로, 같은 키를 반환하면 ' +
+                '<code>request</code>가 이깁니다.</p>' +
+                '<p>단 <code>undefined</code> 반환은 "생략"이지 "삭제"가 아니므로 <code>params</code>가 ' +
+                '준 키를 지우지는 못합니다 — 조건부 제거는 <code>params</code> 쪽에서 하세요.</p>',
+            },
+            {
+              title: '중첩 구조의 직렬화 (v2.10.0)',
+              body:
+                '<p>GET에서 <strong>중첩 객체·배열도 그대로 반환할 수 있습니다</strong>. 표기는 ' +
+                '<a href="#remote-data-guide-Step-3-1-paramsFormat-paramsSerializer">' +
+                '<code>paramsFormat</code></a>이 정하며 기본은 점 표기입니다 — ' +
+                '<code>{ page: { selectPage: 1 } }</code> → <code>page.selectPage=1</code>. ' +
+                '<code>Date</code>는 ISO 문자열, <code>null</code>은 빈 값(<code>key=</code>)이 됩니다.</p>' +
+                '<p>v2.9.0까지는 값에 <code>String()</code>이 걸려 중첩 구조가 ' +
+                '<code>[object Object]</code>로 뭉개졌습니다(BUG-009). POST는 body 전체가 ' +
+                '<code>JSON.stringify</code>되므로 예나 지금이나 중첩 구조가 온전히 나갑니다.</p>',
+            },
+          ],
           example:
             '// GET — 중첩 구조 그대로 반환 (기본 dot 표기: page.selectPage=1&sorts[0].field=…)\n' +
             'dataSource: {\n' +
@@ -1105,9 +1401,9 @@ window.ApiDocs = {
           demo: 'nested-params',
           since: '2.10.0',
           description:
-            '<strong>쿼리스트링에 중첩 구조를 담는 표준 표기는 없습니다</strong> — RFC에 정의된 것이 없어 ' +
-            '서버 프레임워크마다 관례가 다릅니다. 어느 쪽이 옳고 그르다가 아니라 서버에 맞추는 문제이므로 ' +
-            '<code>paramsFormat</code>으로 고릅니다 (v2.11.0):' +
+            '<p><strong>쿼리스트링에 중첩 구조를 담는 표준 표기는 없습니다</strong> — RFC에 정의된 것이 ' +
+            '없어 서버 프레임워크마다 관례가 다릅니다. 어느 쪽이 옳고 그르다가 아니라 서버에 맞추는 ' +
+            '문제이므로 <code>paramsFormat</code>으로 고릅니다 (v2.11.0).</p>' +
             '<table class="api-table"><thead><tr><th>paramsFormat</th><th>출력</th>' +
             '<th>이 표기를 기본으로 파싱하는 곳</th></tr></thead><tbody>' +
             "<tr><td><code>'dot'</code> (기본)</td>" +
@@ -1117,19 +1413,28 @@ window.ApiDocs = {
             '<td><code>page[selectPage]=1</code><br><code>sorts[0][field]=name</code></td>' +
             '<td>qs(Express) · PHP · Rails · Laravel · jQuery <code>$.param()</code></td></tr>' +
             '</tbody></table>' +
-            '<strong>배열 인덱스는 두 표기 모두 대괄호</strong>입니다 — Spring의 List 바인딩이 ' +
-            '<code>sorts[0].field</code> 규약이기 때문입니다. 원시값 배열' +
-            '(<code>tags[0]=x</code>)도 두 표기가 같습니다.<br>' +
-            '두 표기로도 안 되는 서버 — 반복 키(<code>tags=a&amp;tags=b</code>), JSON-in-query, ' +
-            '<code>sortSpec=name:asc,pay:desc</code> 같은 compact 표기 등 — 은 ' +
-            '<code>paramsSerializer(params)</code>로 <strong>쿼리스트링 생성 전체를 대체</strong>합니다 ' +
-            '(<code>paramsFormat</code>보다 우선). ' +
-            '<code>params</code>는 <code>params</code> + <code>request</code>가 합쳐진 최종 객체이고, ' +
-            '반환한 문자열이 그대로 <code>?</code> 뒤에 붙습니다 — ' +
-            '<strong>인코딩도 직접 책임집니다</strong>(<code>encodeURIComponent</code>). ' +
-            '앞에 <code>?</code>나 <code>&amp;</code>가 붙어 있으면 떼고 붙입니다. ' +
-            '예외가 나면 <code>console.error</code> 후 기본 직렬화로 폴백합니다. ' +
-            'GET에서만 쓰입니다(POST는 body가 JSON).',
+            '<p><strong>배열 인덱스는 두 표기 모두 대괄호</strong>입니다 — Spring의 List 바인딩이 ' +
+            '<code>sorts[0].field</code> 규약이기 때문입니다. 원시값 배열(<code>tags[0]=x</code>)도 두 ' +
+            '표기가 같습니다.</p>',
+          notes: [
+            {
+              title: 'paramsSerializer — 두 표기로도 안 될 때',
+              body:
+                '<p>반복 키(<code>tags=a&amp;tags=b</code>), JSON-in-query, ' +
+                '<code>sortSpec=name:asc,pay:desc</code> 같은 compact 표기 등은 ' +
+                '<code>paramsSerializer(params)</code>로 <strong>쿼리스트링 생성 전체를 ' +
+                '대체</strong>합니다(<code>paramsFormat</code>보다 우선).</p>' +
+                '<ul>' +
+                '<li>인자 <code>params</code>는 <code>params</code> + <code>request</code>가 합쳐진 ' +
+                '최종 객체입니다.</li>' +
+                '<li>반환한 문자열이 그대로 <code>?</code> 뒤에 붙습니다 — <strong>인코딩도 직접 ' +
+                '책임집니다</strong>(<code>encodeURIComponent</code>). 앞에 <code>?</code>나 ' +
+                '<code>&amp;</code>가 붙어 있으면 떼고 붙입니다.</li>' +
+                '<li>예외가 나면 <code>console.error</code> 후 기본 직렬화로 폴백합니다.</li>' +
+                '<li>GET에서만 쓰입니다(POST는 body가 JSON).</li>' +
+                '</ul>',
+            },
+          ],
           example:
             'dataSource: {\n' +
             "  url: '/api/employees',\n" +
@@ -1228,19 +1533,20 @@ window.ApiDocs = {
           demo: 'infinite-scroll',
           since: '2.22.0',
           description:
-            '<code>pagination</code> 대신 <code>infiniteScroll</code>을 켜면 바닥에 닿을 때마다 다음 페이지를 ' +
-            '자동으로 받아 <strong>이어 붙입니다</strong>. 요청 파라미터는 서버 페이징과 똑같이 ' +
-            '<code>page</code>/<code>pageSize</code>이므로 <strong>서버는 그대로 두고</strong> 옵션만 바꾸면 됩니다.<br><br>' +
-            '<strong>서버가 할 일은 하나</strong> — 마지막 페이지임을 알려주는 것입니다. ' +
+            '<p><code>pagination</code> 대신 <code>infiniteScroll</code>을 켜면 바닥에 닿을 때마다 다음 ' +
+            '페이지를 자동으로 받아 <strong>이어 붙입니다</strong>. 요청 파라미터는 서버 페이징과 똑같이 ' +
+            '<code>page</code>/<code>pageSize</code>이므로 <strong>서버는 그대로 두고</strong> 옵션만 ' +
+            '바꾸면 됩니다.</p>' +
+            '<p><strong>서버가 할 일은 하나</strong> — 마지막 페이지임을 알려주는 것입니다. ' +
             '<code>last</code>(Spring Data <code>Page</code> 그대로) · <code>lastPage</code> · ' +
             '<code>isLast</code> · <code>hasMore</code> · <code>hasNext</code> 중 아무 이름이나 좋습니다. ' +
             '이걸 주면 하단 상태 바가 곧바로 "마지막 페이지"로 바뀌고, <strong>끝을 확인하려고 빈 페이지를 ' +
             '한 번 더 요청하지 않습니다.</strong> 플래그가 없으면 <code>total</code>로, 그것도 없으면 ' +
-            '"받은 건수 &lt; pageSize"로 추론합니다.<br><br>' +
-            '<code>parse</code>를 쓰는 경우, 플래그를 <strong>반환 객체에 실어도 되고 안 실어도 됩니다</strong> — ' +
-            '반환값에서 못 찾으면 <strong>원본 응답의 최상위</strong>에서 다시 찾습니다. ' +
+            '"받은 건수 &lt; pageSize"로 추론합니다.</p>' +
+            '<p><code>parse</code>를 쓰는 경우, 플래그를 <strong>반환 객체에 실어도 되고 안 실어도 ' +
+            '됩니다</strong> — 반환값에서 못 찾으면 <strong>원본 응답의 최상위</strong>에서 다시 찾습니다. ' +
             '다만 플래그가 envelope 안쪽(<code>json.result.last</code>)에 있으면 최상위가 아니므로 ' +
-            '<code>parse</code>가 꺼내 올려줘야 합니다.',
+            '<code>parse</code>가 꺼내 올려줘야 합니다.</p>',
           example:
             '// 서버 응답: { "rows": [...], "last": false }\n' +
             'var grid = new DataGrid(el, {\n' +
@@ -1261,14 +1567,14 @@ window.ApiDocs = {
           demo: 'auto-load',
           since: '2.24.0',
           description:
-            '기본적으로 그리드는 생성되자마자 <code>dataSource</code>를 한 번 호출합니다. ' +
+            '<p>기본적으로 그리드는 생성되자마자 <code>dataSource</code>를 한 번 호출합니다. ' +
             '<strong>검색 조건을 받은 뒤에 조회하는 화면</strong>에서는 이 첫 요청이 낭비이고 ' +
             '(조건 없는 전체 조회) 비싼 쿼리라면 서버에도 부담입니다. ' +
-            '<code>autoLoad: false</code>로 끄고 조회 시점을 소비자가 정하세요.<br><br>' +
-            '끄는 건 <strong>자동 조회뿐</strong>입니다 — <code>reloadData()</code>는 그대로 동작하고, ' +
+            '<code>autoLoad: false</code>로 끄고 조회 시점을 소비자가 정하세요.</p>' +
+            '<p>끄는 건 <strong>자동 조회뿐</strong>입니다 — <code>reloadData()</code>는 그대로 동작하고, ' +
             '한 번 조회한 뒤에는 정렬·필터·페이지 이동에 따른 자동 재조회도 평소처럼 일어납니다. ' +
             '조회 전까지 뭔가 보여주고 싶으면 <code>rowData</code>를 함께 주면 됩니다 ' +
-            '(그 데이터가 첫 조회 때 교체됩니다).',
+            '(그 데이터가 첫 조회 때 교체됩니다).</p>',
           example:
             'var grid = new DataGrid(el, {\n' +
             '  dataSource: {\n' +
@@ -1509,31 +1815,48 @@ window.ApiDocs = {
           type: "'sum' | 'avg' | 'min' | 'max' | 'count' | (values, ctx) => any",
           since: '1.1.0',
           description:
-            '이 컬럼의 집계 함수. <a href="#grid-options-groupBy"><code>groupBy</code></a> 그룹 헤더 행 · ' +
+            '<p>이 컬럼의 집계 함수. <a href="#grid-options-groupBy"><code>groupBy</code></a> 그룹 헤더 행 · ' +
             '<a href="#grid-options-grandTotal"><code>grandTotal</code></a> 요약 행 · ' +
             '<a href="#grid-options-treeData"><code>treeData.summary</code></a> 부모 노드 행 ' +
-            '<strong>세 곳 모두</strong>에 같은 규칙으로 적용됩니다. ' +
-            '<code>count</code>를 제외한 내장 집계는 숫자로 해석 가능한 값만 집계하며(빈 값·문자 제외), ' +
-            '집계값에도 <code>valueFormatter</code>가 적용됩니다(이때 두 번째 인자 <code>row</code>는 <code>null</code>).<br>' +
-            '<strong>커스텀 함수</strong>(v2.20) — <code>(values, ctx) => any</code>:<br>' +
-            '<code>values</code>는 그 컬럼의 <strong>원본 값 배열</strong>입니다(null·빈 값 포함 — 거르는 건 소비자 몫). ' +
-            '<code>ctx</code>는 <code>{ rows, field, colDef, parent }</code>이고 ' +
-            '<code>rows</code>는 집계 대상 행(그룹: 그 그룹의 행 / 트리: 자손 <strong>리프</strong> / ' +
-            '전체합계: 현재 뷰 전체), <code>parent</code>는 <strong>트리 요약에서만</strong> 부모 행이고 ' +
-            '나머지 두 곳에서는 <code>null</code>입니다(그 자리엔 행 객체가 없습니다).<br>' +
-            '반환값이 <code>null</code>/<code>undefined</code>면 그 셀은 비웁니다(내장 집계와 같은 규약). ' +
-            '<code>0</code>과 빈 문자열은 유효한 결과로 그대로 표시됩니다. ' +
-            '<strong>커스텀 함수의 결과에는 <code>valueFormatter</code>가 적용되지 않습니다</strong> — ' +
-            '함수가 이미 출력을 결정했는데 포매터가 다시 가공하면 문자열 반환이 망가지기 때문입니다. ' +
-            '함수가 예외를 던지면 그 집계만 비우고 <code>console.error</code>로 <strong>컬럼당 한 번</strong> ' +
-            '보고합니다(부모 노드마다 찍히면 콘솔이 쓸모없어지므로) — 그리드는 계속 그려집니다.<br>' +
-            '집계는 <strong>필터가 적용된 뒤의 행</strong>으로 매번 다시 계산되므로, ' +
-            '트리에서 "이름 (자손 수)" 같은 표시를 만들면 필터를 자동으로 따라갑니다. ' +
-            '<strong>주의:</strong> 트리·그룹의 요약 셀은 그 컬럼의 <em>원래 값을 대체</em>합니다. ' +
-            '트리 컬럼에 <code>aggFunc</code>를 달면 부모 행의 이름 자리에 집계 결과가 그려지므로 ' +
-            '(들여쓰기·셰브론은 유지) 이름을 남기려면 <code>ctx.parent</code>에서 직접 만들어 붙이세요. ' +
-            '또 <code>groupBy</code> 그룹 행은 "<code>aggFunc</code>가 없는 첫 컬럼"을 라벨 자리로 쓰므로, ' +
-            '첫 컬럼에 <code>aggFunc</code>를 달면 그룹 라벨이 다음 컬럼으로 밀립니다.',
+            '<strong>세 곳 모두</strong>에 같은 규칙으로 적용됩니다.</p>' +
+            '<p><code>count</code>를 제외한 내장 집계는 숫자로 해석 가능한 값만 집계하며(빈 값·문자 제외), ' +
+            '집계값에도 <a href="#column-defs-valueFormatter"><code>valueFormatter</code></a>가 ' +
+            '적용됩니다(이때 두 번째 인자 <code>row</code>는 <code>null</code>).</p>' +
+            '<p>집계는 <strong>필터가 적용된 뒤의 행</strong>으로 매번 다시 계산되므로, 트리에서 ' +
+            '"이름 (자손 수)" 같은 표시를 만들면 필터를 자동으로 따라갑니다.</p>',
+          notes: [
+            {
+              title: '커스텀 함수 — (values, ctx) => any (v2.20)',
+              body:
+                '<ul>' +
+                '<li><code>values</code> — 그 컬럼의 <strong>원본 값 배열</strong>입니다. null·빈 값도 ' +
+                '들어 있고, 거르는 건 소비자 몫입니다.</li>' +
+                '<li><code>ctx.rows</code> — 집계 대상 행. 그룹이면 그 그룹의 행, 트리면 자손 ' +
+                '<strong>리프</strong>, 전체합계면 현재 뷰 전체입니다.</li>' +
+                '<li><code>ctx.parent</code> — <strong>트리 요약에서만</strong> 부모 행이고 나머지 두 곳에서는 ' +
+                '<code>null</code>입니다(그 자리엔 행 객체가 없습니다).</li>' +
+                '<li>나머지는 <code>ctx.field</code> · <code>ctx.colDef</code>.</li>' +
+                '</ul>' +
+                '<p>반환값이 <code>null</code>/<code>undefined</code>면 그 셀은 비웁니다(내장 집계와 같은 ' +
+                '규약). <code>0</code>과 빈 문자열은 유효한 결과로 그대로 표시됩니다.</p>' +
+                '<p><strong>커스텀 함수의 결과에는 <code>valueFormatter</code>가 적용되지 않습니다</strong> — ' +
+                '함수가 이미 출력을 결정했는데 포매터가 다시 가공하면 문자열 반환이 망가지기 때문입니다. ' +
+                '함수가 예외를 던지면 그 집계만 비우고 <code>console.error</code>로 ' +
+                '<strong>컬럼당 한 번</strong> 보고합니다(부모 노드마다 찍히면 콘솔이 쓸모없어지므로) — ' +
+                '그리드는 계속 그려집니다.</p>',
+            },
+            {
+              variant: 'warn',
+              title: '요약 셀은 그 컬럼의 원래 값을 대체합니다',
+              body:
+                '<p>트리 컬럼에 <code>aggFunc</code>를 달면 부모 행의 이름 자리에 집계 결과가 ' +
+                '그려집니다(들여쓰기·셰브론은 유지). 이름을 남기려면 <code>ctx.parent</code>에서 직접 ' +
+                '만들어 붙이세요.</p>' +
+                '<p>또 <a href="#grid-options-groupBy"><code>groupBy</code></a> 그룹 행은 ' +
+                '"<code>aggFunc</code>가 없는 첫 컬럼"을 라벨 자리로 쓰므로, 첫 컬럼에 ' +
+                '<code>aggFunc</code>를 달면 그룹 라벨이 다음 컬럼으로 밀립니다.</p>',
+            },
+          ],
           example:
             "{ field: 'salary', aggFunc: 'sum', align: 'right',\n" +
             "  valueFormatter: function (v) { return '$' + v.toLocaleString(); } }\n\n" +
@@ -1569,47 +1892,100 @@ window.ApiDocs = {
           default: "'text'",
           since: '1.2.0',
           description:
-            '인라인 에디터 종류. <code>\'number\'</code>는 커밋 시 숫자로 변환하고 숫자가 아니면 이전 값으로 되돌립니다. '
-            + "<code>'date'</code>·<code>'datetime'</code>(v2.8.0)은 브라우저 기본 날짜 피커"
-            + '(<code>&lt;input type="date"&gt;</code> / <code>datetime-local</code>)로 편집하며, '
-            + '커밋 값은 <strong>원본 타입을 보존</strong>합니다 — 원본이 문자열이면 문자열'
-            + '(<a href="#column-defs-format"><code>format</code></a>이 날짜 패턴이면 그 표기로), '
-            + '<code>Date</code>면 <code>Date</code>, 타임스탬프 숫자면 숫자입니다. '
-            + '입력을 비우면 <code>null</code>로 커밋해 날짜를 지웁니다(원본도 빈 값이면 변경 없음). '
-            + '선택 범위·정밀도·커밋 타입은 <a href="#column-defs-editorOptions"><code>editorOptions</code></a>의 '
-            + '<code>{ min, max, step, valueType }</code>로 조정합니다 '
-            + '(<a href="../examples/features.html#date-datetime-editor">date/datetime 데모 ↗</a>). ' +
-            '<code>\'select\'</code>·<code>\'radio\'</code>는 <code>editorOptions</code>에서 단일 선택 ' +
-            '(select는 드롭다운, radio는 multiselect와 같은 셀 앵커 라디오 패널). ' +
-            "select는 <a href='#column-defs-editorSearch'><code>editorSearch</code></a>를 주면 " +
-            '검색 입력이 있는 옵션 패널로 바뀝니다 (v2.3.0). ' +
-            '<code>\'multiselect\'</code>(v2.2.0)는 셀 아래에 체크리스트 패널을 펼치고 ' +
-            '<code>editorOptions</code> 순서로 커밋합니다 — 내용이 같으면 커밋하지 않습니다. ' +
-            "multiselect도 <a href='#column-defs-editorSearch'><code>editorSearch</code></a>를 받습니다 " +
-            "(v2.25 — <a href='../examples/features.html#searchable-multiselect'>데모 ↗</a>): " +
-            '검색창 + 체크리스트가 되고 고른 값은 칩으로 표시되며, 이때는 <strong>고른 순서</strong>로 커밋합니다. ' +
-            '<strong>값 표현은 배열과 콤마 구분 문자열을 모두 받습니다</strong>(v2.21) — ' +
-            '<code>[\'js\', \'css\']</code>와 <code>"js,css"</code>(항목 앞뒤 공백 허용)가 같은 값이고, ' +
-            '읽기·표시·편집·변경 판정이 모두 두 표현을 동일하게 다룹니다. ' +
-            '커밋할 때는 <strong>그 행이 원래 쓰던 표현을 유지</strong>합니다 — 배열이었으면 배열, ' +
-            '문자열이었으면 콤마 문자열이고, 원본이 <code>null</code>/빈 값이라 추론할 게 없으면 ' +
-            '<strong>콤마 문자열이 기본</strong>입니다(편집 한 번에 컬럼의 값 타입이 바뀌면 서버 스키마와 어긋나므로). ' +
-            '전부 해제하면 문자열 컬럼은 <code>\'\'</code>, 배열 컬럼은 <code>[]</code>가 됩니다. ' +
-            '구분자는 <code>,</code>로 고정이며 옵션으로 열지 않습니다 — ' +
-            '<strong>옵션 값 자체에 콤마가 들어 있으면 분해되므로</strong> 그런 값은 배열로 저장하세요. ' +
-            '<code>\'checkbox\'</code>(v2.2.0)는 체크박스입니다 — 기본은 불리언 커밋이고, ' +
-            "<code>editorOptions: { checked: 'Y', unchecked: 'N' }</code> 매핑을 주면 " +
-            "그 값('Y'/'N', 1/0 등)으로 읽고 커밋합니다. 매핑 없이도 'y'/'yes'/'true'/'1' 계열 문자열은 " +
-            '체크로 인식합니다 (커밋은 불리언). ' +
-            '모두 <kbd>Enter</kbd>/바깥 클릭으로 커밋, <kbd>Esc</kbd>로 취소하며, ' +
-            'editor를 선언하면 <code>editable: true</code>는 생략할 수 있습니다 (v2.2.0). ' +
-            '문자열 대신 객체를 주면 <strong>커스텀 에디터</strong>입니다: ' +
-            '<code>init(cellEl, value, row, col)</code>로 UI를 셀에 렌더링하고, 커밋 시 ' +
-            '<code>getValue()</code>가 새 값을 반환하며, 닫힐 때 <code>destroy()</code>(선택)가 호출됩니다. ' +
-            '커스텀 에디터에서도 <kbd>Enter</kbd>/<kbd>Esc</kbd>/포커스 이탈과 ' +
-            '<code>validator</code>·<code>beforeCellSave</code> 검증이 동일하게 동작합니다. ' +
-            '생략 시 <code>dataType</code>/<code>filter</code>가 number면 숫자, '
-            + '<code>dataType: \'date\'</code>면 date 에디터, 아니면 텍스트 에디터입니다.',
+            '<p>인라인 에디터 종류. 모두 <kbd>Enter</kbd>/바깥 클릭으로 커밋하고 <kbd>Esc</kbd>로 취소하며, ' +
+            'editor를 선언하면 <a href="#column-defs-editable"><code>editable: true</code></a>는 ' +
+            '생략할 수 있습니다 (v2.2.0).</p>' +
+            '<p>생략하면 <code>dataType</code>/<code>filter</code>가 number면 숫자, ' +
+            '<code>dataType: \'date\'</code>면 date 에디터, 아니면 텍스트 에디터가 선택됩니다.</p>',
+          propsTitle: '에디터 종류',
+          props: [
+            {
+              name: "'text'",
+              default: '기본값',
+              description: '한 줄 텍스트 입력.',
+            },
+            {
+              name: "'number'",
+              description: '커밋 시 숫자로 변환하고, 숫자가 아니면 이전 값으로 되돌립니다.',
+            },
+            {
+              name: "'date' · 'datetime'",
+              since: '2.8.0',
+              description:
+                '<p>브라우저 기본 날짜 피커(<code>&lt;input type="date"&gt;</code> / ' +
+                '<code>datetime-local</code>)로 편집합니다. 커밋 값은 <strong>원본 타입을 보존</strong>합니다 — ' +
+                '원본이 문자열이면 문자열(<a href="#column-defs-format"><code>format</code></a>이 날짜 패턴이면 ' +
+                '그 표기로), <code>Date</code>면 <code>Date</code>, 타임스탬프 숫자면 숫자입니다.</p>' +
+                '<p>입력을 비우면 <code>null</code>로 커밋해 날짜를 지웁니다(원본도 빈 값이면 변경 없음). ' +
+                '선택 범위·정밀도·커밋 타입은 ' +
+                '<a href="#column-defs-editorOptions"><code>editorOptions</code></a>의 ' +
+                '<code>{ min, max, step, valueType }</code>로 조정합니다 ' +
+                '(<a href="../examples/features.html#date-datetime-editor" target="_blank" rel="noopener">' +
+                'date/datetime 데모 ↗</a>).</p>',
+            },
+            {
+              name: "'select'",
+              description:
+                '<a href="#column-defs-editorOptions"><code>editorOptions</code></a>에서 단일 선택하는 드롭다운. ' +
+                '<a href="#column-defs-editorSearch"><code>editorSearch</code></a>를 주면 검색 입력이 있는 ' +
+                '옵션 패널로 바뀝니다 (v2.3.0).',
+            },
+            {
+              name: "'radio'",
+              description: 'select와 같은 단일 선택이지만, 셀에 앵커된 라디오 패널로 펼쳐집니다.',
+            },
+            {
+              name: "'multiselect'",
+              since: '2.2.0',
+              description:
+                '<p>셀 아래에 체크리스트 패널을 펼치고 <code>editorOptions</code> 순서로 커밋합니다 — ' +
+                '내용이 같으면 커밋하지 않습니다.</p>' +
+                '<p><a href="#column-defs-editorSearch"><code>editorSearch</code></a>를 주면 검색창 + ' +
+                '체크리스트가 되고 고른 값은 칩으로 표시되며, 이때는 <strong>고른 순서</strong>로 커밋합니다 ' +
+                '(v2.25 — <a href="../examples/features.html#searchable-multiselect" target="_blank" rel="noopener">' +
+                '데모 ↗</a>).</p>',
+            },
+            {
+              name: "'checkbox'",
+              since: '2.2.0',
+              description:
+                '기본은 불리언 커밋입니다. ' +
+                "<code>editorOptions: { checked: 'Y', unchecked: 'N' }</code> 매핑을 주면 그 값" +
+                "('Y'/'N', 1/0 등)으로 읽고 커밋합니다. 매핑 없이도 'y'/'yes'/'true'/'1' 계열 문자열은 " +
+                '체크로 인식합니다(커밋은 불리언).',
+            },
+            {
+              name: '{ init, getValue, destroy? }',
+              description:
+                '<strong>커스텀 에디터.</strong> <code>init(cellEl, value, row, col)</code>으로 UI를 셀에 ' +
+                '렌더링하고, 커밋 시 <code>getValue()</code>가 새 값을 반환하며, 닫힐 때 ' +
+                '<code>destroy()</code>(선택)가 호출됩니다. <kbd>Enter</kbd>/<kbd>Esc</kbd>/포커스 이탈과 ' +
+                '<a href="#column-defs-validator"><code>validator</code></a> · ' +
+                '<a href="#events-beforeCellSave"><code>beforeCellSave</code></a> 검증이 내장 에디터와 ' +
+                '동일하게 동작합니다.',
+            },
+          ],
+          notes: [
+            {
+              title: '다중 값의 표현 — 배열과 콤마 문자열 (v2.21)',
+              body:
+                '<p><code>multiselect</code>는 <strong>두 표현을 모두 받습니다</strong> — ' +
+                '<code>[\'js\', \'css\']</code>와 <code>"js,css"</code>(항목 앞뒤 공백 허용)가 같은 값이고, ' +
+                '읽기·표시·편집·변경 판정이 모두 두 표현을 동일하게 다룹니다.</p>' +
+                '<p>커밋할 때는 <strong>그 행이 원래 쓰던 표현을 유지</strong>합니다 — 배열이었으면 배열, ' +
+                '문자열이었으면 콤마 문자열입니다. 원본이 <code>null</code>/빈 값이라 추론할 게 없으면 ' +
+                '<strong>콤마 문자열이 기본</strong>입니다(편집 한 번에 컬럼의 값 타입이 바뀌면 서버 스키마와 ' +
+                '어긋나므로). 전부 해제하면 문자열 컬럼은 <code>\'\'</code>, 배열 컬럼은 <code>[]</code>가 ' +
+                '됩니다.</p>',
+            },
+            {
+              variant: 'warn',
+              title: '구분자는 쉼표로 고정입니다',
+              body:
+                '<p>옵션으로 열지 않습니다. <strong>옵션 값 자체에 쉼표가 들어 있으면 분해되므로</strong> ' +
+                '그런 값은 배열로 저장하세요.</p>',
+            },
+          ],
           example:
             "// dataType만 줘도 date 에디터가 자동 선택된다 (값은 'yyyy-MM-dd' 문자열로 커밋)\n" +
             "{ field: 'hireDate', dataType: 'date', format: 'yyyy-MM-dd', editable: true }\n" +
@@ -1637,22 +2013,46 @@ window.ApiDocs = {
           demo: 'select-label-value',
           type: 'Array<string | { label, value }> | { checked, unchecked } | { min, max, step, valueType }',
           description:
-            "<code>editor: 'select' | 'multiselect' | 'radio'</code>의 선택지 목록. " +
-            '문자열 배열이면 표시와 저장에 같은 값을 쓰고, ' +
-            '<code>{ label, value }</code> 객체 배열이면 편집 UI에는 <code>label</code>이 표시되고 ' +
-            '선택 시 <code>value</code>가 데이터에 저장됩니다 (셀에는 저장된 value가 보입니다 — ' +
-            'label로 표시하려면 짝꿍 렌더러 <code>DataGrid.renderers.select()/radio()/multiselect()</code>를 쓰세요). ' +
-            '<code>value</code>의 원본 타입은 보존됩니다 — 숫자 value를 고르면 숫자로 커밋됩니다. ' +
-            '객체 형식은 v2.2.0부터 지원. ' +
-            "<code>editor: 'checkbox'</code>에서는 배열 대신 <code>{ checked, unchecked }</code> " +
-            "매핑 객체를 받습니다 (예: <code>{ checked: 'Y', unchecked: 'N' }</code> — 읽기/커밋 모두 그 값 사용). " +
-            "<code>editor: 'date' | 'datetime'</code>에서는 <code>{ min, max, step, valueType }</code>을 " +
-            '받습니다 (v2.8.0): <code>min</code>/<code>max</code>는 선택 가능한 날짜 범위' +
-            "(<code>'yyyy-MM-dd'</code> 문자열·<code>Date</code>·타임스탬프 모두 가능), " +
-            '<code>step</code>은 초 단위 정밀도(예: <code>60</code>), ' +
-            "<code>valueType</code>은 커밋 타입을 <code>'date'</code>(Date)·<code>'timestamp'</code>(숫자)·" +
-            "<code>'string'</code>(문자열) 중 하나로 고정합니다 " +
-            "(생략 시 <code>'auto'</code> — 원본 값의 타입을 보존).",
+            '<p>에디터의 부가 설정. <a href="#column-defs-editor"><code>editor</code></a> 종류에 따라 ' +
+            '받는 형식이 다릅니다.</p>',
+          propsTitle: 'editor 종류별 형식',
+          props: [
+            {
+              name: "'select' · 'multiselect' · 'radio'",
+              type: 'Array<string | { label, value }>',
+              description:
+                '<p>선택지 목록. 문자열 배열이면 표시와 저장에 같은 값을 쓰고, ' +
+                '<code>{ label, value }</code> 객체 배열(v2.2.0)이면 편집 UI에는 <code>label</code>이 ' +
+                '표시되고 선택 시 <code>value</code>가 데이터에 저장됩니다.</p>' +
+                '<p>셀에는 저장된 value가 그대로 보이므로, label로 표시하려면 짝꿍 렌더러 ' +
+                '<a href="#renderers-select"><code>DataGrid.renderers.select()</code></a> · ' +
+                '<a href="#renderers-radio"><code>radio()</code></a> · ' +
+                '<a href="#renderers-multiselect"><code>multiselect()</code></a>를 쓰세요. ' +
+                '<code>value</code>의 원본 타입은 보존됩니다 — 숫자 value를 고르면 숫자로 ' +
+                '커밋됩니다.</p>',
+            },
+            {
+              name: "'checkbox'",
+              type: '{ checked, unchecked }',
+              description:
+                "배열 대신 매핑 객체를 받습니다. 예를 들어 " +
+                "<code>{ checked: 'Y', unchecked: 'N' }</code>이면 읽기·커밋 모두 그 값을 씁니다.",
+            },
+            {
+              name: "'date' · 'datetime'",
+              type: '{ min, max, step, valueType }',
+              since: '2.8.0',
+              description:
+                '<ul>' +
+                "<li><code>min</code> · <code>max</code> — 선택 가능한 날짜 범위. " +
+                "<code>'yyyy-MM-dd'</code> 문자열 · <code>Date</code> · 타임스탬프 모두 가능합니다.</li>" +
+                '<li><code>step</code> — 초 단위 정밀도(예: <code>60</code>).</li>' +
+                "<li><code>valueType</code> — 커밋 타입을 <code>'date'</code>(Date) · " +
+                "<code>'timestamp'</code>(숫자) · <code>'string'</code>(문자열) 중 하나로 고정합니다. " +
+                "생략하면 <code>'auto'</code>로 원본 값의 타입을 보존합니다.</li>" +
+                '</ul>',
+            },
+          ],
           example:
             "{ field: 'country', editor: 'select',\n" +
             "  editorOptions: [\n" +
@@ -1667,31 +2067,82 @@ window.ApiDocs = {
           default: 'undefined',
           since: '2.3.0',
           description:
-            "<code>editor: 'select'</code>(단일 선택)와 <code>editor: 'multiselect'</code>(다중 선택, v2.25)를 " +
-            '<strong>검색 입력이 있는 옵션 패널</strong>로 바꿉니다. ' +
-            '<code>true</code>면 정적 <code>editorOptions</code>를 로컬에서 필터하고(label 또는 ' +
-            '문자열화한 value 부분 일치, 대소문자 무관), <code>fetch(query, row, col) =&gt; Promise&lt;options&gt;</code>를 ' +
-            '주면 질의마다 비동기로 목록을 불러옵니다 (lazy 검색 — 반환 형식은 <code>editorOptions</code>와 동일). ' +
-            '<code>debounce</code>(기본 250ms)는 입력 멈춤 후 fetch까지의 지연, <code>minLength</code>(기본 0)는 ' +
-            'fetch를 시작할 최소 글자 수, <code>placeholder</code>(기본 "Search…")는 검색 입력의 플레이스홀더입니다. ' +
-            '옵션을 고르지 않고 닫으면 값이 바뀌지 않으며, fetch 실패 시 ' +
-            '<code>console.error</code> 후 "Load failed"가 표시됩니다(이전 응답이 늦게 도착해도 최신 질의만 반영).<br>' +
-            '<strong>select</strong> — <kbd>↑</kbd>/<kbd>↓</kbd> 이동, <kbd>Enter</kbd>로 선택·커밋, ' +
-            '옵션 클릭은 즉시 커밋, <kbd>Esc</kbd>는 취소. lazy로 고른 값의 label 표시는 짝꿍 렌더러 ' +
-            "<a href='#renderers-searchselect'><code>renderers.searchselect()</code></a>가 담당합니다.<br>" +
-            "<strong>multiselect</strong> (<a href='../examples/features.html#searchable-multiselect'>데모 ↗</a>) — " +
-            '고른 값이 <strong>칩</strong>으로 검색창 위에 상시 표시되므로, 필터로 목록에서 가려지거나 ' +
-            'lazy 질의로 목록이 통째로 갈려도 선택이 사라지지 않습니다(선택 상태를 DOM이 아니라 별도로 들고 있습니다). ' +
-            '칩의 <code>×</code> 또는 항목 재클릭으로 해제합니다.<br>' +
-            '<strong><kbd>Enter</kbd>의 의미는 목록이 보이는지에 따라 갈립니다</strong>(v2.25.1) — ' +
-            '<kbd>↑</kbd>/<kbd>↓</kbd>로 고른 <strong>활성 항목이 있으면 토글</strong>, 활성 항목이 없으면 ' +
-            '폼에서는 목록만 닫고 셀에서는 커밋합니다. <strong>목록이 접혀 있으면 토글하지 않습니다</strong> — ' +
-            '폼에서는 그 <kbd>Enter</kbd>가 저장으로 넘어갑니다. 마우스로 항목을 고르면 키보드 커서가 지워지므로, ' +
-            '<strong>고른 직후의 <kbd>Enter</kbd>가 방금 고른 항목을 되돌리지 않습니다</strong>. ' +
-            '저장 순서는 <strong>고른 순서</strong>이며(검색이 없는 multiselect의 "editorOptions 순서"와 다릅니다 — ' +
-            'lazy에는 전체 목록이라는 것이 없습니다), 값 표현은 원본을 따라 배열이면 배열 · 콤마 문자열이면 ' +
-            '콤마 문자열로 되돌려 커밋합니다. 셀 표시는 ' +
-            "<a href='#renderers-multiselect'><code>renderers.multiselect()</code></a>가 같은 label 캐시를 봅니다.",
+            '<p><a href="#column-defs-editor"><code>editor: \'select\'</code></a>(단일 선택)와 ' +
+            '<code>editor: \'multiselect\'</code>(다중 선택, v2.25)를 ' +
+            '<strong>검색 입력이 있는 옵션 패널</strong>로 바꿉니다.</p>' +
+            '<p>옵션을 고르지 않고 닫으면 값이 바뀌지 않습니다. fetch가 실패하면 ' +
+            '<code>console.error</code> 후 "Load failed"가 표시되며, 이전 응답이 늦게 도착해도 최신 질의만 ' +
+            '반영됩니다.</p>',
+          props: [
+            {
+              name: 'true',
+              description:
+                '정적 <a href="#column-defs-editorOptions"><code>editorOptions</code></a>를 로컬에서 ' +
+                '필터합니다 — label 또는 문자열화한 value의 부분 일치이며 대소문자를 가리지 않습니다.',
+            },
+            {
+              name: 'fetch',
+              type: '(query, row, col) => Promise<options>',
+              description:
+                '질의마다 비동기로 목록을 불러옵니다(lazy 검색). 반환 형식은 ' +
+                '<code>editorOptions</code>와 동일합니다.',
+            },
+            {
+              name: 'debounce',
+              type: 'number',
+              default: '250',
+              description: '입력이 멈춘 뒤 fetch까지의 지연(ms).',
+            },
+            {
+              name: 'minLength',
+              type: 'number',
+              default: '0',
+              description: 'fetch를 시작할 최소 글자 수.',
+            },
+            {
+              name: 'placeholder',
+              type: 'string',
+              default: "'Search…'",
+              description: '검색 입력의 플레이스홀더.',
+            },
+          ],
+          notes: [
+            {
+              title: 'select — 단일 선택',
+              body:
+                '<p><kbd>↑</kbd>/<kbd>↓</kbd>로 이동하고 <kbd>Enter</kbd>로 선택·커밋합니다. 옵션 클릭은 ' +
+                '즉시 커밋, <kbd>Esc</kbd>는 취소입니다.</p>' +
+                '<p>lazy로 고른 값의 label 표시는 짝꿍 렌더러 ' +
+                '<a href="#renderers-searchselect"><code>renderers.searchselect()</code></a>가 ' +
+                '담당합니다.</p>',
+            },
+            {
+              title: 'multiselect — 다중 선택 (v2.25)',
+              body:
+                '<p>고른 값이 <strong>칩</strong>으로 검색창 위에 상시 표시됩니다. 선택 상태를 DOM이 아니라 ' +
+                '별도로 들고 있으므로, 필터로 목록에서 가려지거나 lazy 질의로 목록이 통째로 갈려도 선택이 ' +
+                '사라지지 않습니다. 칩의 <code>×</code> 또는 항목 재클릭으로 해제합니다 ' +
+                '(<a href="../examples/features.html#searchable-multiselect" target="_blank" rel="noopener">' +
+                '데모 ↗</a>).</p>' +
+                '<p>저장 순서는 <strong>고른 순서</strong>입니다 — 검색이 없는 multiselect의 ' +
+                '"editorOptions 순서"와 다릅니다(lazy에는 전체 목록이라는 것이 없습니다). 값 표현은 원본을 ' +
+                '따라 배열이면 배열, 콤마 문자열이면 콤마 문자열로 되돌려 커밋합니다. 셀 표시는 ' +
+                '<a href="#renderers-multiselect"><code>renderers.multiselect()</code></a>가 같은 label ' +
+                '캐시를 봅니다.</p>',
+            },
+            {
+              title: 'Enter의 의미는 목록이 보이는지에 따라 갈립니다 (v2.25.1)',
+              body:
+                '<ul>' +
+                '<li><kbd>↑</kbd>/<kbd>↓</kbd>로 고른 <strong>활성 항목이 있으면 토글</strong>합니다.</li>' +
+                '<li>활성 항목이 없으면 폼에서는 목록만 닫고, 셀에서는 커밋합니다.</li>' +
+                '<li><strong>목록이 접혀 있으면 토글하지 않습니다</strong> — 폼에서는 그 <kbd>Enter</kbd>가 ' +
+                '저장으로 넘어갑니다.</li>' +
+                '</ul>' +
+                '<p>마우스로 항목을 고르면 키보드 커서가 지워지므로, <strong>고른 직후의 <kbd>Enter</kbd>가 ' +
+                '방금 고른 항목을 되돌리지 않습니다.</strong></p>',
+            },
+          ],
           example:
             "{ field: 'city', editor: 'select',\n" +
             '  editorSearch: {\n' +
@@ -1736,33 +2187,60 @@ window.ApiDocs = {
           default: 'false',
           since: '2.19.0',
           description:
-            '<strong>표시와 검증을 한 번에</strong> 켭니다. 빈 값 커밋이 거부되고 — 인라인 편집 · ' +
-            '팝업 폼 · 붙여넣기(<code>pasteTsv</code>) · <code>updateRows</code> · 채우기 드래그가 ' +
-            '모두 같은 규칙을 따릅니다 — 메시지는 <code>localeText.requiredValue</code>' +
-            '(<code>{column}</code> 토큰)에서 옵니다.<br>' +
-            '<strong>그리드 표시는 셀 마커 하나입니다</strong>(v2.19.1 — 헤더 표식은 제거) — ' +
-            '<strong>비어 있는 셀에만</strong> 모서리 마커(<code>--dg-required-color</code>)가 붙어 ' +
-            '<em>조치가 필요한 곳</em>을 가리킵니다. 필수 컬럼의 모든 셀에 그리면 전부 같은 표시라 ' +
-            '정보량이 0이기 때문입니다. <code>*</code> 표식은 <strong>팝업 폼 라벨에만</strong> 남습니다. ' +
-            '마커 자리는 <code>trackChanges</code>의 수정됨 마커(<strong>왼쪽 위 주황</strong>)와 겹치지 않는 ' +
-            '<strong>오른쪽 위</strong>입니다 — 한 셀에 둘이 동시에 뜰 수 있습니다.<br>' +
-            '<strong>빈 값의 정의:</strong> <code>null</code> · <code>undefined</code> · 빈 문자열 · ' +
-            '공백만 있는 문자열 · 빈 배열(<code>multiselect</code>). ' +
-            '<code>0</code>과 <code>false</code>는 <strong>유효한 값</strong>입니다 — 숫자 0이나 체크 해제를 ' +
-            '미입력으로 취급하면 정상 값의 저장을 막게 됩니다.<br>' +
-            '<code>editor</code>와 같은 규약으로 <strong>편집 의도로 해석</strong>되어 ' +
-            '<code>editable</code>을 생략하면 <code>true</code>가 됩니다(명시적 <code>editable: false</code>가 우선). ' +
-            '표시 기준은 <a href="#grid-options-editableIndicator"><code>editableIndicator</code></a>와 같아 ' +
-            '<strong>그리드를 잠그면(<code>setEditable(false)</code>) 셀 마커가 사라집니다</strong> — ' +
-            '고칠 수 없는 자리의 "필수"는 할 일이 없기 때문입니다. 편집 불가 컬럼도 같은 이유로 표시하지 않습니다.<br>' +
-            '<code>validator</code>보다 <strong>먼저</strong> 검사되고, 빈 값이면 <code>validator</code>는 ' +
-            '호출되지 않습니다 — 소비자마다 빈 값 처리를 중복 작성하지 않게. ' +
-            '<a href="#column-defs-popupEditor"><code>popupEditor.required</code></a>로 폼에서만 다르게 ' +
-            '지정할 수도 있습니다.<br>' +
-            '<strong>주의:</strong> <code>number</code>·<code>date</code> 에디터는 빈 입력이 기존 정규화 규칙에 따라 ' +
-            '<strong>이전 값으로 되돌아가므로</strong> 인라인에서는 애초에 빈 값이 커밋되지 않습니다 — ' +
-            '이 컬럼들에서 required 오류 메시지를 보는 경로는 팝업 폼과 붙여넣기입니다. ' +
-            '또 <code>pasteTsv(\'\')</code>는 빈 문자열 가드에서 곧바로 <code>0</code>을 반환해 검증을 거치지 않습니다.',
+            '<p><strong>표시와 검증을 한 번에</strong> 켭니다. 빈 값 커밋이 거부되며 인라인 편집 · ' +
+            '팝업 폼 · 붙여넣기(<code>pasteTsv</code>) · <code>updateRows</code> · 채우기 드래그가 모두 ' +
+            '같은 규칙을 따릅니다. 메시지는 <code>localeText.requiredValue</code>' +
+            '(<code>{column}</code> 토큰)에서 옵니다.</p>',
+          notes: [
+            {
+              title: '빈 값의 정의',
+              body:
+                '<p><code>null</code> · <code>undefined</code> · 빈 문자열 · 공백만 있는 문자열 · ' +
+                '빈 배열(<code>multiselect</code>).</p>' +
+                '<p><code>0</code>과 <code>false</code>는 <strong>유효한 값</strong>입니다 — 숫자 0이나 ' +
+                '체크 해제를 미입력으로 취급하면 정상 값의 저장을 막게 됩니다.</p>',
+            },
+            {
+              title: '그리드 표시는 셀 마커 하나입니다 (v2.19.1)',
+              body:
+                '<p><strong>비어 있는 셀에만</strong> 모서리 마커' +
+                '(<a href="#theming--dg-required-color"><code>--dg-required-color</code></a>)가 붙어 ' +
+                '<em>조치가 필요한 곳</em>을 가리킵니다. 필수 컬럼의 모든 셀에 그리면 전부 같은 표시라 ' +
+                '정보량이 0이기 때문입니다(헤더 표식은 제거됐고, <code>*</code>는 <strong>팝업 폼 ' +
+                '라벨에만</strong> 남습니다).</p>' +
+                '<p>마커 자리는 <a href="#grid-options-trackChanges"><code>trackChanges</code></a>의 ' +
+                '수정됨 마커(<strong>왼쪽 위 주황</strong>)와 겹치지 않는 <strong>오른쪽 위</strong>입니다 — ' +
+                '한 셀에 둘이 동시에 뜰 수 있습니다.</p>',
+            },
+            {
+              title: '다른 옵션과의 관계',
+              body:
+                '<ul>' +
+                '<li><a href="#column-defs-editor"><code>editor</code></a>와 같은 규약으로 ' +
+                '<strong>편집 의도로 해석</strong>되어, <code>editable</code>을 생략하면 ' +
+                '<code>true</code>가 됩니다(명시적 <code>editable: false</code>가 우선).</li>' +
+                '<li>표시 기준은 <a href="#grid-options-editableIndicator"><code>editableIndicator</code></a>와 ' +
+                '같아 <strong>그리드를 잠그면(<code>setEditable(false)</code>) 셀 마커가 사라집니다</strong> — ' +
+                '고칠 수 없는 자리의 "필수"는 할 일이 없기 때문입니다. 편집 불가 컬럼도 같은 이유로 ' +
+                '표시하지 않습니다.</li>' +
+                '<li><a href="#column-defs-validator"><code>validator</code></a>보다 ' +
+                '<strong>먼저</strong> 검사되고, 빈 값이면 <code>validator</code>는 호출되지 않습니다 — ' +
+                '소비자마다 빈 값 처리를 중복 작성하지 않게.</li>' +
+                '<li><a href="#column-defs-popupEditor"><code>popupEditor.required</code></a>로 폼에서만 ' +
+                '다르게 지정할 수 있습니다.</li>' +
+                '</ul>',
+            },
+            {
+              variant: 'warn',
+              title: 'number · date 에디터는 인라인에서 빈 값을 만들지 않습니다',
+              body:
+                '<p>빈 입력이 기존 정규화 규칙에 따라 <strong>이전 값으로 되돌아가므로</strong> 인라인에서는 ' +
+                '애초에 빈 값이 커밋되지 않습니다 — 이 컬럼들에서 required 오류 메시지를 보는 경로는 ' +
+                '팝업 폼과 붙여넣기입니다.</p>' +
+                '<p>또 <code>pasteTsv(\'\')</code>는 빈 문자열 가드에서 곧바로 <code>0</code>을 반환해 ' +
+                '검증을 거치지 않습니다.</p>',
+            },
+          ],
           example:
             "{ field: 'city', headerName: 'City', editor: 'select', editorOptions: cities,\n" +
             '  required: true }   // editable도 함께 켜진다\n\n' +
@@ -1776,36 +2254,94 @@ window.ApiDocs = {
           type: 'false | object',
           since: '2.16.0',
           description:
-            '<a href="#grid-options-popupEditor">팝업 폼</a> 안에서만 적용되는 <strong>컬럼 오버레이</strong>입니다. ' +
-            '그리드 셀의 표시·동작은 전혀 바뀌지 않습니다 — 셀은 좁아서 <code>select</code>, ' +
-            '폼은 넓어서 검색형처럼 <strong>맥락별로 다르게</strong> 쓰는 것이 주 용도입니다. ' +
-            '<code>popupEditor: false</code>면 그 컬럼을 폼에서 제외합니다.<br>' +
-            '<strong>폼 전용 표시</strong> — <code>label</code>(기본 <code>headerName</code>) · ' +
-            '<code>hint</code>(입력 아래 도움말) · ' +
-            '<code>hide</code>(기본은 컬럼의 <code>hide</code>를 따르지만 <strong>여기 지정한 값이 이깁니다</strong> — ' +
-            '<code>hide: false</code>로 "그리드에선 숨기고 폼에서만 편집"이 가능) · ' +
-            '<code>readonly</code>(마찬가지로 컬럼의 <code>editable</code>을 덮어씀. ' +
-            '단 <code>setEditable(false)</code> 그리드 잠금은 못 이깁니다) · ' +
-            '<code>order</code>(작을수록 앞. 지정한 필드만 움직이고 나머지는 컬럼 순서 유지) · ' +
-            '<code>span</code>(<code>columns: 2</code>에서 두 칸 차지).<br>' +
-            '<strong>오버라이드</strong> — <code>editor</code> · <code>editorOptions</code> · ' +
-            '<code>editorSearch</code> · <code>validator</code> · ' +
-            '<code>required</code>(v2.19 — 폼에서만 필수로 올리거나 해제. 그리드 셀의 헤더 표식·마커는 ' +
-            '원본 컬럼의 <code>required</code>를 따릅니다). 원본 컬럼 정의는 변경되지 않습니다.<br>' +
-            '<strong>커스텀 콘텐츠</strong> — <code>buttons</code>(입력 오른쪽에 붙는 버튼 배열, ' +
-            '그리드 레벨 <code>buttons</code>와 같은 형식이되 내장 <code>\'save\'</code>/' +
-            '<code>\'cancel\'</code>은 무시. <code>onLoad(ctx)</code>도 같이 지원합니다 — ' +
-            '필드 버튼의 <code>onLoad</code>가 푸터 버튼보다 먼저 호출되고, 그 시점에 ' +
-            '<strong>모든 필드가 이미 존재</strong>하므로 뒤 필드의 값도 초기화할 수 있습니다) · ' +
-            '<code>before(ctx)</code> / <code>after(ctx)</code>' +
-            '(필드 위/아래에 임의 HTML 문자열 또는 Element 반환).<br>' +
-            '<code>ctx</code>는 <code>{ grid, data, colDef, field, fieldEl, buttonEl, value, values, ' +
-            'getValue(field), setValue(field, v), isValid(), reset(), save(), cancel(), close() }</code>입니다 ' +
-            '(<code>buttonEl</code>은 버튼 콜백에서만 채워집니다). ' +
-            '<strong>주의:</strong> <code>before</code>/<code>after</code>가 반환한 문자열은 ' +
-            'HTML로 삽입되며 이스케이프되지 않습니다(<code>cellRenderer</code>와 동일). ' +
-            '입력 자체를 대체하려면 이 슬롯이 아니라 <a href="#column-defs-editor"><code>editor</code></a>의 ' +
-            '커스텀 객체(<code>{ init, getValue, destroy }</code>)를 쓰세요 — 팝업에서도 그대로 동작합니다.',
+            '<p><a href="#grid-options-popupEditor">팝업 폼</a> 안에서만 적용되는 ' +
+            '<strong>컬럼 오버레이</strong>입니다. 그리드 셀의 표시·동작은 전혀 바뀌지 않고, 원본 컬럼 ' +
+            '정의도 변경되지 않습니다 — 셀은 좁아서 <code>select</code>, 폼은 넓어서 검색형처럼 ' +
+            '<strong>맥락별로 다르게</strong> 쓰는 것이 주 용도입니다.</p>' +
+            '<p><code>popupEditor: false</code>면 그 컬럼을 폼에서 제외합니다.</p>',
+          props: [
+            {
+              name: 'label',
+              type: 'string',
+              default: 'headerName',
+              description: '폼에서 쓸 필드 라벨.',
+            },
+            {
+              name: 'hint',
+              type: 'string',
+              description: '입력 아래에 표시할 도움말.',
+            },
+            {
+              name: 'hide',
+              type: 'boolean',
+              description:
+                '기본은 컬럼의 <code>hide</code>를 따르지만 <strong>여기 지정한 값이 이깁니다</strong> — ' +
+                '<code>hide: false</code>로 "그리드에선 숨기고 폼에서만 편집"이 됩니다.',
+            },
+            {
+              name: 'readonly',
+              type: 'boolean',
+              description:
+                '마찬가지로 컬럼의 <code>editable</code>을 덮어씁니다. 단 ' +
+                '<code>setEditable(false)</code> 그리드 잠금은 못 이깁니다.',
+            },
+            {
+              name: 'order',
+              type: 'number',
+              description: '작을수록 앞. 지정한 필드만 움직이고 나머지는 컬럼 순서를 유지합니다.',
+            },
+            {
+              name: 'span',
+              type: 'boolean',
+              description: '<code>columns: 2</code>에서 두 칸을 차지합니다.',
+            },
+            {
+              name: 'editor · editorOptions · editorSearch · validator',
+              description: '폼에서만 다른 위젯·선택지·검증을 씁니다. 형식은 원본 컬럼 옵션과 같습니다.',
+            },
+            {
+              name: 'required',
+              type: 'boolean',
+              since: '2.19.0',
+              description:
+                '폼에서만 필수로 올리거나 해제합니다. 그리드 셀의 마커는 원본 컬럼의 ' +
+                '<a href="#column-defs-required"><code>required</code></a>를 따릅니다.',
+            },
+            {
+              name: 'buttons',
+              type: 'object[]',
+              description:
+                '<p>입력 오른쪽에 붙는 버튼 배열. 그리드 레벨 ' +
+                '<a href="#grid-options-popupEditor"><code>buttons</code></a>와 같은 형식이되 내장 ' +
+                '<code>\'save\'</code>/<code>\'cancel\'</code>은 무시됩니다.</p>' +
+                '<p><code>onLoad(ctx)</code>도 같이 지원합니다 — 필드 버튼의 <code>onLoad</code>가 푸터 ' +
+                '버튼보다 먼저 호출되고, 그 시점에 <strong>모든 필드가 이미 존재</strong>하므로 뒤 필드의 ' +
+                '값도 초기화할 수 있습니다.</p>',
+            },
+            {
+              name: 'before · after',
+              type: '(ctx) => string | Element',
+              description: '필드 위/아래에 임의 콘텐츠를 넣습니다.',
+            },
+          ],
+          notes: [
+            {
+              title: 'ctx 객체',
+              body:
+                '<p><code>{ grid, data, colDef, field, fieldEl, buttonEl, value, values, ' +
+                'getValue(field), setValue(field, v), isValid(), reset(), save(), cancel(), close() }</code> ' +
+                '— <code>buttonEl</code>은 버튼 콜백에서만 채워집니다.</p>',
+            },
+            {
+              variant: 'warn',
+              title: 'before / after의 반환 문자열은 이스케이프되지 않습니다',
+              body:
+                '<p>HTML로 그대로 삽입됩니다(<a href="#column-defs-cellRenderer"><code>cellRenderer</code></a>와 ' +
+                '동일한 규약). 입력 자체를 대체하려면 이 슬롯이 아니라 ' +
+                '<a href="#column-defs-editor"><code>editor</code></a>의 커스텀 객체' +
+                '(<code>{ init, getValue, destroy }</code>)를 쓰세요 — 팝업에서도 그대로 동작합니다.</p>',
+            },
+          ],
           example:
             "{ field: 'city', headerName: 'City', editor: 'select', editorOptions: cities,\n" +
             '  popupEditor: {\n' +
@@ -2006,19 +2542,29 @@ window.ApiDocs = {
           signature: 'reloadData(options?: { keepPage?: boolean }): void',
           since: '1.2.0',
           description:
-            '<code>dataSource</code>에서 데이터를 다시 불러옵니다. <strong>1페이지로 되돌린 뒤</strong> ' +
-            '요청하며(2.14.0부터), server 모드인 축의 현재 상태(정렬·필터)가 요청 파라미터로 전달되고, ' +
-            '응답이 오면 행을 교체하고 <code>dataChanged</code>를 발생시킵니다. ' +
-            '여러 요청이 겹치면 마지막 요청만 반영됩니다.<br><br>' +
-            '<strong>페이지 리셋 이유</strong> — 이 메서드는 조회 조건이 바뀌어 호출하는 경우가 대부분입니다. ' +
-            '12페이지를 보던 중 조건이 좁혀져 결과가 3페이지로 줄면, 페이지를 유지한 채로는 범위 밖 페이지 ' +
-            '(빈 화면)에 머물게 됩니다. <code>setDataSource()</code>가 1페이지로 리셋하는 것과도 일관됩니다.<br><br>' +
-            '저장 후 <strong>보던 페이지 그대로</strong> 새로고침하려면 ' +
-            '<code>reloadData({ keepPage: true })</code>. 정렬 클릭·필터 변경·페이지 이동에 따른 자동 재조회는 ' +
-            '이 메서드를 거치지 않으므로 영향받지 않습니다(페이지 이동은 이동한 페이지를, 필터는 1페이지를 요청). ' +
-            '조회 조건 변경 패턴은 <a href="#remote-data-guide">가이드 Step 5</a> 참고.<br><br>' +
+            '<p><a href="#grid-options-dataSource"><code>dataSource</code></a>에서 데이터를 다시 ' +
+            '불러옵니다. <strong>1페이지로 되돌린 뒤</strong> 요청하며(2.14.0부터), server 모드인 축의 현재 ' +
+            '상태(정렬·필터)가 요청 파라미터로 전달됩니다. 응답이 오면 행을 교체하고 ' +
+            '<a href="#events-dataChanged"><code>dataChanged</code></a>를 발생시키며, 여러 요청이 겹치면 ' +
+            '마지막 요청만 반영됩니다.</p>' +
+            '<p>저장 후 <strong>보던 페이지 그대로</strong> 새로고침하려면 ' +
+            '<code>reloadData({ keepPage: true })</code>를 쓰세요. ' +
             '<code>dataSource.autoLoad: false</code>로 자동 조회를 꺼둔 그리드에서 ' +
-            '<strong>첫 조회를 시작하는 것도 이 메서드</strong>입니다(2.24.0).',
+            '<strong>첫 조회를 시작하는 것도 이 메서드</strong>입니다(2.24.0).</p>',
+          notes: [
+            {
+              title: '1페이지로 되돌리는 이유',
+              body:
+                '<p>이 메서드는 조회 조건이 바뀌어 호출하는 경우가 대부분입니다. 12페이지를 보던 중 조건이 ' +
+                '좁혀져 결과가 3페이지로 줄면, 페이지를 유지한 채로는 범위 밖 페이지(빈 화면)에 머물게 ' +
+                '됩니다. <a href="#api-methods-setDataSource"><code>setDataSource()</code></a>가 1페이지로 ' +
+                '리셋하는 것과도 일관됩니다.</p>' +
+                '<p>정렬 클릭·필터 변경·페이지 이동에 따른 자동 재조회는 이 메서드를 거치지 않으므로 ' +
+                '영향받지 않습니다 — 페이지 이동은 이동한 페이지를, 필터는 1페이지를 요청합니다. ' +
+                '조회 조건 변경 패턴은 ' +
+                '<a href="#remote-data-guide-Step-5-params-reloadData">가이드 Step 5</a>를 참고하세요.</p>',
+            },
+          ],
           example:
             'grid.reloadData();                    // 조건 변경 후 — 1페이지부터\n' +
             'grid.reloadData({ keepPage: true });  // 저장 후 새로고침 — 보던 페이지 유지',
@@ -2340,10 +2886,10 @@ window.ApiDocs = {
           group: 'Pagination',
           signature: 'setPageSize(size: number): void',
           description:
-            '페이지 크기를 변경합니다. 현재 보고 있던 첫 행이 포함된 페이지로 이동합니다.<br><br>' +
-            '<code>infiniteScroll</code>에서는 <strong>"한 번에 받을 행 수"</strong>가 되며, ' +
-            '쌓인 것을 버리고 새 크기로 0페이지부터 다시 받습니다(스크롤도 맨 위로). ' +
-            '상태 바의 크기 선택 UI가 이 메서드를 호출합니다(2.23.0).',
+            '<p>페이지 크기를 변경합니다. 현재 보고 있던 첫 행이 포함된 페이지로 이동합니다.</p>' +
+            '<p><a href="#grid-options-infiniteScroll"><code>infiniteScroll</code></a>에서는 ' +
+            '<strong>"한 번에 받을 행 수"</strong>가 되며, 쌓인 것을 버리고 새 크기로 0페이지부터 다시 ' +
+            '받습니다(스크롤도 맨 위로). 상태 바의 크기 선택 UI가 이 메서드를 호출합니다(2.23.0).</p>',
         },
 
         /* ---- 마스터-디테일 ---- */
