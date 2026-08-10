@@ -190,13 +190,12 @@
   border-bottom: 1px solid var(--dg-border-color);
 }
 .dg-header-group-cell:last-child { border-right: none; }
-/* 아래 줄로 이어지는 칸 — 가로선을 지워 위아래가 한 칸으로 보이게 한다 */
+/* 아래 줄로 이어지는 칸 — 가로선을 지워 위아래가 한 칸으로 보이게 한다.
+   라벨은 자기 줄 안에 그대로 둔다: 두 줄 블록의 가운데로 내리려면 칸(34px) 밖으로
+   나가야 하는데, 칸은 overflow: hidden이라 글자가 잘린다. 칸을 키우거나 넘치게
+   두는 방법은 아래 줄이 나중에 그려져 라벨을 덮는 문제(고정 컬럼 배경)로 이어지므로,
+   2단 그룹 라벨과 같은 위치 규칙(자기 줄 세로 가운데)을 유지한다. */
 .dg-header-group-cell.dg-header-group-span { border-bottom: none; }
-/* 두 줄을 차지하는 라벨은 블록 가운데로 내린다 (실제 rowspan이 아니므로 직접 보정).
-   50%는 라벨 자기 높이 기준이라 어긋난다 — 줄 높이의 절반이어야 한다. */
-.dg-header-group-span > .dg-header-group-label {
-  transform: translateY(calc(var(--dg-group-header-height) / 2));
-}
 .dg-header-group-cell.dg-pinned-left,
 .dg-header-group-cell.dg-pinned-right {
   position: sticky;

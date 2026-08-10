@@ -185,9 +185,10 @@
 - API는 기존 `children`을 넓히는 쪽으로. 문자열(`colId`·`field`)과 그룹 객체를 **섞어** 넣을 수 있고, 평면 배열은 그대로 depth 1이라 **기존 설정이 한 글자도 안 바뀐다.** 새 옵션(`columnGroupDepth` 같은)을 만들면 같은 개념이 둘로 갈린다.
 - **줄 수는 설정이 아니라 "지금 보이는 컬럼에 실제로 걸린 깊이"로 정한다.** 설정 기준으로 잡으면 하위 그룹 컬럼을 전부 숨겼을 때 빈 그룹 줄이 34px 자리만 차지한다. 단위 테스트를 쓰다가 잡았다(`buildGroupHeaderRows([], groups)`가 빈 줄을 하나 내놨다).
 - 순수 함수 `normalizeColumnGroups(groups, maxDepth)`(컬럼 → 조상 경로, 경고는 **배열로 반환** — §13) + `buildGroupHeaderRows(cols, groups, maxDepth)`(레벨별 스팬). `_test` 노출. 기존 `buildGroupHeaderRuns`를 대체한다.
-- **자식 그룹이 없는 구간은 상위 그룹이 두 줄을 차지한다.** 진짜 `rowspan`이 아니라 아래 줄에 몸통 칸(`dg-header-group-cont`)을 두고 가로선을 지우는 방식 — 그룹 헤더는 flex 행이고 pinned가 `position: sticky`라 absolute 배치나 CSS Grid로 못 바꾼다. 라벨은 `translateY(calc(var(--dg-group-header-height) / 2))`로 내려 두 줄의 가운데에 맞춘다(`translateY(50%)`는 **라벨 자기 높이** 기준이라 어긋난다 — 검증에서 8px 차이로 잡혔다).
+- **자식 그룹이 없는 구간은 상위 그룹이 두 줄을 차지한다.** 진짜 `rowspan`이 아니라 아래 줄에 몸통 칸(`dg-header-group-cont`)을 두고 가로선을 지우는 방식 — 그룹 헤더는 flex 행이고 pinned가 `position: sticky`라 absolute 배치나 CSS Grid로 못 바꾼다. **라벨은 자기 줄 안에 그대로 둔다**(2단 그룹 라벨과 같은 규칙). 두 줄 블록의 세로 가운데로 내리려면 34px 칸 밖으로 나가야 하는데 칸이 `overflow: hidden`이라 글자가 잘리고, 칸을 키우거나 넘치게 두면 나중에 그려지는 아래 줄(고정 컬럼 배경)이 라벨을 덮는다 — 가운데 정렬 하나를 위해 감수할 위험이 아니다. **첫 시도에서 `translateY`로 내렸다가 사용자 스샷으로 잘림을 제보받았다**(아래 검증 항목 참조).
 - **경계선을 오른쪽에만 긋는다.** 기존엔 좌우에 긋고 `margin-left: -1px`로 겹쳐 없앴는데, 그러면 칸의 위치가 **앞선 칸 수만큼** 밀린다. 한 줄일 땐 안 보이지만 줄마다 칸 수가 다르면 두 줄의 세로선이 어긋난다(검증에서 1px 밀림으로 확인).
 - **한 스팬에 깊이가 다른 컬럼이 섞이면 이어 붙이지 않는다** — 칸 하나에 아래 경계선을 일부 구간만 그릴 수 없기 때문. 처음엔 런의 첫 컬럼만 보고 `span`을 정했다가, "자식 그룹이 있는 컬럼 + 없는 컬럼"이 나란한 배치에서 **선을 그어 놓고 그 아래를 몸통으로 그리는** 모순이 나왔다(브라우저 검증에서 발견 — 단위 테스트는 그 상태를 정답으로 적어두고 있었다).
+- **검증 구멍 하나를 사용자가 잡아줬다** — 라벨 중앙 정렬을 `getBoundingClientRect`로 확인하고 "가운데 맞음"으로 통과시켰는데, **`overflow: hidden`은 rect를 바꾸지 않고 페인트만 자른다.** 기하는 정확히 가운데였고 화면에서는 글자 아래가 잘려 있었다. 이후 검증은 ① 라벨 rect가 칸 rect 안에 완전히 들어가는지 ② `elementsFromPoint`로 라벨의 **위·아래 가장자리 둘 다** 실제로 잡히는지를 같이 본다(뷰포트 밖이면 빈 결과가 나오므로 `scrollIntoView` 후에).
 - 데모: features.html `#nested-column-groups` — 깊이가 섞인 배치 + 컬럼 숨김 버튼으로 그룹 줄 수가 따라 바뀌는 것을 보여준다. components.html에 2단/3단 정적 견본 추가.
 
 ### v2.25.1 — Enter가 방금 고른 항목을 되돌리던 버그 ([BUG-014](bug-reports/2026-08-10-014-multiselect-enter-undoes-selection.md), 사용자 제보)
