@@ -22,7 +22,7 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.25.0',
+  version: '2.25.1',
   updated: '2026-08-09',
 
   sections: [
@@ -1682,8 +1682,12 @@ window.ApiDocs = {
             "<strong>multiselect</strong> (<a href='../examples/features.html#searchable-multiselect'>데모 ↗</a>) — " +
             '고른 값이 <strong>칩</strong>으로 검색창 위에 상시 표시되므로, 필터로 목록에서 가려지거나 ' +
             'lazy 질의로 목록이 통째로 갈려도 선택이 사라지지 않습니다(선택 상태를 DOM이 아니라 별도로 들고 있습니다). ' +
-            '칩의 <code>×</code> 또는 항목 재클릭으로 해제하고, <kbd>Enter</kbd>는 <strong>활성 항목 토글</strong>입니다 ' +
-            '— 커밋은 <kbd>Tab</kbd>·바깥 클릭이 담당합니다(활성 항목이 없을 때의 <kbd>Enter</kbd>는 커밋). ' +
+            '칩의 <code>×</code> 또는 항목 재클릭으로 해제합니다.<br>' +
+            '<strong><kbd>Enter</kbd>의 의미는 목록이 보이는지에 따라 갈립니다</strong>(v2.25.1) — ' +
+            '<kbd>↑</kbd>/<kbd>↓</kbd>로 고른 <strong>활성 항목이 있으면 토글</strong>, 활성 항목이 없으면 ' +
+            '폼에서는 목록만 닫고 셀에서는 커밋합니다. <strong>목록이 접혀 있으면 토글하지 않습니다</strong> — ' +
+            '폼에서는 그 <kbd>Enter</kbd>가 저장으로 넘어갑니다. 마우스로 항목을 고르면 키보드 커서가 지워지므로, ' +
+            '<strong>고른 직후의 <kbd>Enter</kbd>가 방금 고른 항목을 되돌리지 않습니다</strong>. ' +
             '저장 순서는 <strong>고른 순서</strong>이며(검색이 없는 multiselect의 "editorOptions 순서"와 다릅니다 — ' +
             'lazy에는 전체 목록이라는 것이 없습니다), 값 표현은 원본을 따라 배열이면 배열 · 콤마 문자열이면 ' +
             '콤마 문자열로 되돌려 커밋합니다. 셀 표시는 ' +

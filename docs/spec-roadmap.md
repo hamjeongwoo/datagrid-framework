@@ -180,6 +180,13 @@
 ### v2.1 — "TreeGrid" (§6 T1~T4)
 - treeData 코어(계층 표시·펼침/접힘·계층 정렬/필터), 체크박스 캐스케이드, 부모 요약, 지연 로딩
 
+### v2.25.1 — Enter가 방금 고른 항목을 되돌리던 버그 ([BUG-014](bug-reports/2026-08-10-014-multiselect-enter-undoes-selection.md), 사용자 제보)
+- 제보: "팝업 에디터에서 multiselect에 아이템을 선택 후 엔터를 누르면 적용이 안 돼."
+- 원인 하나에서 증상 셋. Enter 핸들러가 `ssActive >= 0`(키보드 커서가 살아 있는가)만 보고 **그 커서가 지금 유효한가**를 묻지 않았다 — ① 마우스 클릭이 커서를 남겨 직후의 Enter가 방금 고른 항목을 해제 ② 목록이 접혀도 커서가 살아 있어 안 보이는 항목이 토글 ③ 팝업의 Enter=저장 가드가 검색형이면 무조건 건너뛰어, 목록이 닫힌 뒤의 Enter를 **양쪽 다 상대에게 미루며** 침묵.
+- 판정을 순수 함수 `resolveSearchEnterAction({ listOpen, activeIndex, multi, collapsible })`로 뽑았다 → `'toggle' | 'pick' | 'close' | 'bubble'`. 기본값은 항상 `bubble`(가로채지 않음).
+- 마우스로 고르면 키보드 커서를 지운다(`ssClearActive`). 팝업 가드는 `dg-searchselect-open`일 때만 양보한다.
+- 인라인 단일 값 select의 `pick`은 **일부러 가로채지 않는다** — 셀의 공용 Enter 핸들러가 커밋과 `enterMovesDown`까지 처리해야 한다(구현 중 `stopPropagation`을 걸었다가 회귀 검증에서 잡았다).
+
 ### v2.25 — 검색형 multiselect (사용자 요청)
 - 요청: "multiselect에도 검색이 되는지 확인 → lazy까지 지원, 표시는 칩으로." 확인 결과 `editorSearch` 분기가 `editorType === 'select'`에만 걸려 있었고, `multiselect` 분기가 **그보다 위에 있어** 옵션이 에러도 경고도 없이 무시됐다.
 - **새 분기를 파지 않고 기존 searchselect 분기를 `multi` 플래그로 일반화한다.** 두 위젯의 공통부(질의·디바운스·최신 질의 판별·label 캐시·위치 결정·폼 접힘·focusout)가 분기부보다 훨씬 크다 — 따로 두면 이후 수정이 한쪽에만 반영된다. 위에 있는 비검색 `multiselect` 분기에는 `&& !col.editorSearch` 가드를 세트로 넣는다(이게 빠지면 아래 분기에 도달하지 못한다 — 실제로 첫 구현에서 그렇게 됐다).

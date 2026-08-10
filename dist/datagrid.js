@@ -1083,6 +1083,29 @@
   }
 
   /**
+   * 검색형 에디터(editorSearch)에서 <kbd>Enter</kbd>가 무엇을 해야 하는지 결정한다.
+   *
+   * 활성 항목(`activeIndex`)은 **키보드 탐색 커서일 뿐**이다. 커서가 살아 있다는 것만으로
+   * Enter를 토글/선택으로 해석하면 두 가지가 깨진다:
+   *   ① 마우스로 옵션을 고른 직후의 Enter가 **방금 고른 항목을 도로 해제**한다
+   *      (클릭은 커서를 그 항목에 남긴다).
+   *   ② 목록이 접힌 폼에서 저장하려고 누른 Enter가 **보이지도 않는 항목을 토글**한다.
+   * 그래서 "커서가 있는가"가 아니라 **"지금 목록이 보이고 그 커서가 유효한가"**로 가른다.
+   *
+   * @param {object} state `listOpen` 목록이 실제로 보이는가 · `activeIndex` 커서(-1/null이면 없음) ·
+   *   `multi` 다중 선택인가 · `collapsible` 접히는 콤보박스인가(폼)
+   * @returns {'toggle'|'pick'|'close'|'bubble'} `bubble`은 가로채지 않고 넘김
+   *   (인라인이면 셀 커밋, 폼이면 저장) — 판단이 안 서면 항상 이쪽이 기본이다.
+   */
+  function resolveSearchEnterAction(state) {
+    const s = state || {};
+    const active = s.activeIndex === null || s.activeIndex === undefined ? -1 : s.activeIndex;
+    if (s.listOpen && active >= 0) return s.multi ? 'toggle' : 'pick';
+    if (s.listOpen && s.collapsible) return 'close';
+    return 'bubble';
+  }
+
+  /**
    * 헤더 필터 행(floatingFilter)의 입력값 → 컬럼 필터 모델.
    * - raw가 null/undefined이거나 (set 제외) 공백뿐이면 null(필터 해제).
    * - 이미 적용된 모델의 연산자는 유지하되, 단일 입력으로 표현할 수 없는
@@ -5721,6 +5744,12 @@
           ssFlipList();
           onChange();
         };
+        /** 키보드 탐색 커서를 없앤다 (마우스로 고른 뒤 — 위 click 핸들러의 주석 참조) */
+        const ssClearActive = () => {
+          ssActive = -1;
+          ssList.querySelectorAll('.dg-searchselect-option.dg-active')
+            .forEach(optEl => optEl.classList.remove('dg-active'));
+        };
         const ssSetActive = i => {
           if (!ssShown.length) return;
           ssActive = clamp(i, 0, ssShown.length - 1);
@@ -5819,8 +5848,11 @@
           const o = ssShown[Number(optEl.dataset.idx)];
           if (!o) return;
           if (multi) {
-            /* 목록은 열어 둔다 — 연달아 더 고를 수 있어야 한다 */
+            /* 목록은 열어 둔다 — 연달아 더 고를 수 있어야 한다.
+             * 단 **키보드 커서는 지운다**: 마우스로 고르는 것은 끝난 동작이라,
+             * 커서를 그 항목에 남겨 두면 바로 뒤의 Enter가 방금 고른 것을 도로 해제한다. */
             msToggle(o);
+            ssClearActive();
             return;
           }
           ssPicked = o.value;
@@ -5841,17 +5873,28 @@
         ssInput.addEventListener('keydown', e => {
           if (e.key === 'ArrowDown') { e.preventDefault(); ssOpen(); ssSetActive(ssActive + 1); }
           else if (e.key === 'ArrowUp') { e.preventDefault(); ssSetActive(ssActive - 1); }
-          else if (e.key === 'Enter' && ssActive >= 0 && ssShown[ssActive]) {
-            if (multi) {
-              /* 다중 선택에서 Enter는 **토글**이다. 커밋에 쓰면 첫 선택에서 편집이
-               * 닫혀 두 번째 항목을 고를 수 없다. 활성 항목이 없을 때만 그대로
-               * 버블시켜(이 분기에 안 들어와서) 셀 커밋으로 넘긴다. */
-              e.stopPropagation();
-              e.preventDefault();
+          else if (e.key === 'Enter') {
+            /* Enter의 의미는 **지금 목록이 보이는가**로 갈린다 — 커서(ssActive)가
+             * 살아 있는지만 보면, 마우스로 고른 직후나 목록이 접힌 폼에서 안 보이는
+             * 항목을 토글해 버린다. 판정은 순수 함수에 몰아 두고 테스트한다. */
+            const action = resolveSearchEnterAction({
+              listOpen: !collapsible || ssPanel.classList.contains('dg-searchselect-open'),
+              activeIndex: ssShown[ssActive] ? ssActive : -1,
+              multi,
+              collapsible,
+            });
+            if (action === 'bubble') return; /* 인라인이면 셀 커밋, 폼이면 저장 */
+            if (action === 'close') {
+              e.stopPropagation(); e.preventDefault();
+              ssCollapse();
+              return;
+            }
+            if (action === 'toggle') {
+              e.stopPropagation(); e.preventDefault();
               msToggle(ssShown[ssActive]);
               return;
             }
-            /* 선택만 반영 — 커밋은 셀로 버블된 Enter를 공용 핸들러가 처리 */
+            /* pick — 선택만 반영 */
             ssPicked = ssShown[ssActive].value;
             ssCacheLabel(ssShown[ssActive]);
             if (collapsible) {
@@ -5862,6 +5905,8 @@
               ssCollapse();
               onPick();
             }
+            /* 인라인은 가로채지 않는다 — 셀의 공용 Enter 핸들러가 커밋과
+             * enterMovesDown(다음 행으로 이동)까지 처리해야 한다 */
           }
         });
         markEditing();
@@ -6307,7 +6352,13 @@
         if (e.key !== 'Enter') return;
         const t = e.target;
         if (!t || t.tagName !== 'INPUT') return;
-        if (t.closest('.dg-editor-searchselect, .dg-editor-multiselect, .dg-editor-radio')) return;
+        /* 늘 펼쳐져 있는 패널형(multiselect/radio)은 Enter를 자기 키로 쓴다 */
+        if (t.closest('.dg-editor-multiselect, .dg-editor-radio')) return;
+        /* 검색형은 **목록이 열려 있을 때만** Enter를 가져간다(선택/토글).
+         * 닫혀 있을 때까지 넘겨주면 "다 골랐으니 Enter로 저장"이 침묵한다 —
+         * 위젯이 이미 return한 뒤라 여기서 막으면 아무도 처리하지 않는다. */
+        const ss = t.closest('.dg-editor-searchselect');
+        if (ss && ss.classList.contains('dg-searchselect-open')) return;
         e.preventDefault();
         this._popupSave();
       });
@@ -8093,7 +8144,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.25.0';
+  DataGrid.version = '2.25.1';
 
   /**
    * 내장 로케일. `localeText: DataGrid.locales.ko`처럼 통째로 쓰거나,
@@ -8144,6 +8195,7 @@
     validationMessage,
     normalizeEditorOptions,
     filterEditorOptions,
+    resolveSearchEnterAction,
     lookupOptionLabel,
     lookupOptionLabels,
     lookupOptionLabelsWith,

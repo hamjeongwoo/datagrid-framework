@@ -400,6 +400,41 @@ suite('lookupOptionLabelsWith (label 캐시 폴백)', function () {
   assertEq(T.lookupOptionLabels(opts, ['js', 'seoul']), ['JS', 'seoul'], '래퍼는 캐시를 보지 않는다');
 });
 
+/* v2.25.1 — 검색형 에디터에서 Enter가 무엇을 해야 하는지.
+ * 활성 항목(ssActive)은 **키보드 탐색 커서**일 뿐이라, 커서가 살아 있다는 것만으로
+ * Enter를 토글로 해석하면 ① 마우스로 고른 직후의 Enter가 방금 고른 항목을 도로 해제하고
+ * ② 목록이 접힌 상태의 Enter가 보이지도 않는 항목을 토글한다. */
+suite('resolveSearchEnterAction', function () {
+  var r = T.resolveSearchEnterAction;
+
+  /* 인라인 셀 — 목록이 늘 보인다 (collapsible: false) */
+  assertEq(r({ listOpen: true, activeIndex: 0, multi: true, collapsible: false }), 'toggle',
+    '인라인 multiselect + 활성 항목 → 토글');
+  assertEq(r({ listOpen: true, activeIndex: 0, multi: false, collapsible: false }), 'pick',
+    '인라인 select + 활성 항목 → 선택');
+  assertEq(r({ listOpen: true, activeIndex: -1, multi: true, collapsible: false }), 'bubble',
+    '인라인 + 활성 항목 없음 → 버블 (셀 커밋)');
+
+  /* 팝업 폼 — 접히는 콤보박스 (collapsible: true) */
+  assertEq(r({ listOpen: true, activeIndex: 1, multi: true, collapsible: true }), 'toggle',
+    '폼 + 목록 열림 + 활성 항목 → 토글');
+  assertEq(r({ listOpen: true, activeIndex: -1, multi: true, collapsible: true }), 'close',
+    '폼 + 목록 열림 + 활성 항목 없음 → 목록만 닫기');
+  assertEq(r({ listOpen: false, activeIndex: 2, multi: true, collapsible: true }), 'bubble',
+    '**목록이 접혀 있으면 커서가 살아 있어도 토글하지 않는다** (안 보이는 항목 토글 방지)');
+  assertEq(r({ listOpen: false, activeIndex: -1, multi: true, collapsible: true }), 'bubble',
+    '폼 + 목록 닫힘 → 버블 (폼 저장)');
+  assertEq(r({ listOpen: false, activeIndex: 0, multi: false, collapsible: true }), 'bubble',
+    '단일 값도 목록이 닫혀 있으면 버블');
+
+  /* 커서가 없다는 표현은 -1만이 아니다 — 방어적으로 null/undefined도 같게 본다 */
+  assertEq(r({ listOpen: true, activeIndex: null, multi: true, collapsible: true }), 'close',
+    'activeIndex: null은 활성 항목 없음');
+  assertEq(r({ listOpen: true, activeIndex: undefined, multi: true, collapsible: false }), 'bubble',
+    'activeIndex: undefined는 활성 항목 없음');
+  assertEq(r({}), 'bubble', '빈 상태 → 버블 (아무것도 가로채지 않는 쪽이 기본)');
+});
+
 /* v2.25 — 검색형 multiselect의 선택 토글. 선택 상태는 DOM이 아니라 이 배열이 진실이라,
  * 필터로 가려진 항목이 목록에서 사라져도 선택이 유실되지 않는다. */
 suite('multiValueIndex / toggleMultiValue', function () {

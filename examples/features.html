@@ -3960,8 +3960,11 @@
     <code class="inline">editorOptions</code>를 로컬 필터하고, <code class="inline">{ fetch(query) }</code>면
     질의마다 비동기로 목록을 불러옵니다. 고른 값은 <strong>칩</strong>으로 검색창 위에 상시 표시되므로,
     필터로 목록에서 가려지거나 lazy 질의로 목록이 통째로 갈려도 지금 무엇이 골라져 있는지 사라지지 않습니다.
-    칩의 <code class="inline">×</code> 또는 항목 재클릭으로 해제하고, <strong>Enter는 활성 항목 토글</strong>입니다
-    (커밋은 Tab·바깥 클릭). 저장 순서는 <strong>고른 순서</strong>이며,
+    칩의 <code class="inline">×</code> 또는 항목 재클릭으로 해제합니다.
+    <strong>Enter는 목록이 보일 때만</strong> 활성 항목(↑/↓로 고른 것)을 토글하고, 목록이 접혀 있으면
+    셀에서는 커밋 · 폼에서는 저장으로 넘어갑니다 — 마우스로 고른 직후의 Enter가 방금 고른 항목을
+    되돌리지 않습니다 (<a href="../docs/bug-reports/2026-08-10-014-multiselect-enter-undoes-selection.md">BUG-014</a>).
+    저장 순서는 <strong>고른 순서</strong>이며,
     원본이 배열이면 배열로 · 콤마 문자열이면 콤마 문자열로 되돌려 커밋합니다.
   </p>
   <div class="example-card">
