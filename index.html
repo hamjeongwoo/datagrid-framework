@@ -28,9 +28,13 @@
     퀵 필터, 행 그룹핑·집계, 체크박스 선택, 페이지네이션,
     클립보드 복사/붙여넣기(<kbd>Ctrl+C</kbd>/<kbd>Ctrl+V</kbd>), CSV 내보내기를 한 화면에서 사용합니다.
     인라인 편집은 <strong>모든 에디터 종류</strong>를 한 번에 보여줍니다 —
-    text · number · select · searchselect(검색형) · radio · multiselect · checkbox ·
+    text · number · select · searchselect(검색형) · radio · multiselect ·
+    <strong>검색형 multiselect</strong>(Certifications — 검색 + 칩) · checkbox ·
     date · datetime · 커스텀(range 슬라이더). 헤더에 <strong>연필 아이콘</strong>이 있는 컬럼이
     편집 가능한 컬럼입니다(<code class="inline">editableIndicator</code>).
+    툴바의 <strong>Edit in form</strong>은 같은 컬럼 정의를 그대로 재사용하는
+    <strong>행 단위 폼 편집</strong>(<code class="inline">popupEditor</code>)을 엽니다 —
+    더블클릭은 인라인 편집 그대로라 두 방식을 나란히 비교할 수 있습니다.
     <strong>View Source</strong> 탭에서 전체 코드를 확인하세요.
   </p>
 
@@ -45,6 +49,7 @@
           <option value="status">Group by: Status</option>
         </select>
         <span class="grow"></span>
+        <button class="tb-btn" id="editInForm" type="button">Edit in form</button>
         <button class="tb-btn" id="clearFilters" type="button">Clear filters</button>
         <button class="tb-btn" id="deleteSelected" type="button" disabled>Delete selected</button>
         <button class="tb-btn" id="exportCsv" type="button">Export CSV</button>
@@ -72,6 +77,25 @@
         'Toronto', 'Amsterdam', 'Barcelona', 'Chicago', 'Dubai', 'Helsinki', 'Osaka', 'Paris',
         'Prague', 'San Francisco', 'Stockholm', 'Taipei', 'Vancouver'];
 
+      /* 검색형 multiselect용 자격증 카탈로그 — 체크리스트로 훑기엔 길어서 검색이 필요합니다.
+         'code|표시 이름' — 코드가 저장되고 화면엔 이름이 뜹니다. 코드에 콤마를 쓰지 않는
+         이유는 multiselect가 콤마 구분 문자열 표현도 받기 때문입니다. */
+      var CERT_OPTIONS = [
+        'aws-sa|AWS Solutions Architect', 'aws-dev|AWS Developer',
+        'gcp-ace|Google Cloud Associate Engineer', 'az-104|Azure Administrator',
+        'cka|Certified Kubernetes Administrator', 'ckad|Kubernetes App Developer',
+        'terraform|HashiCorp Terraform Associate', 'dbt|dbt Analytics Engineering',
+        'cissp|CISSP', 'ceh|Certified Ethical Hacker', 'sec-plus|CompTIA Security+',
+        'net-plus|CompTIA Network+', 'itil|ITIL 4 Foundation', 'pmp|PMP',
+        'psm|Professional Scrum Master', 'safe|SAFe Agilist',
+        'cpa|CPA', 'cfa|CFA Level I', 'six-sigma|Lean Six Sigma Green Belt',
+        'ux-cert|UX Certification', 'figma-adv|Figma Advanced',
+        'ga4|Google Analytics 4', 'hubspot|HubSpot Inbound', 'sf-admin|Salesforce Administrator',
+      ].map(function (s) {
+        var p = s.split('|');
+        return { value: p[0], label: p[1] };
+      });
+
       /* 커스텀 에디터 — { init, getValue, destroy? } 객체 (내장 에디터로 안 되는 UI) */
       var sliderEditor = {
         init: function (cell, value) {
@@ -93,6 +117,12 @@
         var p = r.hireDate.split('-');
         r.skills = [SKILL_OPTIONS[i % 6].value, SKILL_OPTIONS[(i * 5 + 2) % 6].value]
           .filter(function (v, k, arr) { return arr.indexOf(v) === k; });
+        /* certs는 **콤마 구분 문자열**로 둡니다 — multiselect는 배열(skills)과 이 표현을
+           모두 받고, 커밋할 때 그 행이 원래 쓰던 표현을 그대로 유지합니다 */
+        r.certs = [CERT_OPTIONS[(i * 7) % CERT_OPTIONS.length].value,
+          CERT_OPTIONS[(i * 3 + 5) % CERT_OPTIONS.length].value]
+          .filter(function (v, k, arr) { return arr.indexOf(v) === k; })
+          .join(',');
         r.lastReview = new Date(+p[0] + 1, +p[1] - 1, +p[2], 9 + (i % 8), (i % 4) * 15);
         return r;
       });
@@ -107,6 +137,16 @@
         floatingFilter: true,
         editableIndicator: true,   // 편집 가능한 컬럼 헤더에 연필 아이콘 표시
         defaultColDef: { sortable: true, resizable: true },
+        /* 행 단위 폼 편집. trigger: 'none'이라 더블클릭은 그대로 인라인 편집이고,
+           폼은 툴바의 "Edit in form" 버튼(openEditPopup)으로만 엽니다 —
+           두 편집 방식을 한 화면에서 비교할 수 있게. 폼의 각 필드는 아래 컬럼 정의를
+           그대로 재사용하므로(에디터·옵션·검증 포함) 별도 폼 스키마가 없습니다. */
+        popupEditor: {
+          trigger: 'none',
+          columns: 2,
+          width: 760,
+          title: function (row) { return row.name + ' — 직원 정보'; },
+        },
         columnDefs: [
           { colId: 'sel', headerName: '', width: 48, minWidth: 48, pinned: 'left',
             checkboxSelection: true, headerCheckboxSelection: true,
@@ -137,6 +177,12 @@
           // multiselect — 배열 값을 체크리스트 패널에서 (label 표시 / value 저장)
           { field: 'skills', headerName: 'Skills', width: 190, sortable: false,
             editor: 'multiselect', editorOptions: SKILL_OPTIONS,
+            cellRenderer: DataGrid.renderers.multiselect() },
+          // 검색형 multiselect — 목록이 길면 editorSearch로 검색 + 칩 표시
+          // (칩 줄이 고른 값을 항상 보여주므로 필터로 목록에서 가려져도 선택이 남습니다.
+          //  lazy 검색은 examples/features.html#searchable-multiselect 참고)
+          { field: 'certs', headerName: 'Certifications', width: 230, sortable: false,
+            editor: 'multiselect', editorOptions: CERT_OPTIONS, editorSearch: true,
             cellRenderer: DataGrid.renderers.multiselect() },
           // number — 커밋 시 숫자로 변환
           { field: 'salary', headerName: 'Salary', width: 120, align: 'right',
@@ -184,12 +230,24 @@
         grid.exportCsv('employees.csv');
       });
 
+      /* 폼 편집 — 선택한 행이 있으면 그 행, 없으면 지금 보이는 첫 행을 엽니다.
+         getDisplayedRows()는 필터·정렬·그룹핑이 적용된 뷰라서 화면과 어긋나지 않습니다. */
+      document.getElementById('editInForm').addEventListener('click', function () {
+        var target = grid.getSelectedRows()[0] ||
+          grid.getDisplayedRows().filter(function (r) { return !r.__group; })[0];
+        if (!target) {
+          statusLine.textContent = '폼으로 열 행이 없습니다 — 필터를 확인하세요.';
+          return;
+        }
+        grid.openEditPopup(target);
+      });
+
       var nextId = 10001;
       document.getElementById('addRow').addEventListener('click', function () {
         grid.addRow({
           id: nextId++, name: 'New Employee', email: 'new@example.com',
           department: 'Engineering', city: 'Seoul', status: 'Active',
-          skills: ['js'], salary: 50000, rating: 3.0, progress: 0, remote: false,
+          skills: ['js'], certs: 'aws-sa', salary: 50000, rating: 3.0, progress: 0, remote: false,
           hireDate: '2026-08-01', lastReview: new Date(2026, 7, 1, 10, 0),
         }, 0);   // 0 = 맨 앞에 삽입 — 추가된 행을 찾으러 스크롤할 필요 없음
         statusLine.textContent = '새 직원이 추가되었습니다. (총 ' +
@@ -226,6 +284,18 @@
         statusLine.textContent =
           '"' + e.data.name + '" 행의 ' + e.colDef.headerName + ' 값이 ' +
           showValue(e.oldValue) + ' → ' + showValue(e.newValue) + ' (으)로 변경되었습니다.';
+      });
+
+      /* 폼은 Save를 눌러야 행에 반영됩니다 — 인라인(셀 단위 즉시 커밋)과 다른 점 */
+      grid.on('popupEditStopped', function (e) {
+        var fields = Object.keys(e.changes);
+        if (!e.committed) {
+          statusLine.textContent = '"' + e.data.name + '" 폼 편집을 취소했습니다.';
+          return;
+        }
+        statusLine.textContent = fields.length
+          ? '"' + e.data.name + '" 폼에서 ' + fields.length + '개 필드 저장 — ' + fields.join(', ')
+          : '"' + e.data.name + '" 폼을 저장했지만 변경된 값은 없습니다.';
       });
     </script>
   </div>
