@@ -3482,6 +3482,476 @@
     </script>
   </div>
 
+  <!-- ======================================================== 팝업 버튼 onLoad -->
+  <h2 class="section" id="popup-button-onload">Popup Button onLoad (버튼 초기화 훅)</h2>
+  <p class="section-desc">
+    팝업 버튼의 <code class="inline">onLoad</code>는 폼이 <strong>완전히 만들어진 직후 한 번</strong> 호출됩니다 —
+    <code class="inline">onClick</code>과 같은 컨텍스트에 버튼 DOM(<code class="inline">ctx.buttonEl</code>)이
+    더해져, 행 값을 보고 버튼 문구·잠금을 정하거나 해당 필드(<code class="inline">ctx.fieldEl</code>)와
+    값(<code class="inline">ctx.setValue</code>)을 초기화할 수 있습니다.
+    호출 순서는 <strong>DOM 순서</strong>(필드 버튼 → 푸터 버튼)이고, 모든 필드가 이미 존재하므로
+    다른 필드도 안전하게 만질 수 있습니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn primary" id="polOpenLowBtn" type="button">연봉 낮은 행</button>
+        <button class="tb-btn" id="polOpenCapBtn" type="button">연봉 상한 행</button>
+        <button class="tb-btn" id="polOpenEmptyBtn" type="button">도시가 빈 행</button>
+        <button class="tb-btn" id="polOpenActiveBtn" type="button">이미 승인된 행</button>
+      </div>
+      <div id="gridPopupOnLoad" class="grid-wrap-md"></div>
+      <div class="status-line" id="popupOnLoadStatus">행을 더블클릭하면 onLoad 호출 순서가 여기에 표시됩니다.</div>
+    </div>
+    <script type="text/x-example">
+      var status = document.getElementById('popupOnLoadStatus');
+      var CAP = 90000;                 // 연봉 상한 — 넘으면 인상 버튼을 잠근다
+      var log = [];
+
+      var rows = DemoData.makeEmployees(40, 21).map(function (r, i) {
+        if (i % 4 === 0) r.city = '';  // onLoad가 기본값을 채워 넣는 케이스
+        return r;
+      });
+
+      var grid = new DataGrid(document.getElementById('gridPopupOnLoad'), {
+        rowData: rows,
+        popupEditor: {
+          title: function (row) { return row.name + ' — onLoad 데모'; },
+          buttons: ['save', 'cancel', {
+            key: 'approve', text: '승인', variant: 'primary',
+            onLoad: function (ctx) {
+              // 이미 Active면 승인할 것이 없다 — 로드 시점에 잠근다.
+              // disabled 옵션을 함께 쓰지 않았으므로 이 수동 지정이 유지된다.
+              var done = ctx.data.status === 'Active';
+              ctx.buttonEl.disabled = done;
+              ctx.buttonEl.textContent = done ? '승인 완료' : '승인';
+              log.push('footer:approve(status=' + ctx.data.status + ')');
+            },
+            onClick: function (ctx) {
+              ctx.setValue('status', 'Active');
+              ctx.buttonEl.disabled = true;
+              ctx.buttonEl.textContent = '승인 완료';
+            },
+          }],
+        },
+        columnDefs: [
+          { field: 'name', headerName: 'Name', flex: 1, editable: true,
+            popupEditor: { label: '이름' } },
+
+          { field: 'city', headerName: 'City', width: 130, editable: true,
+            popupEditor: {
+              label: '근무 도시',
+              buttons: [{
+                key: 'fill', text: '기본값',
+                onLoad: function (ctx) {
+                  // 빈 값이면 로드 시점에 채우고 그 필드를 강조한다 (컬럼 조작)
+                  if (!ctx.getValue('city')) {
+                    ctx.setValue('city', 'Seoul');
+                    ctx.fieldEl.style.background = 'var(--dg-selected-row-background-color)';
+                    log.push('field:city(빈 값 → Seoul)');
+                  } else {
+                    log.push('field:city(' + ctx.getValue('city') + ')');
+                  }
+                  if (ctx.data.remote) ctx.buttonEl.textContent = '기본값(원격)';
+                },
+                onClick: function (ctx) { ctx.setValue('city', 'Seoul'); },
+              }],
+            } },
+
+          { field: 'salary', headerName: 'Salary', width: 120, editable: true,
+            editor: 'number', align: 'right',
+            popupEditor: {
+              label: '연봉',
+              hint: '상한 ' + CAP.toLocaleString() + ' 이상이면 인상 버튼이 잠깁니다',
+              buttons: [{
+                key: 'raise', text: '+10%',
+                onLoad: function (ctx) {
+                  // 현재 값으로 버튼 문구·툴팁·잠금을 정한다
+                  var v = ctx.value || 0;
+                  if (v >= CAP) {
+                    ctx.buttonEl.disabled = true;
+                    ctx.buttonEl.textContent = '상한 도달';
+                  } else {
+                    ctx.buttonEl.title = v.toLocaleString() + ' → ' +
+                      Math.round(v * 1.1).toLocaleString();
+                  }
+                  log.push('field:salary(' + v.toLocaleString() + ')');
+                },
+                onClick: function (ctx) { ctx.setValue('salary', Math.round((ctx.value || 0) * 1.1)); },
+              }],
+            } },
+
+          { field: 'status', headerName: 'Status', width: 110,
+            editor: 'select', editorOptions: ['Active', 'On Leave', 'Contract', 'Inactive'],
+            popupEditor: { label: '상태', readonly: true } },
+        ],
+      });
+
+      grid.on('popupEditStarted', function () {
+        // onLoad는 popupEditStarted보다 먼저 끝나므로 여기서 결과를 그대로 읽을 수 있다
+        status.textContent = 'onLoad 호출 순서 → ' + log.join('  →  ');
+        log = [];
+      });
+
+      function openWhere(pred, label) {
+        var row = grid.getRowData().filter(pred)[0];
+        if (!row) { status.textContent = label + '에 해당하는 행이 없습니다.'; return; }
+        grid.openEditPopup(row);
+      }
+      /* 케이스가 겹치지 않게 조건을 서로 배타적으로 둔다 — 버튼마다 다른 초기화를 보여주려면
+         "상한 행"이 우연히 "도시가 빈 행"이기도 하면 안 된다 */
+      document.getElementById('polOpenLowBtn').addEventListener('click', function () {
+        openWhere(function (r) { return r.salary < CAP && r.city; }, '연봉 낮은 행');
+      });
+      document.getElementById('polOpenCapBtn').addEventListener('click', function () {
+        openWhere(function (r) { return r.salary >= CAP && r.city && r.status !== 'Active'; }, '연봉 상한 행');
+      });
+      document.getElementById('polOpenEmptyBtn').addEventListener('click', function () {
+        openWhere(function (r) { return !r.city && r.salary < CAP; }, '도시가 빈 행');
+      });
+      document.getElementById('polOpenActiveBtn').addEventListener('click', function () {
+        openWhere(function (r) { return r.status === 'Active' && r.city && r.salary < CAP; }, '이미 승인된 행');
+      });
+    </script>
+  </div>
+
+  <!-- ======================================================== 필수 컬럼 -->
+  <h2 class="section" id="required-columns">Required Columns (column.required)</h2>
+  <p class="section-desc">
+    <code class="inline">column.required: true</code>는 <strong>표시와 검증을 한 번에</strong> 켭니다 —
+    <strong>비어 있는 셀</strong>에만 오른쪽 위 모서리 마커가 나타나며,
+    빈 값 커밋은 인라인 편집 · 팝업 폼 · 붙여넣기 · <code class="inline">updateRows</code>
+    어느 경로로도 거부됩니다.
+    그리드 표시는 <strong>셀 마커 하나</strong>이고 헤더에는 표식을 두지 않습니다 —
+    필수 컬럼의 모든 셀에 그리면 다 같은 표시라 정보량이 0이기 때문입니다.
+    (<code class="inline">*</code> 표식은 팝업 폼 라벨에만 붙습니다 — 아래 "첫 행 폼 편집"으로 확인하세요.)
+    <code class="inline">trackChanges</code>의 수정됨 마커(<strong>왼쪽 위 주황</strong>)와
+    자리·색이 겹치지 않게 <strong>오른쪽 위 빨강</strong>을 씁니다 — 한 셀에 둘이 동시에 뜰 수 있습니다.
+    <code class="inline">0</code>과 <code class="inline">false</code>는 유효한 값으로 취급합니다.
+    <strong>단 <code class="inline">number</code>·<code class="inline">date</code> 에디터는</strong>
+    빈 입력이 기존 정규화 규칙에 따라 <strong>이전 값으로 되돌아가므로</strong> 애초에 빈 값이
+    커밋되지 않습니다 — 인라인에서 required 오류를 보려면 텍스트 계열 컬럼(아래 Department)을 쓰세요.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn primary" id="reqAddBtn" type="button">빈 행 추가</button>
+        <button class="tb-btn" id="reqClearBtn" type="button">첫 3행의 City 비우기</button>
+        <button class="tb-btn" id="reqPasteBtn" type="button">빈 값 붙여넣기 시도</button>
+        <button class="tb-btn" id="reqPopupBtn" type="button">첫 행 폼 편집</button>
+        <label class="tb-check"><input type="checkbox" id="reqLock"> 그리드 잠금(setEditable false)</label>
+      </div>
+      <div id="gridRequired" class="grid-wrap-md"></div>
+      <div class="status-line" id="requiredStatus">City · Salary · Department가 필수입니다. Department를 더블클릭해 지우고 Enter를 눌러 보세요.</div>
+    </div>
+    <script type="text/x-example">
+      var status = document.getElementById('requiredStatus');
+      var CITIES = ['Seoul', 'Tokyo', 'New York', 'London', 'Berlin', 'Singapore'];
+
+      var grid = new DataGrid(document.getElementById('gridRequired'), {
+        rowData: DemoData.makeEmployees(30, 5),
+        localeText: DataGrid.locales.ko,
+        trackChanges: true,          // 수정됨(왼쪽 위 주황) 마커와 함께 보기
+        // trigger: 'none' — 더블클릭은 인라인 편집에 남기고 폼은 버튼으로만 연다
+        popupEditor: { position: 'right', width: 460, trigger: 'none' },
+        columnDefs: [
+          { field: 'name', headerName: 'Name', flex: 1, editable: true },
+          // required만 선언하면 editable도 함께 켜진다 (editor 선언과 같은 규약)
+          { field: 'city', headerName: 'City', width: 140,
+            editor: 'select', editorOptions: CITIES, required: true },
+          { field: 'salary', headerName: 'Salary', width: 120, align: 'right',
+            editor: 'number', required: true,
+            // required가 먼저 검사되므로 validator는 빈 값을 볼 일이 없다
+            validator: function (v) { return v >= 40000 || '40,000 이상이어야 합니다'; } },
+          // 텍스트 컬럼은 지우면 빈 문자열이 커밋 대상이 되므로 인라인에서 바로 막힌다
+          { field: 'department', headerName: 'Department', width: 140,
+            editor: 'text', required: true },
+          // 필수지만 편집 불가 → 고칠 수 없으니 표식도 마커도 붙지 않는다
+          { field: 'status', headerName: 'Status', width: 110, required: true, editable: false },
+        ],
+      });
+
+      grid.on('cellValueChanged', function (e) {
+        status.textContent = e.colDef.headerName + ' → ' + e.newValue + ' (저장됨)';
+      });
+
+      document.getElementById('reqAddBtn').addEventListener('click', function () {
+        // 빈 행은 필수 컬럼이 전부 비어 있으므로 추가 즉시 마커가 붙는다 —
+        // "새 행에서 아직 채워야 할 칸"을 셀 마커가 그대로 알려주는 경우
+        grid.addRow({ name: '', city: '', salary: null, department: '', status: 'Active' }, 0);
+        grid.focusCell(0, 'city');
+        var blanks = grid.getRowData()[0];
+        var missing = ['city', 'salary', 'department'].filter(function (f) {
+          var v = blanks[f];
+          return v === null || v === undefined || String(v).trim() === '';
+        });
+        status.textContent = '빈 행을 맨 위에 추가했습니다 — 미입력 필수 칸 ' + missing.length +
+          '개(' + missing.join(', ') + ')에 오른쪽 위 마커가 붙습니다. ' +
+          'Department를 더블클릭해 값을 넣으면 그 칸의 마커만 사라집니다.';
+      });
+
+      document.getElementById('reqClearBtn').addEventListener('click', function () {
+        // API로 직접 비우면(updateRows 아님) 마커가 나타난다 — "이미 비어 있는 데이터"의 경우
+        var rows = grid.getRowData().slice(0, 3);
+        rows.forEach(function (r) { r.city = ''; });
+        grid.refresh();
+        status.textContent = '3개 행의 City를 비웠습니다 — 오른쪽 위 모서리 마커를 보세요.';
+      });
+
+      document.getElementById('reqPasteBtn').addEventListener('click', function () {
+        // 공백만 있는 값을 Department(required)와 Name(비필수)에 나란히 붙여넣는다.
+        // pasteTsv('')는 빈 문자열 가드에서 그냥 0을 반환하므로 required 검증을
+        // 거치지 않는다 — 실제 거부를 보려면 truthy한 공백 값을 써야 한다.
+        grid.focusCell(0, 'department');
+        var before = grid.getRowData()[0].department;
+        var n = grid.pasteTsv('   ');
+        var after = grid.getRowData()[0].department;
+        status.textContent = '공백 붙여넣기 → ' + n + '개 셀 반영, Department: "' +
+          before + '" → "' + after + '" (required가 거부해 그대로)';
+      });
+
+      document.getElementById('reqPopupBtn').addEventListener('click', function () {
+        grid.openEditPopup(grid.getRowData()[0]);
+        status.textContent = '폼에서도 라벨에 *가 붙고, 비우면 Save가 막힙니다.';
+      });
+
+      document.getElementById('reqLock').addEventListener('change', function (e) {
+        grid.setEditable(!e.target.checked);
+        status.textContent = e.target.checked
+          ? '잠금 — 고칠 수 없으므로 셀 마커가 사라집니다.'
+          : '잠금 해제 — 표시가 돌아옵니다.';
+      });
+    </script>
+  </div>
+
+  <!-- ======================================================== 커스텀 집계 함수 -->
+  <h2 class="section" id="agg-func-custom">Custom aggFunc (집계 함수 직접 작성)</h2>
+  <p class="section-desc">
+    <code class="inline">aggFunc</code>에 문자열 대신 <code class="inline">(values, ctx) =&gt; any</code> 함수를 줄 수 있습니다.
+    <code class="inline">values</code>는 그 컬럼의 원본 값 배열,
+    <code class="inline">ctx</code>는 <code class="inline">{ rows, field, colDef, parent }</code>이고
+    <code class="inline">parent</code>는 <strong>트리 요약에서만</strong> 부모 행입니다(그룹·전체합계에서는 <code class="inline">null</code>).
+    집계는 <strong>필터 적용 후의 행</strong>으로 매번 다시 계산되므로,
+    아래 Name 컬럼의 <strong>(자손 수)</strong>는 필터를 자동으로 따라갑니다.
+    커스텀 함수의 결과에는 <code class="inline">valueFormatter</code>가 적용되지 않습니다 — 함수가 이미 출력을 정했기 때문입니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <input id="aggcQuick" class="tb-input" type="text" placeholder="필터해서 (자손 수)가 따라오는지 확인 (예: js)" />
+      </div>
+      <div id="gridAggCustom" class="grid-wrap-md"></div>
+      <div class="status-line" id="aggcStatus">폴더 이름 옆 (n)은 자손 파일 수, Size는 중앙값입니다.</div>
+    </div>
+    <script type="text/x-example">
+      var grid = new DataGrid(document.getElementById('gridAggCustom'), {
+        rowData: DemoData.makeFileTree(31),
+        treeData: { treeField: 'name', defaultExpandLevel: -1, summary: true },
+        columnDefs: [
+          // ctx.parent로 부모 이름을 되살려 붙인다 — 요약 셀은 원래 값을 대체하므로
+          { field: 'name', headerName: 'Name', flex: 2,
+            aggFunc: function (values, ctx) {
+              return ctx.parent.name + ' (' + ctx.rows.length + ')';
+            } },
+          { field: 'type', headerName: 'Type', width: 90 },
+          // 내장에 없는 집계 — 중앙값
+          { field: 'size', headerName: 'Size 중앙값', width: 130, dataType: 'number',
+            aggFunc: function (values) {
+              var ns = values.map(Number).filter(function (n) { return !isNaN(n); })
+                             .sort(function (a, b) { return a - b; });
+              if (!ns.length) return null;            // null = 이 셀은 비운다
+              var m = Math.floor(ns.length / 2);
+              var mid = ns.length % 2 ? ns[m] : (ns[m - 1] + ns[m]) / 2;
+              return Math.round(mid) + ' KB';
+            } },
+          // 확장자 분포처럼 숫자가 아닌 집계도 자유롭게
+          { field: 'modified', headerName: '확장자 분포', width: 190,
+            aggFunc: function (values, ctx) {
+              var byExt = {};
+              ctx.rows.forEach(function (r) {
+                var ext = (r.name.split('.').pop() || '?');
+                byExt[ext] = (byExt[ext] || 0) + 1;
+              });
+              return Object.keys(byExt).sort().map(function (k) {
+                return k + '×' + byExt[k];
+              }).join(', ');
+            } },
+        ],
+      });
+
+      document.getElementById('aggcQuick').addEventListener('input', function (e) {
+        grid.setQuickFilter(e.target.value);
+        document.getElementById('aggcStatus').textContent = e.target.value
+          ? '필터 적용 — 첫 폴더의 집계가 남은 파일 기준으로 재계산되었습니다.'
+          : '폴더 이름 옆 (n)은 자손 파일 수, Size는 중앙값입니다.';
+      });
+    </script>
+  </div>
+
+  <!-- ======================================================== 무한 스크롤 -->
+  <h2 class="section" id="infinite-scroll">Infinite Scroll (infiniteScroll)</h2>
+  <p class="section-desc">
+    <code class="inline">infiniteScroll: true | { threshold, pageSize }</code>는 바닥 근처에 닿으면
+    다음 페이지를 자동으로 조회해 <strong>기존 행 뒤에 이어 붙입니다</strong>(교체가 아닙니다).
+    <code class="inline">dataSource</code>가 필요하며 페이저 UI와는 배타입니다 —
+    대신 하단 상태 바가 <strong>불러오는 중 / N건 불러옴 / 마지막 페이지</strong>를 알립니다.
+    <strong>끝 판정</strong>은 서버가 준 플래그(<code class="inline">last</code> ·
+    <code class="inline">lastPage</code> · <code class="inline">isLast</code> ·
+    <code class="inline">hasMore</code> · <code class="inline">hasNext</code>)가 최우선이고,
+    없으면 <code class="inline">total</code> → 수신 건수 순으로 추론합니다.
+    이 데모 서버(<code class="inline">/api/employees-infinite</code>)는 <strong>총건수를 주지 않고</strong>
+    <code class="inline">last</code>만 주므로, 마지막 페이지 표시가 순전히 그 플래그에서 나옵니다.
+    상태 바 왼쪽의 <strong>크기 선택</strong>으로 한 번에 받을 행 수를 바꿀 수 있습니다
+    (<code class="inline">paginationPageSizeOptions</code>가 선택지, 바꾸면 쌓인 것을 버리고 새 크기로 다시 받습니다).
+    끄려면 <code class="inline">infiniteScroll: { pageSizeSelector: false }</code>.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <input class="tb-input" id="infQuick" type="text" placeholder="서버측 quickFilter… (예: Seoul)">
+        <button class="tb-btn" id="infMoreBtn" type="button">loadMore()</button>
+        <button class="tb-btn" id="infReloadBtn" type="button">reloadData()</button>
+      </div>
+      <div id="gridInfinite" class="grid-wrap-md"></div>
+      <div class="status-line" id="infStatus">아래로 스크롤하면 25행씩 자동으로 이어 받습니다.</div>
+    </div>
+    <script type="text/x-example">
+      var status = document.getElementById('infStatus');
+
+      var grid = new DataGrid(document.getElementById('gridInfinite'), {
+        // 서버는 { rows, last } 만 준다 — total 없음
+        dataSource: { url: '/api/employees-infinite' },
+        // infiniteScroll을 켜면 pageMode가 'server'로 올라가고 sort/filter도 따라온다
+        infiniteScroll: { threshold: 200, pageSize: 25 },
+        // 상태 바 크기 선택의 선택지 (페이저와 같은 옵션을 공유)
+        paginationPageSizeOptions: [10, 25, 50, 100],
+        localeText: DataGrid.locales.ko,
+        rowNumbers: true,          // 몇 번째 행까지 쌓였는지 눈으로 확인
+        columnDefs: [
+          { field: 'id', headerName: 'ID', width: 70 },
+          { field: 'name', headerName: 'Name', flex: 1 },
+          { field: 'department', headerName: 'Department', width: 150 },
+          { field: 'city', headerName: 'City', width: 130 },
+          { field: 'salary', headerName: 'Salary', dataType: 'number', format: '$#,##0', width: 130 },
+        ],
+      });
+
+      // 누적을 버리고 다시 쌓는 경우(정렬·필터·reloadData)는 rowsAppended가 아니라 dataChanged.
+      // 이어 받기일 때는 바로 아래 rowsAppended가 이 문구를 덮어쓴다.
+      grid.on('dataChanged', function (e) {
+        status.textContent = '처음부터 다시 — ' + e.rowCount + '행 (아래로 스크롤하면 이어 받습니다)';
+      });
+
+      // 한 페이지가 도착할 때마다 (교체가 아니라 누적이므로 rows는 이번에 받은 것만)
+      grid.on('rowsAppended', function (e) {
+        status.textContent = 'page ' + e.page + ' 도착 — 이번에 ' + e.rows.length +
+          '행, 누적 ' + e.loaded + '행' + (e.hasMore ? ' (더 있음)' : '');
+      });
+
+      // 서버가 last: true를 준 순간 한 번만 발생한다
+      grid.on('lastPageReached', function (e) {
+        status.textContent = '마지막 페이지 도달 — 총 ' + e.loaded +
+          '행 (서버가 total을 주지 않으므로 e.total은 ' + e.total + ')';
+      });
+
+      grid.on('dataLoadError', function (e) {
+        status.textContent = '로드 실패: ' + e.error.message;
+      });
+
+      // 스크롤 없이 수동으로 한 페이지 더 (이미 마지막이면 false)
+      document.getElementById('infMoreBtn').addEventListener('click', function () {
+        if (!grid.loadMore()) {
+          status.textContent = grid.hasMoreRows()
+            ? '이미 불러오는 중입니다.'
+            : '더 받을 페이지가 없습니다 (hasMoreRows() === false).';
+        }
+      });
+
+      // 조회 조건이 바뀌면 누적을 버리고 처음부터 다시 쌓는다
+      document.getElementById('infQuick').addEventListener('input', function (e) {
+        grid.setQuickFilter(e.target.value);
+      });
+      document.getElementById('infReloadBtn').addEventListener('click', function () {
+        grid.reloadData();
+        status.textContent = '처음부터 다시 — 누적을 버리고 0페이지부터 쌓습니다.';
+      });
+    </script>
+  </div>
+
+  <!-- ======================================================== 최초 조회 보류 -->
+  <h2 class="section" id="auto-load">Deferred First Load (dataSource.autoLoad)</h2>
+  <p class="section-desc">
+    <code class="inline">dataSource.autoLoad: false</code>면 그리드가 <strong>스스로 첫 조회를 하지 않습니다</strong>
+    (기본값 <code class="inline">true</code>). 검색 조건을 받은 뒤에 조회하는 화면, 비싼 쿼리,
+    탭이 열릴 때까지 미루는 경우에 씁니다.
+    <strong>데이터 소스를 끄는 게 아니라 "자동"만 끄는 것</strong>이라
+    <code class="inline">reloadData()</code> · <code class="inline">loadMore()</code> 같은 명시적 호출은 그대로 동작하고,
+    정렬·필터 자동 재조회도 <strong>한 번이라도 조회한 뒤부터는</strong> 평소처럼 동작합니다.
+    <code class="inline">setDataSource()</code>도 새 소스가 <code class="inline">autoLoad: false</code>면
+    교체만 하고 조회하지 않습니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <input class="tb-input" id="alDept" type="text" placeholder="부서명 (예: Engineering)">
+        <button class="tb-btn primary" id="alSearchBtn" type="button">조회</button>
+        <button class="tb-btn" id="alSwapBtn" type="button">setDataSource() — 자동 조회 없음</button>
+      </div>
+      <div id="gridAutoLoad" class="grid-wrap-sm"></div>
+      <div class="status-line" id="alStatus">
+        아직 요청을 보내지 않았습니다 — 부서명을 넣고 조회를 누르세요. (네트워크 탭에 요청이 없습니다)
+      </div>
+    </div>
+    <script type="text/x-example">
+      var status = document.getElementById('alStatus');
+      var deptInput = document.getElementById('alDept');
+      var calls = 0;
+
+      // 요청을 조립할 때마다 입력값을 읽어 보낸다 (교체용 소스와 공유)
+      function buildParams() {
+        calls++;
+        return { quickFilter: deptInput.value || undefined };
+      }
+      function makeSource(url) {
+        return { url: url, autoLoad: false, params: buildParams };
+      }
+
+      var grid = new DataGrid(document.getElementById('gridAutoLoad'), {
+        dataSource: makeSource('/api/employees'),   // autoLoad: false — 생성 시 조회하지 않는다
+        sortMode: 'server',
+        filterMode: 'server',
+        pageMode: 'server',
+        pagination: true,
+        paginationPageSize: 20,
+        localeText: DataGrid.locales.ko,
+        columnDefs: [
+          { field: 'id', headerName: 'ID', width: 70 },
+          { field: 'name', headerName: 'Name', flex: 1 },
+          { field: 'department', headerName: 'Department', width: 150, filter: 'text' },
+          { field: 'city', headerName: 'City', width: 130 },
+        ],
+      });
+
+      grid.on('dataChanged', function (e) {
+        status.textContent = '요청 ' + calls + '회 — ' + e.rowCount + '행 수신. ' +
+          '이제 헤더 정렬·필터도 서버로 나갑니다.';
+      });
+
+      // 조회는 소비자가 시작한다 (reloadData는 1페이지로 되돌린 뒤 요청)
+      document.getElementById('alSearchBtn').addEventListener('click', function () {
+        grid.reloadData();
+      });
+
+      // 새 소스도 autoLoad: false면 교체만 되고 요청은 나가지 않는다
+      document.getElementById('alSwapBtn').addEventListener('click', function () {
+        var before = calls;
+        grid.setDataSource(makeSource('/api/employees'));
+        status.textContent = '데이터 소스만 교체 — 요청 횟수가 ' + before + '회 그대로입니다(' + calls + '회). ' +
+          '조회를 눌러야 받아옵니다.';
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

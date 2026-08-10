@@ -296,7 +296,52 @@ suite('normalizeMultiValue', function () {
   assertEq(n(undefined), [], 'undefined → empty');
   assertEq(n('a'), ['a'], 'single value wrapped');
   assertEq(n(0), [0], 'falsy single value (0) wrapped');
-  assertEq(n(''), [''], 'falsy single value (empty string) wrapped');
+
+  /* 콤마 구분 문자열도 다중 값 표현으로 받는다 (v2.21) */
+  assertEq(n('a,b'), ['a', 'b'], '콤마 문자열 분해');
+  assertEq(n('a, b ,c'), ['a', 'b', 'c'], '항목 trim');
+  assertEq(n('a,,b'), ['a', 'b'], '빈 항목 제거');
+  assertEq(n(','), [], '구분자만 → 선택 없음');
+  assertEq(n(''), [], '빈 문자열 = 선택 없음 (v2.21 — 이전엔 [""])');
+  assertEq(n('   '), [], '공백만 → 선택 없음');
+  /* 배열 항목은 손대지 않는다 — 이미 분해된 값을 다시 쪼개면 안 된다 */
+  assertEq(n(['a,b']), ['a,b'], '배열 안의 콤마는 그대로 (한 항목)');
+  assertEq(n([' a ']), [' a '], '배열 항목은 trim하지 않는다');
+});
+
+suite('denormalizeMultiValue', function () {
+  var d = T.denormalizeMultiValue;
+  /* 원본이 쓰던 표현을 유지한다 — 편집 한 번에 값 타입이 바뀌면 서버 스키마와 어긋난다 */
+  assertEq(d(['a', 'b'], ['x']), ['a', 'b'], '원본이 배열 → 배열');
+  assertEq(d(['a', 'b'], 'x'), 'a,b', '원본이 문자열 → 콤마 문자열');
+  assertEq(d(['a', 'b'], null), 'a,b', '원본 null → 문자열이 기본');
+  assertEq(d(['a', 'b'], undefined), 'a,b', '원본 undefined → 문자열이 기본');
+  assertEq(d([], 'x'), '', '선택 없음 + 문자열 원본 → 빈 문자열');
+  assertEq(d([], ['x']), [], '선택 없음 + 배열 원본 → 빈 배열');
+  /* 반환 배열은 사본이어야 한다 (호출자가 원본을 쥐고 흔들지 못하게) */
+  var src = ['a'];
+  assert(d(src, []) !== src, '배열 반환은 사본');
+  /* 문자열 입력도 받아 정규화 후 다시 직렬화한다 */
+  assertEq(d('a, b', 'x'), 'a,b', '문자열 입력 → 정규화된 문자열');
+});
+
+suite('sameEditValue', function () {
+  var s = T.sameEditValue;
+  /* 다중 값은 표현이 아니라 내용으로 비교 — 열었다 그냥 닫으면 변경이 아니어야 한다 */
+  assert(s('a,b', ['a', 'b'], true), '콤마 문자열 == 배열');
+  assert(s('a, b', 'a,b', true), '공백 차이는 같은 값');
+  assert(s(null, '', true), 'null == 빈 문자열 (둘 다 선택 없음)');
+  assert(s('', [], true), '빈 문자열 == 빈 배열');
+  assert(!s('a,b', 'b,a', true), '순서가 다르면 다른 값');
+  assert(!s('a', 'a,b', true), '항목 수가 다르면 다른 값');
+  /* multi가 아니면 종전대로 엄격 비교 — 콤마가 든 일반 문자열을 쪼개면 안 된다 */
+  assert(s('a,b', 'a,b', false), '비다중: 같은 문자열');
+  assert(!s('a, b', 'a,b', false), '비다중: 공백 차이는 다른 값');
+  assert(!s(null, '', false), '비다중: null !== 빈 문자열');
+  /* 한쪽이 배열이면 multi 플래그가 없어도 내용 비교로 넘어간다 (기존 동작) */
+  assert(s(['a'], 'a', false), '한쪽이 배열이면 내용 비교');
+  /* Date 비교는 종전대로 */
+  assert(s(new Date(2024, 0, 1), new Date(2024, 0, 1), false), 'Date는 시각으로 비교');
 });
 
 suite('shallowArrayEquals', function () {
@@ -321,6 +366,14 @@ suite('lookupOptionLabels', function () {
   assertEq(l(opts, [3]), ['레벨3'], 'number value matched');
   assertEq(l(opts, ['js', null, 'css']), ['JS', 'CSS'], 'null entries skipped');
   assertEq(l(undefined, ['js']), ['js'], 'no options → raw strings');
+
+  /* 콤마 문자열도 배열과 똑같이 label로 매핑된다 (v2.21) —
+   * 이전에는 'js,css'가 통째로 옵션 조회에 실패해 코드 그대로 칩 하나가 됐다 */
+  assertEq(l(opts, 'js,css'), ['JS', 'CSS'], '콤마 문자열 → label 배열');
+  assertEq(l(opts, 'js, css'), ['JS', 'CSS'], '공백 있는 콤마 문자열');
+  assertEq(l(opts, ''), [], '빈 문자열 → 빈 배열 (칩 없음)');
+  /* 숫자 값은 분해 후 문자열이 되지만 lookupOptionLabel이 String 비교로 잡는다 */
+  assertEq(l(opts, '3'), ['레벨3'], '문자열로 들어온 숫자 값도 매칭');
 });
 
 /* ---------------- floating filter model ---------------- */
@@ -364,6 +417,47 @@ suite('aggregateValues', function () {
   assertEq(T.aggregateValues([], 'v', 'sum'), null, 'empty rows -> null');
   assertEq(T.aggregateValues([], 'v', 'count'), 0, 'empty rows count 0');
   assertEq(T.aggregateValues([{ v: -5 }, { v: 3 }], 'v', 'min'), -5, 'negative min');
+
+  /* ---- 커스텀 함수 aggFunc ---- */
+  var seen = null;
+  var out = T.aggregateValues(rows, 'v', function (values, ctx) { seen = { values: values, ctx: ctx }; return 'X'; });
+  assertEq(out, 'X', '함수 반환값이 그대로 집계값');
+  assertEq(seen.values, [10, 20, 30, null, '', 'abc'], 'values는 원본 그대로 (거르지 않는다)');
+  assert(seen.ctx.rows === rows, 'ctx.rows는 집계 대상 행 배열');
+  assertEq(seen.ctx.field, 'v', 'ctx.field');
+  assertEq(seen.ctx.colDef, null, 'opts 없으면 colDef는 null');
+  assertEq(seen.ctx.parent, null, 'opts 없으면 parent는 null');
+
+  var ctx2 = null;
+  var parentRow = { name: 'project' };
+  var col = { field: 'v', aggFunc: 'noop' };
+  T.aggregateValues(rows, 'v', function (v, c) { ctx2 = c; }, { colDef: col, parent: parentRow });
+  assert(ctx2.colDef === col, 'opts.colDef가 ctx로 전달');
+  assert(ctx2.parent === parentRow, 'opts.parent가 ctx로 전달 (트리 요약)');
+
+  /* 문자열이 아닌 값도 그대로 통과 — "이름 (자식 수)" 같은 표시가 목적 */
+  assertEq(
+    T.aggregateValues([{ v: 1 }, { v: 2 }], 'v', function (values, c) { return c.parent.name + ' (' + values.length + ')'; },
+      { parent: { name: 'project' } }),
+    'project (2)',
+    '부모 이름 + 자식 수 조합'
+  );
+
+  /* undefined 반환은 null로 정규화 — 내장 집계의 "표시하지 않음" 규약과 통일 */
+  assertEq(T.aggregateValues(rows, 'v', function () {}), null, 'undefined 반환 → null');
+  assertEq(T.aggregateValues(rows, 'v', function () { return null; }), null, 'null 반환 유지');
+  /* 0과 빈 문자열은 유효한 집계 결과다 */
+  assertEq(T.aggregateValues(rows, 'v', function () { return 0; }), 0, '0 반환 유지');
+  assertEq(T.aggregateValues(rows, 'v', function () { return ''; }), '', '빈 문자열 반환 유지');
+
+  /* 예외는 집계 하나만 null로 만들고 failures로 올려보낸다 (콘솔은 호출자가) */
+  var failures = [];
+  var boom = T.aggregateValues(rows, 'v', function () { throw new Error('boom'); }, { failures: failures });
+  assertEq(boom, null, '예외 → null');
+  assertEq(failures.length, 1, 'failures로 보고');
+  assertEq(failures[0].field, 'v', 'failures에 필드명');
+  /* failures를 안 넘겨도 죽지 않는다 */
+  assertEq(T.aggregateValues(rows, 'v', function () { throw new Error('x'); }), null, 'failures 없어도 안전');
 });
 
 /* ---------------- row grouping ---------------- */
@@ -386,6 +480,23 @@ suite('buildGroupView', function () {
   assertEq([out[0].value, out[0].leafCount, out[0].agg.pay], ['Sales', 2, 300], 'Sales group: first-seen order, count, sum');
   assertEq(out[1].team, 'A', 'leaves follow their group header');
   assertEq([out[3].value, out[3].agg.pay], ['Dev', 800], 'Dev group aggregate');
+
+  /* 커스텀 함수 aggFunc — 그룹에서는 parent가 null이고 rows가 그 그룹의 행들 */
+  var gseen = [];
+  var fnOut = T.buildGroupView(rows, ['dept'], expandAll, [{ field: 'pay', aggFunc: function (values, ctx) {
+    gseen.push({ n: values.length, parent: ctx.parent, field: ctx.field });
+    return values.length + '건';
+  } }]);
+  assertEq(fnOut[0].agg.pay, '2건', '그룹 집계에 함수 반환값');
+  assertEq(gseen[0].parent, null, '그룹에는 부모 행이 없다 → parent null');
+  assertEq(gseen[0].field, 'pay', 'ctx.field 전달');
+  /* 함수 예외는 failures로 — 그룹 뷰 자체는 정상 생성된다 */
+  var gfail = [];
+  var gboom = T.buildGroupView(rows, ['dept'], expandAll,
+    [{ field: 'pay', aggFunc: function () { throw new Error('boom'); } }], gfail);
+  assertEq(gboom.length, 6, '집계가 실패해도 그룹 뷰는 그대로');
+  assertEq(gboom[0].agg.pay, null, '실패한 집계는 null');
+  assertEq(gfail.length, 2, '그룹마다 failure 보고 (호출자가 컬럼당 1회로 접는다)');
 
   /* collapsed: leaves hidden, aggregates still computed */
   var closed = T.buildGroupView(rows, ['dept'], collapseAll, [{ field: 'pay', aggFunc: 'sum' }]);
@@ -748,14 +859,24 @@ suite('dataSource request/response', function () {
   assertEq(req10.headers, { 'X-Token': 'live' }, 'headers function evaluated per request');
   assertEq(T.buildDataSourceRequest({ url: '/x' }, state).headers, null, 'no headers option → null');
 
-  assertEq(T.parseDataSourceResponse([{ a: 1 }]), { rows: [{ a: 1 }], total: 1 }, 'bare array response');
+  assertEq(T.parseDataSourceResponse([{ a: 1 }]), { rows: [{ a: 1 }], total: 1, hasTotal: false, last: null },
+    'bare array response');
   assertEq(
     T.parseDataSourceResponse({ rows: [{ a: 1 }], total: 99 }),
-    { rows: [{ a: 1 }], total: 99 },
+    { rows: [{ a: 1 }], total: 99, hasTotal: true, last: null },
     '{rows, total} response'
   );
-  assertEq(T.parseDataSourceResponse({ rows: [{}] }), { rows: [{}], total: 1 }, 'total defaults to rows.length');
-  assertEq(T.parseDataSourceResponse(null), { rows: [], total: 0 }, 'malformed response → empty');
+  assertEq(T.parseDataSourceResponse({ rows: [{}] }), { rows: [{}], total: 1, hasTotal: false, last: null },
+    'total defaults to rows.length');
+  assertEq(T.parseDataSourceResponse(null), { rows: [], total: 0, hasTotal: false, last: null },
+    'malformed response → empty');
+
+  /* v2.22 — hasTotal은 "서버가 실제로 준 총건수인가". rows.length로 채운 값을
+   * 기지의 총계로 믿으면 무한 스크롤이 첫 페이지에서 끝나버린다. */
+  assertEq(T.parseDataSourceResponse({ rows: [{}, {}] }).hasTotal, false, '채운 total은 hasTotal false');
+  assertEq(T.parseDataSourceResponse({ rows: [], total: 0 }).hasTotal, true, 'total: 0도 서버가 준 값');
+  assertEq(T.parseDataSourceResponse({ rows: [{}], last: true }).last, true, '마지막 페이지 플래그를 함께 읽는다');
+  assertEq(T.parseDataSourceResponse({ rows: [{}], hasMore: true }).last, false, 'hasMore는 반전');
 });
 
 /* ---------------- buildGroupHeaderRuns ---------------- */
@@ -1009,6 +1130,22 @@ suite('computeTreeSummary', function () {
   var cnt = T.computeTreeSummary(roots, getId, [{ field: 'size', aggFunc: 'count' }]);
   assertEq(cnt.root.size, 3, 'count counts leaves');
   assertEq(T.computeTreeSummary([], getId, [{ field: 'size', aggFunc: 'sum' }]), {}, 'empty tree');
+
+  /* 커스텀 함수 aggFunc — 트리에서만 ctx.parent가 부모 행으로 채워진다.
+   * "이름 (자손 리프 수)" 표시가 이 API의 주 동기다. */
+  var named = T.computeTreeSummary(roots, getId, [{ field: 'id', aggFunc: function (values, ctx) {
+    return ctx.parent.id + ' (' + ctx.rows.length + ')';
+  } }]);
+  assertEq(named.root.id, 'root (3)', 'parent 행 + 자손 리프 수');
+  assertEq(named.sub.id, 'sub (2)', '중첩 부모도 자기 리프 기준');
+  assertEq(named.single, undefined, '리프 루트는 여전히 요약 없음');
+
+  /* 예외 → 해당 집계만 null, failures로 보고 (부모마다 1건씩) */
+  var tfail = [];
+  var tboom = T.computeTreeSummary(roots, getId,
+    [{ field: 'size', aggFunc: function () { throw new Error('boom'); } }], tfail);
+  assertEq(tboom.root.size, null, '실패한 집계는 null');
+  assertEq(tfail.length, 2, '부모 2개 → failure 2건');
 });
 
 /* ---------------- applyTreeCheck ---------------- */
@@ -1223,6 +1360,16 @@ suite('normalizeColumns', function () {
   assertEq(ed[2].editable, true, 'custom editor object also implies editable');
   assertEq(ed[3].editable, false, 'no editor → editable stays false');
 
+  /* required 선언도 편집 의도 — 올려주지 않으면 required만 쓴 컬럼이 조용히 무동작 */
+  var req = T.normalizeColumns([
+    { field: 'a', required: true },
+    { field: 'b', required: true, editable: false },
+    { field: 'c' },
+  ]);
+  assertEq(req[0].editable, true, 'required declared → editable defaults to true');
+  assertEq(req[1].editable, false, 'explicit editable:false wins over required');
+  assertEq(req[2].required, false, 'required defaults to false');
+
   var edDefault = T.normalizeColumns(
     [{ field: 'a', editor: 'text' }, { field: 'b' }],
     { editable: false }
@@ -1424,6 +1571,202 @@ suite('resolveDataModes — pageMode 상속', function () {
   assertEq(T.resolveDataModes({ pageMode: 'server', sortMode: null }).sortMode, 'server', 'null → 미지정으로 상속');
   assertEq(T.resolveDataModes({ pageMode: 'server', sortMode: undefined }).sortMode, 'server', 'undefined → 상속');
   assertEq(T.resolveDataModes({ pageMode: 'server', sortMode: 'oops' }).sortMode, 'client', '잘못된 값 → client');
+
+  /* v2.22 — infiniteScroll은 서버 페이징이 전제이므로 pageMode를 올린다 */
+  var inf = T.resolveDataModes({ infiniteScroll: true });
+  assertEq(inf.pageMode, 'server', 'infiniteScroll → pageMode server');
+  assertEq(inf.sortMode, 'server', 'sort도 따라 올라감');
+  assertEq(inf.filterMode, 'server', 'filter도 따라 올라감');
+  assertEq(inf.warnings.length, 0, '자동 승격은 경고 대상 아님');
+  /* 명시 지정은 여전히 이긴다 */
+  assertEq(T.resolveDataModes({ infiniteScroll: true, pageMode: 'client' }).pageMode, 'client',
+    '명시한 pageMode가 승격을 이긴다');
+  assertEq(T.resolveDataModes({ infiniteScroll: true, sortMode: 'client' }).warnings[0], 'sortMode',
+    '승격된 server + 명시 client는 종전대로 경고');
+});
+
+suite('resolveInfiniteScroll — 무한 스크롤 옵션 정규화', function () {
+  var ds = { url: '/api/x' };
+
+  var off = T.resolveInfiniteScroll({});
+  assertEq(off.enabled, false, '옵션 없으면 비활성');
+  assertEq(off.warnings.length, 0, '비활성은 경고 없음');
+  assertEq(T.resolveInfiniteScroll(undefined).enabled, false, 'options 자체가 없어도 크래시 없음');
+  assertEq(T.resolveInfiniteScroll({ infiniteScroll: false, dataSource: ds }).enabled, false, 'false는 비활성');
+
+  var on = T.resolveInfiniteScroll({ infiniteScroll: true, dataSource: ds });
+  assertEq(on.enabled, true, 'true + dataSource → 활성');
+  assertEq(on.threshold, 200, '기본 임계값 200px');
+  assertEq(on.pageSize, null, 'pageSize 미지정이면 null (paginationPageSize를 쓴다)');
+
+  /* dataSource 없이는 자동 조회할 대상이 없다 — 조용히 무시하지 않고 알린다 */
+  var noDs = T.resolveInfiniteScroll({ infiniteScroll: true });
+  assertEq(noDs.enabled, false, 'dataSource 없으면 비활성');
+  assertEq(noDs.warnings[0], 'noDataSource', '경고 키');
+
+  var cfg = T.resolveInfiniteScroll({ infiniteScroll: { threshold: 50, pageSize: 30 }, dataSource: ds });
+  assertEq(cfg.threshold, 50, '객체 설정 threshold');
+  assertEq(cfg.pageSize, 30, '객체 설정 pageSize');
+  assertEq(T.resolveInfiniteScroll({ infiniteScroll: { threshold: 0 }, dataSource: ds }).threshold, 0,
+    'threshold 0 = 정확히 바닥에서만 (유효값)');
+  assertEq(T.resolveInfiniteScroll({ infiniteScroll: { threshold: -5 }, dataSource: ds }).threshold, 200,
+    '음수는 기본값으로');
+  assertEq(T.resolveInfiniteScroll({ infiniteScroll: { threshold: 'x' }, dataSource: ds }).threshold, 200,
+    '숫자 아니면 기본값');
+  assertEq(T.resolveInfiniteScroll({ infiniteScroll: { pageSize: 0 }, dataSource: ds }).pageSize, null,
+    'pageSize 0은 무효');
+  assertEq(T.resolveInfiniteScroll({ infiniteScroll: { pageSize: 25.7 }, dataSource: ds }).pageSize, 25,
+    '소수는 내림');
+
+  /* 어긋난 조합 — 막지는 않고 경고만 */
+  var client = T.resolveInfiniteScroll({ infiniteScroll: true, dataSource: ds, pageMode: 'client' });
+  assertEq(client.enabled, true, "pageMode: 'client'여도 막지는 않는다 (request 훅 구성 가능)");
+  assertEq(client.warnings[0], 'clientPageMode', '경고 키');
+  assertEq(T.resolveInfiniteScroll({ infiniteScroll: true, dataSource: ds, domLayout: 'autoHeight' }).warnings[0],
+    'autoHeight', 'autoHeight는 스크롤이 안 생겨 끝까지 받는다 — 경고');
+  assertEq(T.resolveInfiniteScroll({ infiniteScroll: true, domLayout: 'autoHeight' }).warnings.length, 1,
+    '비활성이면 추가 경고를 쌓지 않는다 (noDataSource 하나뿐)');
+
+  /* v2.23 — 페이저가 없으니 크기 변경 UI는 상태 바가 대신한다 (기본 표시) */
+  assertEq(on.pageSizeSelector, true, '기본은 크기 선택 표시');
+  assertEq(T.resolveInfiniteScroll({ infiniteScroll: { pageSizeSelector: false }, dataSource: ds }).pageSizeSelector,
+    false, 'false면 숨김');
+  assertEq(T.resolveInfiniteScroll({ infiniteScroll: { pageSizeSelector: 0 }, dataSource: ds }).pageSizeSelector,
+    true, 'false가 아닌 값은 모두 표시 (opt-out만 허용)');
+  assertEq(off.pageSizeSelector, false, '무한 스크롤이 아니면 선택 UI도 없음');
+});
+
+suite('pageSizeSelectOptions — 페이지 크기 선택지', function () {
+  assertEq(T.pageSizeSelectOptions([10, 20, 50, 100], 20), [10, 20, 50, 100], '현재 값이 목록에 있으면 그대로');
+
+  /* 핵심: 현재 값이 목록에 없으면 select가 빈 칸이 된다 (selectedIndex -1) */
+  assertEq(T.pageSizeSelectOptions([10, 20, 50, 100], 25), [10, 20, 25, 50, 100],
+    '현재 값을 정렬된 자리에 끼워 넣는다');
+  assertEq(T.pageSizeSelectOptions([10, 20], 5), [5, 10, 20], '가장 작아도 앞에 들어간다');
+  assertEq(T.pageSizeSelectOptions([10, 20], 500), [10, 20, 500], '가장 커도 뒤에 들어간다');
+
+  assertEq(T.pageSizeSelectOptions([50, 10, 20], 20), [10, 20, 50], '오름차순 정렬');
+  assertEq(T.pageSizeSelectOptions([10, 10, 20], 20), [10, 20], '중복 제거');
+  assertEq(T.pageSizeSelectOptions(['10', '20'], 20), [10, 20], '문자열 숫자도 수용');
+
+  /* 크기로 성립하지 않는 값은 버린다 — 0이 남으면 나눗셈이 무한대가 된다 */
+  assertEq(T.pageSizeSelectOptions([0, -5, 'x', null, 20], 20), [20], '0·음수·비숫자는 제외');
+  assertEq(T.pageSizeSelectOptions([], 25), [25], '목록이 비어도 현재 값은 남는다');
+  assertEq(T.pageSizeSelectOptions(null, 25), [25], 'null 목록 안전');
+  assertEq(T.pageSizeSelectOptions([10, 20], 0), [10, 20], '현재 값이 무효면 끼워 넣지 않는다');
+  assertEq(T.pageSizeSelectOptions(null, null), [], '둘 다 없으면 빈 목록');
+});
+
+suite('shouldLoadMore — 바닥 판정', function () {
+  var base = {
+    enabled: true, hasMore: true, loading: false, threshold: 200,
+    scrollTop: 0, clientHeight: 400, scrollHeight: 4000,
+  };
+  var w = function (patch) {
+    var o = {}, k;
+    for (k in base) o[k] = base[k];
+    for (k in patch || {}) o[k] = patch[k];
+    return o;
+  };
+
+  assertEq(T.shouldLoadMore(w()), false, '맨 위에서는 로드 안 함');
+  assertEq(T.shouldLoadMore(w({ scrollTop: 3399 })), false, '남은 201px — 아직');
+  assertEq(T.shouldLoadMore(w({ scrollTop: 3400 })), true, '남은 거리가 임계값과 같으면 로드 (경계 포함)');
+  assertEq(T.shouldLoadMore(w({ scrollTop: 3401 })), true, '임계값 안으로 들어오면 로드');
+  assertEq(T.shouldLoadMore(w({ scrollTop: 3600 })), true, '완전히 바닥이면 로드');
+  assertEq(T.shouldLoadMore(w({ scrollTop: 3400, threshold: 0 })), false, 'threshold 0이면 정확히 바닥에서만');
+  assertEq(T.shouldLoadMore(w({ scrollTop: 3600, threshold: 0 })), true, 'threshold 0 + 바닥');
+
+  /* 가드 3종 */
+  assertEq(T.shouldLoadMore(w({ scrollTop: 3600, enabled: false })), false, '비활성이면 안 함');
+  assertEq(T.shouldLoadMore(w({ scrollTop: 3600, hasMore: false })), false, '마지막이면 안 함');
+  assertEq(T.shouldLoadMore(w({ scrollTop: 3600, loading: true })), false, '로드 중이면 안 함 (중복 요청 방지)');
+
+  /* 첫 페이지가 뷰포트를 못 채운 경우 — 스크롤이 없으니 scroll 이벤트도 없다.
+   * 이걸 바닥으로 보지 않으면 "더 있는데 멈춘 그리드"가 된다. */
+  assertEq(T.shouldLoadMore(w({ scrollHeight: 300, clientHeight: 400 })), true,
+    '내용이 뷰포트보다 작으면 바닥으로 본다');
+
+  /* 레이아웃이 없는 경우(숨겨진 탭 등)는 판정 불가 — 안 보이는 그리드가 끝까지 받아버리면 안 된다 */
+  assertEq(T.shouldLoadMore(w({ clientHeight: 0, scrollHeight: 0 })), false, 'clientHeight 0이면 판정 보류');
+  assertEq(T.shouldLoadMore(undefined), false, '인자 없어도 크래시 없음');
+});
+
+suite('readLastPageFlag — 서버 마지막 페이지 플래그', function () {
+  assertEq(T.readLastPageFlag({ last: true }), true, 'last: true = 마지막 (Spring Data Page)');
+  assertEq(T.readLastPageFlag({ last: false }), false, 'last: false = 더 있음');
+  assertEq(T.readLastPageFlag({ lastPage: true }), true, 'lastPage');
+  assertEq(T.readLastPageFlag({ isLast: true }), true, 'isLast');
+  /* hasMore/hasNext는 의미가 반대 */
+  assertEq(T.readLastPageFlag({ hasMore: true }), false, 'hasMore: true = 아직 아님');
+  assertEq(T.readLastPageFlag({ hasMore: false }), true, 'hasMore: false = 마지막');
+  assertEq(T.readLastPageFlag({ hasNext: false }), true, 'hasNext: false = 마지막');
+
+  assertEq(T.readLastPageFlag({}), null, '아무 키도 없으면 모름');
+  assertEq(T.readLastPageFlag(null), null, 'null 안전');
+  assertEq(T.readLastPageFlag([1, 2]), null, '배열 응답에는 플래그가 없다');
+  /* 불리언이 아닌 값은 모름 — 문자열 'false'가 true로 읽히면 안 된다 */
+  assertEq(T.readLastPageFlag({ last: 'false' }), null, "문자열 'false'는 모름으로");
+  assertEq(T.readLastPageFlag({ last: 0 }), null, '숫자도 모름으로');
+  /* 우선순위: last가 hasMore보다 앞 */
+  assertEq(T.readLastPageFlag({ last: true, hasMore: true }), true, 'last가 우선');
+});
+
+suite('resolveLastPage — 마지막 페이지 확정', function () {
+  /* 1. 명시 플래그가 최우선 — 다른 신호로 덮지 않는다 */
+  assertEq(T.resolveLastPage({ explicit: false, receivedCount: 0 }), false,
+    '서버가 더 있다고 하면 0건이어도 그 말을 따른다');
+  assertEq(T.resolveLastPage({ explicit: true, receivedCount: 50, pageSize: 50, total: 1000, loaded: 50 }), true,
+    '서버가 마지막이라 하면 다른 신호와 무관하게 마지막');
+
+  /* 2. 수신 0건 = 무한 루프 안전장치 */
+  assertEq(T.resolveLastPage({ explicit: null, receivedCount: 0 }), true, '0건이면 마지막');
+  assertEq(T.resolveLastPage({ receivedCount: 0, pageSize: 50 }), true, 'explicit 생략 + 0건');
+
+  /* 3. total 기지 */
+  assertEq(T.resolveLastPage({ receivedCount: 20, pageSize: 50, loaded: 100, total: 100 }), true,
+    'loaded === total이면 마지막');
+  assertEq(T.resolveLastPage({ receivedCount: 50, pageSize: 50, loaded: 50, total: 500 }), false,
+    'total이 남았으면 더 있음');
+  /* total을 모르면(null) 이 규칙은 건너뛴다 — rows.length로 채운 값을 믿으면 첫 페이지에서 끝난다 */
+  assertEq(T.resolveLastPage({ receivedCount: 50, pageSize: 50, loaded: 50, total: null }), false,
+    'total 미지 + 꽉 찬 페이지 = 더 있음');
+
+  /* 4. 부분 페이지 추론 */
+  assertEq(T.resolveLastPage({ receivedCount: 30, pageSize: 50, loaded: 130 }), true,
+    'pageSize보다 적게 오면 마지막');
+  assertEq(T.resolveLastPage({ receivedCount: 50, pageSize: 50, loaded: 150 }), false,
+    '꽉 찬 페이지면 더 있음 (다음 요청이 0건이면 그때 끝)');
+  /* pageSize를 모르면 추론하지 않는다 */
+  assertEq(T.resolveLastPage({ receivedCount: 3, loaded: 3 }), false, 'pageSize 없으면 부분 페이지 추론 없음');
+  assertEq(T.resolveLastPage(undefined), true, '인자 없으면 0건 취급 → 마지막 (무한 루프 방지 쪽으로)');
+});
+
+suite('resolveInfiniteStatus — 하단 상태 바 문구', function () {
+  var loading = T.resolveInfiniteStatus({ loading: true, hasMore: true, loaded: 40 });
+  assertEq(loading.kind, 'loading', '로딩 중');
+  assertEq(loading.key, 'loadingMore', '로케일 키');
+
+  /* 로딩이 마지막 판정보다 우선 — 로딩 중에 "마지막"이 뜨면 안 된다 */
+  assertEq(T.resolveInfiniteStatus({ loading: true, hasMore: false, loaded: 40 }).kind, 'loading',
+    '로딩이 우선');
+
+  var end = T.resolveInfiniteStatus({ loading: false, hasMore: false, loaded: 137 });
+  assertEq(end.kind, 'end', '마지막 도달');
+  assertEq(end.key, 'noMoreRows', '로케일 키');
+  assertEq(end.params.loaded, 137, '누적 건수');
+
+  var moreNoTotal = T.resolveInfiniteStatus({ loading: false, hasMore: true, loaded: 40, total: null });
+  assertEq(moreNoTotal.key, 'rowsLoaded', 'total 모르면 누적만');
+  assertEq(moreNoTotal.params.loaded, 40, '누적 건수');
+
+  var moreTotal = T.resolveInfiniteStatus({ loading: false, hasMore: true, loaded: 40, total: 500 });
+  assertEq(moreTotal.key, 'rowsLoadedOfTotal', 'total 알면 분모까지');
+  assertEq(moreTotal.params.total, 500, '총건수');
+
+  assertEq(T.resolveInfiniteStatus({}).kind, 'end', '아무것도 없으면 더 받을 게 없는 상태');
+  assertEq(T.resolveInfiniteStatus({}).params.loaded, 0, '0건');
+  assertEq(T.resolveInfiniteStatus(undefined).kind, 'end', '인자 없어도 크래시 없음');
 });
 
 suite('shouldResetPageOnReload', function () {
@@ -1439,6 +1782,23 @@ suite('shouldResetPageOnReload', function () {
   assert(!T.shouldResetPageOnReload({ keepPage: true, silent: true }), '다른 키가 섞여도 유지');
 });
 
+suite('shouldAutoLoad — dataSource 최초 자동 조회', function () {
+  /* 기본은 조회 — 기존 코드(autoLoad를 적지 않은 전부)의 동작이 그대로여야 한다 */
+  assert(T.shouldAutoLoad({ url: '/api/x' }), '생략 → 자동 조회');
+  assert(T.shouldAutoLoad({ url: '/api/x', autoLoad: true }), 'true → 자동 조회');
+
+  /* 끄는 건 정확히 false일 때만 */
+  assert(!T.shouldAutoLoad({ url: '/api/x', autoLoad: false }), 'false → 조회 안 함');
+  assert(T.shouldAutoLoad({ url: '/api/x', autoLoad: 0 }), '0은 false가 아니므로 조회 (엄격 비교)');
+  assert(T.shouldAutoLoad({ url: '/api/x', autoLoad: null }), 'null은 미지정 취급 → 조회');
+  assert(T.shouldAutoLoad({ url: '/api/x', autoLoad: undefined }), 'undefined → 조회');
+  assert(T.shouldAutoLoad({ url: '/api/x', autoLoad: 'false' }), "문자열 'false'는 참값 → 조회");
+
+  /* dataSource 자체가 없으면 조회할 대상이 없다 */
+  assert(!T.shouldAutoLoad(null), 'dataSource 없음 → 조회 안 함');
+  assert(!T.shouldAutoLoad(undefined), 'undefined dataSource 안전');
+});
+
 suite('shouldShowEditableIcon', function () {
   var editable = { editable: true };
   var readonly = { editable: false };
@@ -1451,6 +1811,64 @@ suite('shouldShowEditableIcon', function () {
   assert(!T.shouldShowEditableIcon(null, true, true), 'null 컬럼 → 미표시 (크래시 없음)');
   assert(!T.shouldShowEditableIcon({}, true, true), 'editable 미지정 → 미표시');
   assert(T.shouldShowEditableIcon(editable, true, true) === true, '불리언 반환 (truthy 값 누출 없음)');
+});
+
+/* ---------------- required (column.required) ---------------- */
+suite('isBlankValue', function () {
+  var b = T.isBlankValue;
+  assert(b(null), 'null = 빈 값');
+  assert(b(undefined), 'undefined = 빈 값');
+  assert(b(''), '빈 문자열 = 빈 값');
+  assert(b('   '), '공백만 있는 문자열 = 빈 값');
+  assert(b('\t\n'), '탭·개행만 = 빈 값');
+  assert(b([]), '빈 배열(multiselect) = 빈 값');
+
+  /* 0과 false는 유효한 입력이다 — 빈 값으로 보면 숫자 0이나 체크 해제를
+   * 미입력으로 취급해 정상 값의 저장을 막아버린다 */
+  assert(!b(0), '숫자 0 = 유효한 값');
+  assert(!b(false), 'false(체크 해제) = 유효한 값');
+  assert(!b('0'), "문자열 '0' = 유효한 값");
+  assert(!b(['a']), '항목 있는 배열 = 유효한 값');
+  assert(!b('a'), '문자열 = 유효한 값');
+  assert(!b(new Date(2024, 0, 1)), 'Date 객체 = 유효한 값');
+  assert(!b({}), '객체 = 유효한 값');
+  assert(b(null) === true, '불리언 반환');
+});
+
+suite('isRequiredViolated', function () {
+  var v = T.isRequiredViolated;
+  assert(v({ required: true }, ''), 'required + 빈 값 → 위반');
+  assert(v({ required: true }, null), 'required + null → 위반');
+  assert(!v({ required: true }, 'x'), 'required + 값 있음 → 통과');
+  assert(!v({ required: true }, 0), 'required + 0 → 통과');
+  assert(!v({ required: false }, ''), 'required 아님 → 값과 무관하게 통과');
+  assert(!v({}, ''), 'required 미지정 → 통과');
+  assert(!v(null, ''), 'null 컬럼 → 통과 (크래시 없음)');
+  assert(v({ required: true }, '') === true, '불리언 반환');
+});
+
+suite('shouldShowRequired', function () {
+  var s = T.shouldShowRequired;
+  var req = { required: true, editable: true };
+  assert(s(req, true), 'required + 편집 가능 + 그리드 활성 → 표시');
+  /* editableIndicator와 같은 기준 — 고칠 수 없는 자리의 "필수"는 할 일이 없다 */
+  assert(!s(req, false), '그리드 잠금 → 미표시');
+  assert(!s({ required: true, editable: false }, true), '편집 불가 컬럼 → 미표시');
+  assert(!s({ required: false, editable: true }, true), 'required 아님 → 미표시');
+  assert(!s(null, true), 'null 컬럼 → 미표시');
+  assert(s(req, true) === true, '불리언 반환');
+});
+
+suite('shouldMarkRequiredCell', function () {
+  var m = T.shouldMarkRequiredCell;
+  var req = { required: true, editable: true };
+  /* 셀 마커는 "비어서 조치가 필요한" 셀만 — 컬럼 전체에 그리면 정보량이 0이다 */
+  assert(m(req, '', true), '필수 + 빈 값 → 마커');
+  assert(!m(req, 'Seoul', true), '필수 + 값 있음 → 마커 없음');
+  assert(!m(req, 0, true), '필수 + 0 → 마커 없음 (0은 유효한 값)');
+  assert(!m(req, '', false), '그리드 잠금 → 마커 없음');
+  assert(!m({ required: false, editable: true }, '', true), 'required 아님 → 마커 없음');
+  assert(m(req, '', true) === true, '불리언 반환');
 });
 
 /* ---------------- formatNumber / formatDate / formatValue ---------------- */
@@ -1869,6 +2287,11 @@ suite('resolvePopupButtons', function () {
   assertEq(r([{ text: 'X', variant: 'weird' }])[0].variant, 'default', '모르는 variant → default');
   assertEq(typeof r([{ text: 'X', onClick: function () {} }])[0].onClick, 'function', 'onClick 보존');
   assertEq(r([{ text: 'X', onClick: 'nope' }])[0].onClick, null, '함수 아닌 onClick 무시');
+  assertEq(typeof r([{ text: 'X', onLoad: function () {} }])[0].onLoad, 'function', 'onLoad 보존');
+  assertEq(r([{ text: 'X', onLoad: 'nope' }])[0].onLoad, null, '함수 아닌 onLoad 무시');
+  assertEq(r([{ text: 'X' }])[0].onLoad, null, 'onLoad 생략 → null');
+  /* 내장 버튼은 콜백 자리가 없다 — 동작이 고정이므로 onLoad도 받지 않는다 */
+  assertEq(r(['save'])[0].onLoad, undefined, '내장 버튼에는 onLoad 없음');
 
   /* text 없는 객체는 그릴 수 없으니 조용히 건너뛴다 (팝업 전체가 죽지 않게) */
   assertEq(r([{ key: 'a' }, 'save']).map(function (x) { return x.key; }), ['save'], 'text 없는 객체 건너뜀');
@@ -1968,6 +2391,19 @@ suite('buildPopupFields', function () {
   var plain = build([{ field: 'y', colId: 'y', editable: true }], T.resolvePopupEditorConfig(true), true)[0];
   assert(plain.editCol === plain.col, '오버라이드 없으면 editCol === col');
 
+  /* required도 폼 전용 오버라이드 대상 — validator와 같은 층위 */
+  var reqOn = build(
+    [{ field: 'z', colId: 'z', editable: true, popupEditor: { required: true } }],
+    T.resolvePopupEditorConfig(true), true
+  )[0];
+  assertEq(reqOn.editCol.required, true, '폼에서만 필수로 올리기');
+  var reqOff = build(
+    [{ field: 'z', colId: 'z', editable: true, required: true, popupEditor: { required: false } }],
+    T.resolvePopupEditorConfig(true), true
+  )[0];
+  assertEq(reqOff.editCol.required, false, '폼에서만 필수 해제');
+  assertEq(reqOff.col.required, true, '원본 컬럼의 required는 불변 (그리드 셀 마커는 그대로)');
+
   /* config.fields는 목록이자 순서 */
   var picked = build(cols, T.resolvePopupEditorConfig({ fields: ['city', 'name'] }), true);
   assertEq(picked.map(function (x) { return x.field; }), ['city', 'name'], 'fields 순서대로');
@@ -2036,6 +2472,38 @@ suite('validatePopupValues', function () {
 
   assertEq(v(null, {}, row).errors, {}, 'null 필드 안전');
   assertEq(v(fields, null, row).errors, { n: '양수' }, 'values 없으면 undefined로 검증');
+
+  /* ---- required ---- */
+  var reqFields = [
+    { field: 'city', label: '근무 도시', readonly: false, col: {}, editCol: { required: true } },
+    { field: 'ro', label: '읽기', readonly: true, col: {}, editCol: { required: true } },
+  ];
+  var ko = T.resolveLocaleText(DataGrid.locales.ko);
+  assertEq(
+    v(reqFields, { city: '' }, row, ko).errors,
+    { city: '근무 도시은(는) 필수 항목입니다' },
+    'required 위반 → 로케일 메시지 (라벨 사용)'
+  );
+  assertEq(v(reqFields, { city: 'Seoul' }, row, ko).errors, {}, 'required 충족 → 오류 없음');
+  assert(v(reqFields, { ro: '' }, row, ko).errors.ro === undefined, 'readonly 필수는 검증 제외');
+  /* localeText 생략 시 영어 기본 문구 */
+  assert(/is required/.test(v(reqFields, { city: '' }, row).errors.city), 'localeText 생략 → 영어 기본');
+
+  /* required가 validator보다 먼저 — 빈 값을 validator에 넘기지 않는다.
+   * 안 그러면 모든 소비자가 validator 안에서 빈 값 처리를 중복 작성해야 한다 */
+  var calls = [];
+  var both = [{ field: 'z', label: 'Z', readonly: false, col: {}, editCol: {
+    required: true,
+    validator: function (val) { calls.push(val); return '검증 실패'; } } }];
+  var r2 = v(both, { z: '' }, row, ko);
+  assertEq(calls.length, 0, '빈 값이면 validator를 호출하지 않는다');
+  assert(/필수/.test(r2.errors.z), 'required 메시지가 우선');
+  v(both, { z: 'x' }, row, ko);
+  assertEq(calls, ['x'], 'required 통과 후 validator 실행');
+
+  /* 0은 유효한 값이므로 required를 통과하고 validator까지 간다 */
+  var zero = [{ field: 'q', label: 'Q', readonly: false, col: {}, editCol: { required: true } }];
+  assertEq(v(zero, { q: 0 }, row, ko).errors, {}, 'required + 0 → 통과');
 });
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');

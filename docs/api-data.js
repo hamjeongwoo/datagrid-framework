@@ -22,8 +22,8 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.17.0',
-  updated: '2026-08-02',
+  version: '2.24.0',
+  updated: '2026-08-09',
 
   sections: [
 
@@ -199,7 +199,19 @@ window.ApiDocs = {
             '<code>trigger</code>: <code>\'dblclick\'</code>(기본) | <code>\'none\'</code>(API로만) · ' +
             '<code>fields</code>: 표시할 field 목록(순서도 결정) · ' +
             '<code>instantUpdate</code> · <code>closeOnBackdrop</code> · ' +
-            '<code>buttons</code>(<a href="#grid-options-popupEditor">아래 참고</a>).<br>' +
+            '<code>buttons</code>: 문자열 <code>\'save\'</code>/<code>\'cancel\'</code>/<code>\'close\'</code>는 ' +
+            '내장 버튼, 객체는 <code>{ key, text, variant, title, disabled, onClick(ctx), onLoad(ctx) }</code>이며 ' +
+            '<strong>배열 순서가 배치 순서</strong>입니다. ' +
+            '<code>onLoad</code>는 폼이 <strong>완전히 만들어진 직후 한 번</strong> 호출되어(v2.18) ' +
+            '행 값을 보고 버튼 문구·잠금을 정하거나 필드·값을 초기화하는 자리입니다 — ' +
+            '<code>ctx.buttonEl</code>로 버튼 DOM을 직접 만질 수 있고, ' +
+            '호출 순서는 <strong>DOM 순서</strong>(필드 버튼 → 푸터 버튼)이며 모든 필드가 이미 존재하므로 ' +
+            '다른 필드도 안전하게 건드릴 수 있습니다. ' +
+            '<code>disabled</code>를 함께 선언하면 그 결과가 <code>onLoad</code>의 수동 지정을 덮으므로, ' +
+            '로드 시점에만 잠그려면 <code>onLoad</code>에서 <code>ctx.buttonEl.disabled</code>만 쓰세요. ' +
+            '내장 버튼은 동작이 고정이라 콜백을 받지 않습니다 ' +
+            '(<a href="../examples/features.html#popup-button-onload" target="_blank" rel="noopener">' +
+            'onLoad 데모 ↗</a>).<br>' +
             '<strong>커밋 규약:</strong> 기본은 폼에 모았다가 Save에서 <strong>변경된 필드만 일괄 ' +
             '커밋</strong>하고 Cancel/Esc/바깥클릭은 전부 폐기합니다. ' +
             '<code>instantUpdate: true</code>면 필드를 확정할 때마다 즉시 행에 반영되고, ' +
@@ -216,6 +228,13 @@ window.ApiDocs = {
             "  title: function (row) { return row.name + ' 편집'; },\n" +
             '  buttons: [\n' +
             "    { key: 'reset', text: '초기화', onClick: function (ctx) { ctx.reset(); } },\n" +
+            "    { key: 'approve', text: '승인',\n" +
+            '      onLoad: function (ctx) {          // 폼이 만들어진 직후 한 번\n' +
+            "        var done = ctx.data.status === 'Active';\n" +
+            '        ctx.buttonEl.disabled = done;\n' +
+            "        ctx.buttonEl.textContent = done ? '승인 완료' : '승인';\n" +
+            '      },\n' +
+            "      onClick: function (ctx) { ctx.setValue('status', 'Active'); } },\n" +
             "    { key: 'del', text: '삭제', variant: 'danger',\n" +
             '      disabled: function (ctx) { return ctx.values.locked; },\n' +
             '      onClick: function (ctx) { ctx.grid.removeRows([ctx.data]); ctx.close(); } },\n' +
@@ -400,11 +419,12 @@ window.ApiDocs = {
         {
           name: 'dataSource',
           demo: 'remote-data',
-          type: '{ url, method?, params?, request?, parse?, headers?, paramsFormat?, paramsSerializer? }',
+          type: '{ url, method?, params?, autoLoad?, request?, parse?, headers?, paramsFormat?, paramsSerializer? }',
           since: '1.2.0',
           description:
             '원격 데이터 소스. <code>fetch</code>로 <code>url</code>을 호출해 행을 불러옵니다. ' +
             '<code>method</code> 기본은 GET(파라미터를 쿼리스트링으로, POST면 JSON body로), ' +
+            '<code>autoLoad</code>는 생성 시 자동 조회 여부(기본 <code>true</code> — 아래 참고, since 2.24.0), ' +
             '<code>params</code>는 항상 포함할 고정 파라미터(객체 또는 함수), ' +
             '<code>request(state)</code>는 기본 파라미터 매핑을 서버 스펙으로 대체하는 훅(since 2.5.0), ' +
             '<code>parse(json)</code>은 응답을 <code>{ rows, total }</code>로 바꾸는 훅' +
@@ -415,14 +435,81 @@ window.ApiDocs = {
             '<code>paramsSerializer(params)</code>는 GET 쿼리스트링 생성을 통째로 대체하는 훅' +
             '(since 2.10.0)입니다. ' +
             '로딩 중 오버레이가 표시되고 실패 시 <code>dataLoadError</code> 이벤트가 발생합니다. ' +
-            '<code>reloadData()</code>로 다시 불러오고 <code>setDataSource()</code>로 교체합니다. ' +
+            '<code>reloadData()</code>로 다시 불러오고 <code>setDataSource()</code>로 교체합니다.<br><br>' +
+            '<strong><code>autoLoad: false</code> (2.24.0)</strong> — 그리드가 <strong>스스로 첫 조회를 하지 ' +
+            '않습니다.</strong> 검색 조건을 받은 뒤에 조회하는 화면, 비싼 쿼리, 탭이 열릴 때까지 미루는 ' +
+            '경우에 씁니다. 데이터 소스를 끄는 게 아니라 <strong>"자동"만 끄는 것</strong>이라 ' +
+            '<code>reloadData()</code> · <code>loadMore()</code> 같은 명시적 호출은 그대로 동작하고, ' +
+            '정렬·필터·페이지 이동에 따른 자동 재조회도 <strong>한 번이라도 조회한 뒤부터는</strong> ' +
+            '평소처럼 동작합니다. <code>rowData</code>를 함께 주면 첫 조회 전까지 그 데이터가 보입니다. ' +
+            '<code>setDataSource()</code>도 새 소스가 <code>autoLoad: false</code>면 교체만 하고 ' +
+            '조회하지 않습니다 — "이 소스는 그리드가 스스로 부르지 않는다"가 생성 시점에만 적용되면 ' +
+            '반쪽짜리가 되기 때문입니다. <code>infiniteScroll</code>과 함께 쓰면 첫 조회 전까지는 ' +
+            '스크롤로도 자동 조회되지 않고, 그 상태의 <code>loadMore()</code>는 이어받기가 아니라 ' +
+            '<strong>첫 페이지</strong>를 불러옵니다.<br><br>' +
             '<strong>단계별 레시피는 <a href="#remote-data-guide">Remote Data Source 가이드</a> 참고.</strong>',
           example:
             "dataSource: {\n" +
             "  url: '/api/employees',\n" +
             "  params: function () { return { token: auth.token }; },\n" +
             '},\n' +
-            "sortMode: 'server', pageMode: 'server', pagination: true",
+            "sortMode: 'server', pageMode: 'server', pagination: true\n" +
+            '\n' +
+            '// 조회 버튼을 누를 때까지 서버를 부르지 않는 화면\n' +
+            "dataSource: { url: '/api/employees', autoLoad: false },\n" +
+            '// …\n' +
+            "searchBtn.addEventListener('click', function () { grid.reloadData(); });",
+        },
+        {
+          name: 'infiniteScroll',
+          demo: 'infinite-scroll',
+          type: 'boolean | { threshold?: number, pageSize?: number, pageSizeSelector?: boolean }',
+          default: 'false',
+          since: '2.22.0',
+          description:
+            '무한 스크롤. 바닥에서 <code>threshold</code>(기본 200px) 안으로 들어오면 다음 페이지를 ' +
+            '자동으로 조회해 <strong>기존 행 뒤에 이어 붙입니다</strong>(교체가 아닙니다). ' +
+            '<code>pageSize</code>는 한 번에 받을 행 수(생략 시 <code>paginationPageSize</code>).<br><br>' +
+            '<strong>크기 변경 UI (2.23.0)</strong> — 상태 바 왼쪽에 크기 선택이 표시됩니다. ' +
+            '선택지는 <code>paginationPageSizeOptions</code>(기본 <code>[10, 20, 50, 100]</code>)이며 ' +
+            '현재 크기가 목록에 없으면 정렬된 자리에 끼워 넣습니다. 바꾸면 <code>setPageSize()</code>가 ' +
+            '호출돼 쌓인 것을 버리고 새 크기로 다시 받습니다(로드 중에는 비활성). ' +
+            '서버 부하 때문에 크기를 고정하려면 <code>pageSizeSelector: false</code>로 끄세요.<br><br>' +
+            '<strong><code>dataSource</code>가 필요합니다</strong> — 없으면 <code>console.warn</code> 후 ' +
+            '무시됩니다(클라이언트가 이미 전량을 들고 있으면 자동 조회할 대상이 없습니다). ' +
+            '켜면 <code>pageMode</code>가 <code>\'server\'</code>로 올라가고 ' +
+            '<code>sortMode</code>/<code>filterMode</code>도 따라옵니다(명시하면 그 값이 우선).<br><br>' +
+            '<strong>페이저 UI와 배타입니다</strong> — 대신 하단 상태 바가 ' +
+            '"불러오는 중 / N건 불러옴 / 마지막 페이지"를 표시합니다(높이 고정이라 상태가 바뀌어도 ' +
+            '그리드가 흔들리지 않습니다). <code>setPage()</code>는 무한 스크롤에서 동작하지 않고, ' +
+            '<code>treeData</code>와도 함께 쓸 수 없습니다.<br><br>' +
+            '<strong>마지막 페이지 판정</strong>은 다음 순서입니다. ' +
+            '① 서버가 준 플래그 — 응답(또는 <code>parse</code> 반환값)의 <code>last</code> · ' +
+            '<code>lastPage</code> · <code>isLast</code>가 <code>true</code>이거나 ' +
+            '<code>hasMore</code> · <code>hasNext</code>가 <code>false</code>면 마지막입니다 ' +
+            '(Spring Data <code>Page</code>의 <code>last</code>가 그대로 동작합니다). ' +
+            '② 수신 0건. ③ 응답에 <code>total</code>이 있고 누적이 그에 도달. ' +
+            '④ 받은 건수가 요청한 <code>pageSize</code>보다 적을 때. ' +
+            '플래그를 주면 <strong>끝을 확인하려고 빈 페이지를 한 번 더 요청하지 않습니다.</strong><br><br>' +
+            '정렬·필터가 바뀌거나 <code>reloadData()</code>를 호출하면 누적을 버리고 0페이지부터 ' +
+            '다시 쌓습니다(스크롤도 맨 위로). 추가 로드 중에는 전면 로딩 오버레이를 띄우지 않습니다 — ' +
+            '보고 있던 행이 매번 가려지면 페이지 이동처럼 느껴지기 때문입니다.<br><br>' +
+            '<strong>주의:</strong> <code>domLayout: \'autoHeight\'</code>는 바디가 내용만큼 자라 ' +
+            '스크롤이 생기지 않으므로 마지막 페이지까지 연달아 불러옵니다(경고 표시). ' +
+            '그리드가 화면에 없거나 높이가 0이면 바닥을 판정할 수 없어 자동 조회하지 않습니다.',
+          example:
+            "var grid = new DataGrid(el, {\n" +
+            "  dataSource: { url: '/api/employees' },   // { rows, last } 또는 { rows, total }\n" +
+            '  infiniteScroll: { threshold: 200, pageSize: 25 },\n' +
+            '  paginationPageSizeOptions: [10, 25, 50, 100],   // 상태 바 크기 선택지\n' +
+            '});\n' +
+            '\n' +
+            "grid.on('rowsAppended', function (e) {\n" +
+            "  console.log(e.rows.length + '행 추가, 누적 ' + e.loaded);\n" +
+            '});\n' +
+            "grid.on('lastPageReached', function (e) {\n" +
+            "  console.log('끝 — 총 ' + e.loaded + '행');\n" +
+            '});',
         },
         {
           name: 'sortMode',
@@ -788,6 +875,10 @@ window.ApiDocs = {
           ['lastPage', 'Last page', '마지막 페이지', '» 버튼 aria-label'],
           ['noRowsToShow', 'No rows to show', '표시할 데이터가 없습니다', '빈 데이터 오버레이'],
           ['loading', 'Loading…', '불러오는 중…', '로딩 오버레이 · 검색형 select 로딩'],
+          ['loadingMore', 'Loading more…', '더 불러오는 중…', 'infiniteScroll 상태 바 — 추가 로드 중'],
+          ['rowsLoaded', '{loaded} rows loaded', '{loaded}건 불러옴', 'infiniteScroll 상태 바 — total을 모를 때'],
+          ['rowsLoadedOfTotal', '{loaded} of {total} rows loaded', '{total}건 중 {loaded}건 불러옴', 'infiniteScroll 상태 바 — total을 알 때'],
+          ['noMoreRows', 'All {loaded} rows loaded', '{loaded}건 — 마지막 페이지입니다', 'infiniteScroll 상태 바 — 마지막 페이지'],
           ['groupTotal', 'Total', '합계', 'grandTotal 요약 행 라벨'],
           ['rowCount', '({count})', '({count}건)', '그룹 헤더 · 전체 요약 행의 건수'],
           ['searchPlaceholder', 'Search…', '검색…', 'editorSearch 검색 입력 (컬럼 placeholder가 우선)'],
@@ -803,6 +894,8 @@ window.ApiDocs = {
           ['popupCancel', 'Cancel', '취소', 'popupEditor 내장 cancel/close 버튼'],
           ['popupCloseLabel', 'Close editor', '편집 창 닫기', 'popupEditor 헤더 닫기 버튼 aria-label'],
           ['popupReadonlySuffix', ' (readonly)', ' (읽기 전용)', 'popupEditor 읽기 전용 필드 라벨 접미사'],
+          ['requiredValue', '{column} is required', '{column}은(는) 필수 항목입니다', 'column.required 위반 시 거부 메시지'],
+          ['requiredIndicatorLabel', 'Required', '필수', '팝업 폼 필수 필드 라벨 <code>*</code>의 title 툴팁'],
         ].map(r =>
           `<tr><td><code>${r[0]}</code></td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`
         ).join('') +
@@ -1129,6 +1222,69 @@ window.ApiDocs = {
             '  });\n' +
             '});',
         },
+        {
+          name: 'Step 8. 페이저 대신 무한 스크롤 — infiniteScroll',
+          demo: 'infinite-scroll',
+          since: '2.22.0',
+          description:
+            '<code>pagination</code> 대신 <code>infiniteScroll</code>을 켜면 바닥에 닿을 때마다 다음 페이지를 ' +
+            '자동으로 받아 <strong>이어 붙입니다</strong>. 요청 파라미터는 서버 페이징과 똑같이 ' +
+            '<code>page</code>/<code>pageSize</code>이므로 <strong>서버는 그대로 두고</strong> 옵션만 바꾸면 됩니다.<br><br>' +
+            '<strong>서버가 할 일은 하나</strong> — 마지막 페이지임을 알려주는 것입니다. ' +
+            '<code>last</code>(Spring Data <code>Page</code> 그대로) · <code>lastPage</code> · ' +
+            '<code>isLast</code> · <code>hasMore</code> · <code>hasNext</code> 중 아무 이름이나 좋습니다. ' +
+            '이걸 주면 하단 상태 바가 곧바로 "마지막 페이지"로 바뀌고, <strong>끝을 확인하려고 빈 페이지를 ' +
+            '한 번 더 요청하지 않습니다.</strong> 플래그가 없으면 <code>total</code>로, 그것도 없으면 ' +
+            '"받은 건수 &lt; pageSize"로 추론합니다.<br><br>' +
+            '<code>parse</code>를 쓰는 경우, 플래그를 <strong>반환 객체에 실어도 되고 안 실어도 됩니다</strong> — ' +
+            '반환값에서 못 찾으면 <strong>원본 응답의 최상위</strong>에서 다시 찾습니다. ' +
+            '다만 플래그가 envelope 안쪽(<code>json.result.last</code>)에 있으면 최상위가 아니므로 ' +
+            '<code>parse</code>가 꺼내 올려줘야 합니다.',
+          example:
+            '// 서버 응답: { "rows": [...], "last": false }\n' +
+            'var grid = new DataGrid(el, {\n' +
+            "  dataSource: { url: '/api/employees' },\n" +
+            '  infiniteScroll: { pageSize: 50 },   // pagination·pageMode 지정 불필요\n' +
+            '});\n' +
+            '\n' +
+            '// envelope 응답 — 플래그가 안쪽에 있으면 parse가 꺼내 올린다\n' +
+            'dataSource: {\n' +
+            "  url: '/api/employees',\n" +
+            '  parse: function (json) {\n' +
+            '    return { rows: json.result.items, last: json.result.last };\n' +
+            '  },\n' +
+            '}',
+        },
+        {
+          name: 'Step 9. 첫 조회를 미루기 — autoLoad',
+          demo: 'auto-load',
+          since: '2.24.0',
+          description:
+            '기본적으로 그리드는 생성되자마자 <code>dataSource</code>를 한 번 호출합니다. ' +
+            '<strong>검색 조건을 받은 뒤에 조회하는 화면</strong>에서는 이 첫 요청이 낭비이고 ' +
+            '(조건 없는 전체 조회) 비싼 쿼리라면 서버에도 부담입니다. ' +
+            '<code>autoLoad: false</code>로 끄고 조회 시점을 소비자가 정하세요.<br><br>' +
+            '끄는 건 <strong>자동 조회뿐</strong>입니다 — <code>reloadData()</code>는 그대로 동작하고, ' +
+            '한 번 조회한 뒤에는 정렬·필터·페이지 이동에 따른 자동 재조회도 평소처럼 일어납니다. ' +
+            '조회 전까지 뭔가 보여주고 싶으면 <code>rowData</code>를 함께 주면 됩니다 ' +
+            '(그 데이터가 첫 조회 때 교체됩니다).',
+          example:
+            'var grid = new DataGrid(el, {\n' +
+            '  dataSource: {\n' +
+            "    url: '/api/employees',\n" +
+            '    autoLoad: false,                       // 생성 시 조회하지 않는다\n' +
+            '    params: function () {                  // 조회할 때마다 입력값을 읽는다\n' +
+            '      return { dept: deptInput.value || undefined };\n' +
+            '    },\n' +
+            '  },\n' +
+            "  pageMode: 'server',\n" +
+            '  pagination: true,\n' +
+            '});\n' +
+            '\n' +
+            "searchBtn.addEventListener('click', function () {\n" +
+            '  grid.reloadData();   // 여기서부터 조회 — 이후 정렬·필터는 자동 재조회\n' +
+            '});',
+        },
       ],
     },
 
@@ -1348,17 +1504,50 @@ window.ApiDocs = {
         },
         {
           name: 'aggFunc',
-          demo: 'row-grouping',
-          type: "'sum' | 'avg' | 'min' | 'max' | 'count'",
+          demo: 'agg-func-custom',
+          type: "'sum' | 'avg' | 'min' | 'max' | 'count' | (values, ctx) => any",
           since: '1.1.0',
           description:
-            '이 컬럼의 집계 함수. <a href="#grid-options-groupBy"><code>groupBy</code></a> 그룹 헤더 행과 ' +
-            '<a href="#grid-options-grandTotal"><code>grandTotal</code></a> 요약 행에 집계값이 표시됩니다. ' +
-            '<code>count</code>를 제외한 함수는 숫자로 해석 가능한 값만 집계하며(빈 값·문자 제외), ' +
-            '집계값에도 <code>valueFormatter</code>가 적용됩니다(이때 두 번째 인자 <code>row</code>는 <code>null</code>).',
+            '이 컬럼의 집계 함수. <a href="#grid-options-groupBy"><code>groupBy</code></a> 그룹 헤더 행 · ' +
+            '<a href="#grid-options-grandTotal"><code>grandTotal</code></a> 요약 행 · ' +
+            '<a href="#grid-options-treeData"><code>treeData.summary</code></a> 부모 노드 행 ' +
+            '<strong>세 곳 모두</strong>에 같은 규칙으로 적용됩니다. ' +
+            '<code>count</code>를 제외한 내장 집계는 숫자로 해석 가능한 값만 집계하며(빈 값·문자 제외), ' +
+            '집계값에도 <code>valueFormatter</code>가 적용됩니다(이때 두 번째 인자 <code>row</code>는 <code>null</code>).<br>' +
+            '<strong>커스텀 함수</strong>(v2.20) — <code>(values, ctx) => any</code>:<br>' +
+            '<code>values</code>는 그 컬럼의 <strong>원본 값 배열</strong>입니다(null·빈 값 포함 — 거르는 건 소비자 몫). ' +
+            '<code>ctx</code>는 <code>{ rows, field, colDef, parent }</code>이고 ' +
+            '<code>rows</code>는 집계 대상 행(그룹: 그 그룹의 행 / 트리: 자손 <strong>리프</strong> / ' +
+            '전체합계: 현재 뷰 전체), <code>parent</code>는 <strong>트리 요약에서만</strong> 부모 행이고 ' +
+            '나머지 두 곳에서는 <code>null</code>입니다(그 자리엔 행 객체가 없습니다).<br>' +
+            '반환값이 <code>null</code>/<code>undefined</code>면 그 셀은 비웁니다(내장 집계와 같은 규약). ' +
+            '<code>0</code>과 빈 문자열은 유효한 결과로 그대로 표시됩니다. ' +
+            '<strong>커스텀 함수의 결과에는 <code>valueFormatter</code>가 적용되지 않습니다</strong> — ' +
+            '함수가 이미 출력을 결정했는데 포매터가 다시 가공하면 문자열 반환이 망가지기 때문입니다. ' +
+            '함수가 예외를 던지면 그 집계만 비우고 <code>console.error</code>로 <strong>컬럼당 한 번</strong> ' +
+            '보고합니다(부모 노드마다 찍히면 콘솔이 쓸모없어지므로) — 그리드는 계속 그려집니다.<br>' +
+            '집계는 <strong>필터가 적용된 뒤의 행</strong>으로 매번 다시 계산되므로, ' +
+            '트리에서 "이름 (자손 수)" 같은 표시를 만들면 필터를 자동으로 따라갑니다. ' +
+            '<strong>주의:</strong> 트리·그룹의 요약 셀은 그 컬럼의 <em>원래 값을 대체</em>합니다. ' +
+            '트리 컬럼에 <code>aggFunc</code>를 달면 부모 행의 이름 자리에 집계 결과가 그려지므로 ' +
+            '(들여쓰기·셰브론은 유지) 이름을 남기려면 <code>ctx.parent</code>에서 직접 만들어 붙이세요. ' +
+            '또 <code>groupBy</code> 그룹 행은 "<code>aggFunc</code>가 없는 첫 컬럼"을 라벨 자리로 쓰므로, ' +
+            '첫 컬럼에 <code>aggFunc</code>를 달면 그룹 라벨이 다음 컬럼으로 밀립니다.',
           example:
             "{ field: 'salary', aggFunc: 'sum', align: 'right',\n" +
-            "  valueFormatter: function (v) { return '$' + v.toLocaleString(); } }",
+            "  valueFormatter: function (v) { return '$' + v.toLocaleString(); } }\n\n" +
+            '// 트리: 부모 이름 옆에 자손 리프 수 — 필터를 자동으로 따라간다\n' +
+            "{ field: 'name', headerName: 'Name', flex: 2,\n" +
+            '  aggFunc: function (values, ctx) {\n' +
+            "    return ctx.parent.name + ' (' + ctx.rows.length + ')';\n" +
+            '  } }\n\n' +
+            '// 중앙값처럼 내장에 없는 집계\n' +
+            "{ field: 'salary', aggFunc: function (values) {\n" +
+            '    var ns = values.map(Number).filter(function (n) { return !isNaN(n); }).sort(function (a, b) { return a - b; });\n' +
+            '    if (!ns.length) return null;              // null = 표시하지 않음\n' +
+            '    var m = Math.floor(ns.length / 2);\n' +
+            '    return ns.length % 2 ? ns[m] : (ns[m - 1] + ns[m]) / 2;\n' +
+            '  } }',
         },
         {
           name: 'editable',
@@ -1393,8 +1582,17 @@ window.ApiDocs = {
             '(select는 드롭다운, radio는 multiselect와 같은 셀 앵커 라디오 패널). ' +
             "select는 <a href='#column-defs-editorSearch'><code>editorSearch</code></a>를 주면 " +
             '검색 입력이 있는 옵션 패널로 바뀝니다 (v2.3.0). ' +
-            '<code>\'multiselect\'</code>(v2.2.0)는 셀 아래에 체크리스트 패널을 펼치고 <strong>배열</strong>을 ' +
+            '<code>\'multiselect\'</code>(v2.2.0)는 셀 아래에 체크리스트 패널을 펼치고 ' +
             '<code>editorOptions</code> 순서로 커밋합니다 — 내용이 같으면 커밋하지 않습니다. ' +
+            '<strong>값 표현은 배열과 콤마 구분 문자열을 모두 받습니다</strong>(v2.21) — ' +
+            '<code>[\'js\', \'css\']</code>와 <code>"js,css"</code>(항목 앞뒤 공백 허용)가 같은 값이고, ' +
+            '읽기·표시·편집·변경 판정이 모두 두 표현을 동일하게 다룹니다. ' +
+            '커밋할 때는 <strong>그 행이 원래 쓰던 표현을 유지</strong>합니다 — 배열이었으면 배열, ' +
+            '문자열이었으면 콤마 문자열이고, 원본이 <code>null</code>/빈 값이라 추론할 게 없으면 ' +
+            '<strong>콤마 문자열이 기본</strong>입니다(편집 한 번에 컬럼의 값 타입이 바뀌면 서버 스키마와 어긋나므로). ' +
+            '전부 해제하면 문자열 컬럼은 <code>\'\'</code>, 배열 컬럼은 <code>[]</code>가 됩니다. ' +
+            '구분자는 <code>,</code>로 고정이며 옵션으로 열지 않습니다 — ' +
+            '<strong>옵션 값 자체에 콤마가 들어 있으면 분해되므로</strong> 그런 값은 배열로 저장하세요. ' +
             '<code>\'checkbox\'</code>(v2.2.0)는 체크박스입니다 — 기본은 불리언 커밋이고, ' +
             "<code>editorOptions: { checked: 'Y', unchecked: 'N' }</code> 매핑을 주면 " +
             "그 값('Y'/'N', 1/0 등)으로 읽고 커밋합니다. 매핑 없이도 'y'/'yes'/'true'/'1' 계열 문자열은 " +
@@ -1416,7 +1614,7 @@ window.ApiDocs = {
             "{ field: 'reviewAt', editor: 'datetime', format: 'yyyy-MM-dd HH:mm',\n" +
             "  editorOptions: { min: '2026-01-01', max: '2026-12-31' } }\n" +
             '\n' +
-            "{ field: 'skills', editor: 'multiselect',   // 값은 ['js', 'css'] 같은 배열\n" +
+            "{ field: 'skills', editor: 'multiselect',   // 값은 ['js','css'] 또는 'js,css'\n" +
             "  editorOptions: [{ label: 'JavaScript', value: 'js' }, { label: 'CSS', value: 'css' }],\n" +
             '  cellRenderer: DataGrid.renderers.multiselect() }\n' +
             '\n' +
@@ -1509,6 +1707,47 @@ window.ApiDocs = {
             "  validator: function (v) { return v >= 0 || '급여는 0 이상이어야 합니다'; } }",
         },
         {
+          name: 'required',
+          demo: 'required-columns',
+          type: 'boolean',
+          default: 'false',
+          since: '2.19.0',
+          description:
+            '<strong>표시와 검증을 한 번에</strong> 켭니다. 빈 값 커밋이 거부되고 — 인라인 편집 · ' +
+            '팝업 폼 · 붙여넣기(<code>pasteTsv</code>) · <code>updateRows</code> · 채우기 드래그가 ' +
+            '모두 같은 규칙을 따릅니다 — 메시지는 <code>localeText.requiredValue</code>' +
+            '(<code>{column}</code> 토큰)에서 옵니다.<br>' +
+            '<strong>그리드 표시는 셀 마커 하나입니다</strong>(v2.19.1 — 헤더 표식은 제거) — ' +
+            '<strong>비어 있는 셀에만</strong> 모서리 마커(<code>--dg-required-color</code>)가 붙어 ' +
+            '<em>조치가 필요한 곳</em>을 가리킵니다. 필수 컬럼의 모든 셀에 그리면 전부 같은 표시라 ' +
+            '정보량이 0이기 때문입니다. <code>*</code> 표식은 <strong>팝업 폼 라벨에만</strong> 남습니다. ' +
+            '마커 자리는 <code>trackChanges</code>의 수정됨 마커(<strong>왼쪽 위 주황</strong>)와 겹치지 않는 ' +
+            '<strong>오른쪽 위</strong>입니다 — 한 셀에 둘이 동시에 뜰 수 있습니다.<br>' +
+            '<strong>빈 값의 정의:</strong> <code>null</code> · <code>undefined</code> · 빈 문자열 · ' +
+            '공백만 있는 문자열 · 빈 배열(<code>multiselect</code>). ' +
+            '<code>0</code>과 <code>false</code>는 <strong>유효한 값</strong>입니다 — 숫자 0이나 체크 해제를 ' +
+            '미입력으로 취급하면 정상 값의 저장을 막게 됩니다.<br>' +
+            '<code>editor</code>와 같은 규약으로 <strong>편집 의도로 해석</strong>되어 ' +
+            '<code>editable</code>을 생략하면 <code>true</code>가 됩니다(명시적 <code>editable: false</code>가 우선). ' +
+            '표시 기준은 <a href="#grid-options-editableIndicator"><code>editableIndicator</code></a>와 같아 ' +
+            '<strong>그리드를 잠그면(<code>setEditable(false)</code>) 셀 마커가 사라집니다</strong> — ' +
+            '고칠 수 없는 자리의 "필수"는 할 일이 없기 때문입니다. 편집 불가 컬럼도 같은 이유로 표시하지 않습니다.<br>' +
+            '<code>validator</code>보다 <strong>먼저</strong> 검사되고, 빈 값이면 <code>validator</code>는 ' +
+            '호출되지 않습니다 — 소비자마다 빈 값 처리를 중복 작성하지 않게. ' +
+            '<a href="#column-defs-popupEditor"><code>popupEditor.required</code></a>로 폼에서만 다르게 ' +
+            '지정할 수도 있습니다.<br>' +
+            '<strong>주의:</strong> <code>number</code>·<code>date</code> 에디터는 빈 입력이 기존 정규화 규칙에 따라 ' +
+            '<strong>이전 값으로 되돌아가므로</strong> 인라인에서는 애초에 빈 값이 커밋되지 않습니다 — ' +
+            '이 컬럼들에서 required 오류 메시지를 보는 경로는 팝업 폼과 붙여넣기입니다. ' +
+            '또 <code>pasteTsv(\'\')</code>는 빈 문자열 가드에서 곧바로 <code>0</code>을 반환해 검증을 거치지 않습니다.',
+          example:
+            "{ field: 'city', headerName: 'City', editor: 'select', editorOptions: cities,\n" +
+            '  required: true }   // editable도 함께 켜진다\n\n' +
+            '// required가 먼저 검사되므로 validator는 빈 값을 볼 일이 없다\n' +
+            "{ field: 'salary', headerName: 'Salary', editor: 'number', required: true,\n" +
+            "  validator: function (v) { return v >= 40000 || '40,000 이상이어야 합니다'; } }",
+        },
+        {
           name: 'popupEditor',
           demo: 'popup-editor-custom',
           type: 'false | object',
@@ -1527,13 +1766,19 @@ window.ApiDocs = {
             '<code>order</code>(작을수록 앞. 지정한 필드만 움직이고 나머지는 컬럼 순서 유지) · ' +
             '<code>span</code>(<code>columns: 2</code>에서 두 칸 차지).<br>' +
             '<strong>오버라이드</strong> — <code>editor</code> · <code>editorOptions</code> · ' +
-            '<code>editorSearch</code> · <code>validator</code>. 원본 컬럼 정의는 변경되지 않습니다.<br>' +
+            '<code>editorSearch</code> · <code>validator</code> · ' +
+            '<code>required</code>(v2.19 — 폼에서만 필수로 올리거나 해제. 그리드 셀의 헤더 표식·마커는 ' +
+            '원본 컬럼의 <code>required</code>를 따릅니다). 원본 컬럼 정의는 변경되지 않습니다.<br>' +
             '<strong>커스텀 콘텐츠</strong> — <code>buttons</code>(입력 오른쪽에 붙는 버튼 배열, ' +
             '그리드 레벨 <code>buttons</code>와 같은 형식이되 내장 <code>\'save\'</code>/' +
-            '<code>\'cancel\'</code>은 무시) · <code>before(ctx)</code> / <code>after(ctx)</code>' +
+            '<code>\'cancel\'</code>은 무시. <code>onLoad(ctx)</code>도 같이 지원합니다 — ' +
+            '필드 버튼의 <code>onLoad</code>가 푸터 버튼보다 먼저 호출되고, 그 시점에 ' +
+            '<strong>모든 필드가 이미 존재</strong>하므로 뒤 필드의 값도 초기화할 수 있습니다) · ' +
+            '<code>before(ctx)</code> / <code>after(ctx)</code>' +
             '(필드 위/아래에 임의 HTML 문자열 또는 Element 반환).<br>' +
-            '<code>ctx</code>는 <code>{ grid, data, colDef, field, fieldEl, value, values, ' +
-            'getValue(field), setValue(field, v), isValid(), reset(), save(), cancel(), close() }</code>입니다. ' +
+            '<code>ctx</code>는 <code>{ grid, data, colDef, field, fieldEl, buttonEl, value, values, ' +
+            'getValue(field), setValue(field, v), isValid(), reset(), save(), cancel(), close() }</code>입니다 ' +
+            '(<code>buttonEl</code>은 버튼 콜백에서만 채워집니다). ' +
             '<strong>주의:</strong> <code>before</code>/<code>after</code>가 반환한 문자열은 ' +
             'HTML로 삽입되며 이스케이프되지 않습니다(<code>cellRenderer</code>와 동일). ' +
             '입력 자체를 대체하려면 이 슬롯이 아니라 <a href="#column-defs-editor"><code>editor</code></a>의 ' +
@@ -1545,6 +1790,9 @@ window.ApiDocs = {
             '    order: 0,                 // 폼에서는 맨 위로\n' +
             '    editorSearch: true,       // 폼에서만 검색형 select로 교체\n' +
             "    buttons: [{ key: 'hq', text: '본사',\n" +
+            '      onLoad: function (ctx) {                     // 빈 값이면 로드 시점에 채운다\n' +
+            "        if (!ctx.getValue('city')) ctx.setValue('city', 'Seoul');\n" +
+            '      },\n' +
             "      onClick: function (ctx) { ctx.setValue('city', 'Seoul'); } }],\n" +
             "    after: function (ctx) { return '<span>저장된 값: ' + ctx.data.city + '</span>'; },\n" +
             '  } }',
@@ -1745,7 +1993,9 @@ window.ApiDocs = {
             '저장 후 <strong>보던 페이지 그대로</strong> 새로고침하려면 ' +
             '<code>reloadData({ keepPage: true })</code>. 정렬 클릭·필터 변경·페이지 이동에 따른 자동 재조회는 ' +
             '이 메서드를 거치지 않으므로 영향받지 않습니다(페이지 이동은 이동한 페이지를, 필터는 1페이지를 요청). ' +
-            '조회 조건 변경 패턴은 <a href="#remote-data-guide">가이드 Step 5</a> 참고.',
+            '조회 조건 변경 패턴은 <a href="#remote-data-guide">가이드 Step 5</a> 참고.<br><br>' +
+            '<code>dataSource.autoLoad: false</code>로 자동 조회를 꺼둔 그리드에서 ' +
+            '<strong>첫 조회를 시작하는 것도 이 메서드</strong>입니다(2.24.0).',
           example:
             'grid.reloadData();                    // 조건 변경 후 — 1페이지부터\n' +
             'grid.reloadData({ keepPage: true });  // 저장 후 새로고침 — 보던 페이지 유지',
@@ -1761,6 +2011,36 @@ window.ApiDocs = {
             'URL·훅 구성이 통째로 바뀔 때 사용하고, 조회 조건 값만 바뀌면 <code>params</code> 함수 + ' +
             '<code>reloadData()</code>가 더 가볍습니다(<a href="#remote-data-guide">가이드</a> 참고).',
           example: "grid.setDataSource({ url: '/api/archived-employees' });",
+        },
+        {
+          name: 'loadMore',
+          demo: 'infinite-scroll',
+          group: 'Data',
+          signature: 'loadMore(): boolean',
+          since: '2.22.0',
+          description:
+            '<code>infiniteScroll</code>에서 다음 페이지를 <strong>수동으로</strong> 불러옵니다 — ' +
+            '스크롤이 생기지 않는 레이아웃이나 "더 보기" 버튼용입니다. ' +
+            '요청을 시작했으면 <code>true</code>, 이미 마지막이거나 로드 중이거나 무한 스크롤이 ' +
+            '아니면 <code>false</code>를 반환합니다. ' +
+            '<code>autoLoad: false</code>로 아직 아무것도 받지 않은 상태라면 ' +
+            '이어받기가 아니라 <strong>첫 페이지</strong>를 불러옵니다(2.24.0) — ' +
+            '받지도 않은 페이지의 "다음"을 요청하면 첫 페이지가 통째로 비기 때문입니다.',
+          example:
+            'if (!grid.loadMore()) {\n' +
+            "  console.log(grid.hasMoreRows() ? '로드 중' : '마지막 페이지');\n" +
+            '}',
+        },
+        {
+          name: 'hasMoreRows',
+          demo: 'infinite-scroll',
+          group: 'Data',
+          signature: 'hasMoreRows(): boolean',
+          since: '2.22.0',
+          description:
+            '아직 받을 페이지가 남아 있는지. <code>infiniteScroll</code>이 아니면 항상 ' +
+            '<code>false</code>입니다.',
+          example: 'moreBtn.disabled = !grid.hasMoreRows();',
         },
         {
           name: 'addRow',
@@ -2036,7 +2316,11 @@ window.ApiDocs = {
           demo: 'pagination',
           group: 'Pagination',
           signature: 'setPageSize(size: number): void',
-          description: '페이지 크기를 변경합니다. 현재 보고 있던 첫 행이 포함된 페이지로 이동합니다.',
+          description:
+            '페이지 크기를 변경합니다. 현재 보고 있던 첫 행이 포함된 페이지로 이동합니다.<br><br>' +
+            '<code>infiniteScroll</code>에서는 <strong>"한 번에 받을 행 수"</strong>가 되며, ' +
+            '쌓인 것을 버리고 새 크기로 0페이지부터 다시 받습니다(스크롤도 맨 위로). ' +
+            '상태 바의 크기 선택 UI가 이 메서드를 호출합니다(2.23.0).',
         },
 
         /* ---- 마스터-디테일 ---- */
@@ -2746,7 +3030,41 @@ window.ApiDocs = {
           since: '1.2.0',
           description:
             '<code>dataSource</code> 로드가 실패했을 때(네트워크 오류, HTTP 에러 상태). ' +
-            '콘솔에도 기록되며 기존 행은 유지됩니다.',
+            '콘솔에도 기록되며 기존 행은 유지됩니다. <code>infiniteScroll</code>의 추가 로드가 ' +
+            '실패하면 <strong>페이지 번호가 되돌려지므로</strong> 다음 시도가 같은 페이지를 다시 요청합니다 ' +
+            '(건너뛰지 않습니다).',
+        },
+        {
+          name: 'rowsAppended',
+          demo: 'infinite-scroll',
+          payload: '{ rows, page, loaded, hasMore }',
+          since: '2.22.0',
+          description:
+            '<code>infiniteScroll</code>이 다음 페이지를 이어 붙였을 때. <code>rows</code>는 ' +
+            '<strong>이번에 받은 행만</strong>, <code>loaded</code>는 누적 행 수, ' +
+            '<code>page</code>는 방금 받은 페이지 번호(0-based)입니다. ' +
+            '누적을 버리고 다시 쌓는 경우(정렬·필터 변경, <code>reloadData()</code>)에는 ' +
+            '발생하지 않습니다 — 그때는 <code>dataChanged</code>를 쓰세요.',
+          example:
+            "grid.on('rowsAppended', function (e) {\n" +
+            "  status.textContent = e.loaded + '행 로드됨';\n" +
+            '});',
+        },
+        {
+          name: 'lastPageReached',
+          demo: 'infinite-scroll',
+          payload: '{ loaded, total }',
+          since: '2.22.0',
+          description:
+            '더 받을 페이지가 없다고 판정된 순간 <strong>한 번만</strong> 발생합니다(전이 시점). ' +
+            '<code>total</code>은 서버가 <code>total</code>을 준 경우에만 숫자이고, 아니면 ' +
+            '<code>null</code>입니다 — 마지막 페이지 플래그만 주는 서버에서는 <code>loaded</code>가 ' +
+            '유일한 전체 건수입니다. 정렬·필터로 다시 쌓기 시작하면 상태가 초기화되므로 ' +
+            '조건이 바뀔 때마다 다시 발생할 수 있습니다.',
+          example:
+            "grid.on('lastPageReached', function (e) {\n" +
+            "  moreBtn.disabled = true;\n" +
+            '});',
         },
         {
           name: 'gridReady',
@@ -2889,10 +3207,16 @@ window.ApiDocs = {
           signature: 'DataGrid.renderers.multiselect(options?: Array<string | { label, value }>)',
           since: '2.2.0',
           description:
-            'multiselect 에디터의 짝꿍 렌더러 — 값 <strong>배열</strong>을 label 칩 목록으로 표시합니다. ' +
+            'multiselect 에디터의 짝꿍 렌더러 — 다중 값을 label 칩 목록으로 표시합니다. ' +
+            '<strong>배열과 콤마 구분 문자열을 모두 받습니다</strong>(v2.21) — ' +
+            '<code>[\'js\',\'css\']</code>와 <code>"js,css"</code>·<code>"js, css"</code>가 같은 결과를 냅니다. ' +
             '<code>options</code>를 생략하면 그 컬럼의 <code>editorOptions</code>를 사용하고, ' +
-            '목록에 없는 값은 문자열 그대로 칩이 되며 빈 배열/null은 빈 셀입니다. label은 HTML 이스케이프됩니다.',
-          example: "cellRenderer: DataGrid.renderers.multiselect()   // ['js','css'] → 'JavaScript' 'CSS' 칩",
+            '목록에 없는 값은 문자열 그대로 칩이 되며 빈 배열·빈 문자열·null은 빈 셀입니다. ' +
+            'label은 HTML 이스케이프됩니다.',
+          example:
+            "cellRenderer: DataGrid.renderers.multiselect()\n" +
+            "// ['js','css'] → 'JavaScript' 'CSS' 칩\n" +
+            "// 'js,css'     → 같은 결과 (콤마 문자열도 매핑된다)",
         },
         {
           name: 'checkbox',
@@ -2951,7 +3275,8 @@ window.ApiDocs = {
         { name: '--dg-menu-background-color', default: '#ffffff', description: '필터 메뉴 팝업 배경.' },
         { name: '--dg-menu-shadow', default: '0 4px 16px rgba(24,29,31,.16)', description: '필터 메뉴·에디터 패널 그림자.' },
         { name: '--dg-invalid-color', default: '#e02525', description: '검증 실패 표시(테두리·메시지·팝업 폼 라벨).' },
-        { name: '--dg-dirty-color', default: '#e07c00', description: '변경 추적(trackChanges) dirty 셀 표시.', since: '1.2.0' },
+        { name: '--dg-dirty-color', default: '#e07c00', description: '변경 추적(trackChanges) dirty 셀 표시 — 셀 <strong>왼쪽 위</strong> 모서리.', since: '1.2.0' },
+        { name: '--dg-required-color', default: '#e02525', description: '필수 컬럼(column.required)의 빈 셀 마커 — 셀 <strong>오른쪽 위</strong> 모서리(dirty와 겹치지 않게). 팝업 폼 라벨의 <code>*</code>에도 쓰인다. 다크는 #ff6b6b.', since: '2.19.0' },
         { name: '--dg-added-row-background-color', default: 'rgba(13,138,68,.08)', description: '추가된 행 배경(trackChanges).', since: '1.2.0' },
         { name: '--dg-range-background-color', default: 'rgba(33,150,243,.14)', description: '셀/블록 범위 선택 배경(cellSelection).', since: '1.2.0' },
         { name: '--dg-group-row-background-color', default: '#f3f6fa', description: '그룹 헤더 행 배경.', since: '1.1.0' },

@@ -107,6 +107,12 @@
     noRowsToShow: 'No rows to show',
     loading: 'Loading…',
 
+    /* 무한 스크롤 하단 상태 바 (infiniteScroll) */
+    loadingMore: 'Loading more…',
+    rowsLoaded: '{loaded} rows loaded',
+    rowsLoadedOfTotal: '{loaded} of {total} rows loaded',
+    noMoreRows: 'All {loaded} rows loaded',
+
     /* 그룹 헤더 · 전체 요약 행 */
     groupTotal: 'Total',
     rowCount: '({count})',
@@ -129,6 +135,10 @@
     popupCancel: 'Cancel',
     popupCloseLabel: 'Close editor',
     popupReadonlySuffix: ' (readonly)',
+
+    /* 필수 컬럼 (column.required) */
+    requiredValue: '{column} is required',
+    requiredIndicatorLabel: 'Required',
   };
 
   const LOCALE_KO = {
@@ -167,6 +177,11 @@
     noRowsToShow: '표시할 데이터가 없습니다',
     loading: '불러오는 중…',
 
+    loadingMore: '더 불러오는 중…',
+    rowsLoaded: '{loaded}건 불러옴',
+    rowsLoadedOfTotal: '{total}건 중 {loaded}건 불러옴',
+    noMoreRows: '{loaded}건 — 마지막 페이지입니다',
+
     groupTotal: '합계',
     rowCount: '({count}건)',
 
@@ -185,6 +200,9 @@
     popupCancel: '취소',
     popupCloseLabel: '편집 창 닫기',
     popupReadonlySuffix: ' (읽기 전용)',
+
+    requiredValue: '{column}은(는) 필수 항목입니다',
+    requiredIndicatorLabel: '필수',
   };
 
   /**
@@ -442,7 +460,12 @@
   function resolveDataModes(options) {
     const opts = options || {};
     const norm = value => (value === 'server' ? 'server' : 'client');
-    const pageMode = norm(opts.pageMode);
+    /* 무한 스크롤은 "바닥에서 다음 페이지를 서버에 요청"이므로 서버 페이징이 전제다.
+     * pageMode를 적지 않았으면 server로 올린다(그러면 sort/filter도 따라 올라간다). */
+    const infinite = !!opts.infiniteScroll;
+    const pageMode = infinite && (opts.pageMode === undefined || opts.pageMode === null)
+      ? 'server'
+      : norm(opts.pageMode);
     const warnings = [];
     const inherit = key => {
       const raw = opts[key];
@@ -471,6 +494,149 @@
   }
 
   /**
+   * 그리드가 dataSource를 받았을 때 **스스로** 첫 조회를 할지 (dataSource.autoLoad, 기본 true).
+   *
+   * false면 그리드가 먼저 서버를 부르지 않는다 — 검색 조건을 입력받은 뒤에 조회하는 화면,
+   * 비싼 쿼리, 탭이 열릴 때까지 미루는 경우용. 조회는 소비자가 reloadData()로 시작한다.
+   * 명시적 호출(reloadData/loadMore)은 이 옵션과 무관하게 항상 조회한다 —
+   * autoLoad는 "자동"만 끄는 것이지 데이터 소스를 비활성화하는 게 아니다.
+   */
+  function shouldAutoLoad(dataSource) {
+    return !!(dataSource && dataSource.autoLoad !== false);
+  }
+
+  const INFINITE_DEFAULT_THRESHOLD = 200;
+
+  /**
+   * infiniteScroll 옵션 정규화 — true | { threshold, pageSize }.
+   *
+   * 무한 스크롤은 "바닥에 닿으면 다음 페이지를 자동 조회해 누적"이므로 원격
+   * dataSource가 없으면 자동 조회할 대상 자체가 없다(클라이언트는 이미 전량을
+   * 들고 있다) — 조용히 무시하지 않고 warnings로 알린 뒤 비활성.
+   *
+   * pageMode: 'client'를 명시하면 요청에 page/pageSize가 실리지 않아 매번 같은
+   * 페이지를 받아 누적하게 된다. 이 역시 warnings로 알린다(막지는 않는다 —
+   * request 훅으로 직접 페이징 파라미터를 만드는 구성이 가능하므로).
+   *
+   * 순수 함수 — 경고 출력은 호출자가 한다.
+   */
+  function resolveInfiniteScroll(options) {
+    const opts = options || {};
+    const raw = opts.infiniteScroll;
+    const warnings = [];
+    if (!raw) {
+      return {
+        enabled: false, threshold: INFINITE_DEFAULT_THRESHOLD,
+        pageSize: null, pageSizeSelector: false, warnings,
+      };
+    }
+    const cfg = typeof raw === 'object' ? raw : {};
+    let enabled = true;
+    if (!opts.dataSource) { enabled = false; warnings.push('noDataSource'); }
+    if (enabled && opts.pageMode === 'client') warnings.push('clientPageMode');
+    /* autoHeight는 바디가 내용만큼 자라 스크롤이 생기지 않는다 = 항상 바닥이다.
+     * 막지는 않되(작은 데이터셋에서는 의도일 수 있다) 끝까지 다 받는다는 걸 알린다. */
+    if (enabled && opts.domLayout === 'autoHeight') warnings.push('autoHeight');
+    const threshold = typeof cfg.threshold === 'number' && cfg.threshold >= 0
+      ? cfg.threshold
+      : INFINITE_DEFAULT_THRESHOLD;
+    const pageSize = typeof cfg.pageSize === 'number' && cfg.pageSize > 0 ? Math.floor(cfg.pageSize) : null;
+    /* 페이저가 없으니 크기를 바꿀 UI도 사라진다 — 상태 바가 그 자리를 대신하므로 기본 표시.
+     * 서버 부하 때문에 소비자가 크기를 고정하고 싶으면 false로 끈다. */
+    const pageSizeSelector = cfg.pageSizeSelector !== false;
+    return { enabled, threshold, pageSize, pageSizeSelector, warnings };
+  }
+
+  /**
+   * 지금 다음 페이지를 불러와야 하는가.
+   *
+   * scrollHeight <= clientHeight(스크롤이 아예 생기지 않은 경우)도 "바닥"으로
+   * 판정된다 — 첫 페이지가 뷰포트를 못 채우면 scroll 이벤트가 영영 오지 않아
+   * "더 있는데 멈춘 그리드"가 되기 때문. append 직후 이 함수를 다시 돌리면
+   * 뷰포트가 찰 때까지 이어 받는다.
+   */
+  function shouldLoadMore(state) {
+    const s = state || {};
+    if (!s.enabled || !s.hasMore || s.loading) return false;
+    /* 레이아웃이 아직 없거나(숨겨진 탭·display:none) 높이가 0이면 "바닥"을 판정할 수 없다.
+     * 이 가드가 없으면 안 보이는 그리드가 스스로 끝까지 다 받아버린다. */
+    if (!s.clientHeight) return false;
+    const threshold = typeof s.threshold === 'number' ? s.threshold : INFINITE_DEFAULT_THRESHOLD;
+    const remaining = (s.scrollHeight || 0) - (s.scrollTop || 0) - (s.clientHeight || 0);
+    return remaining <= threshold;
+  }
+
+  /**
+   * 응답에서 "마지막 페이지" 플래그를 읽는다 — true(마지막) | false(더 있음) | null(모름).
+   *
+   * 서버마다 이름이 갈린다: Spring Data Page는 `last`/`hasNext`, 커스텀 API는
+   * `hasMore`/`lastPage`/`isLast`가 흔하다. hasMore/hasNext는 의미가 반대이므로 뒤집는다.
+   * 불리언이 아닌 값은 모름으로 둔다(문자열 'false'가 true로 읽히지 않게).
+   */
+  function readLastPageFlag(obj) {
+    if (!obj || typeof obj !== 'object') return null;
+    if (typeof obj.last === 'boolean') return obj.last;
+    if (typeof obj.lastPage === 'boolean') return obj.lastPage;
+    if (typeof obj.isLast === 'boolean') return obj.isLast;
+    if (typeof obj.hasMore === 'boolean') return !obj.hasMore;
+    if (typeof obj.hasNext === 'boolean') return !obj.hasNext;
+    return null;
+  }
+
+  /**
+   * 마지막 페이지인지 확정한다. 우선순위:
+   *   1. 서버 명시 플래그 — 있으면 무조건 그것(다른 신호로 덮지 않는다)
+   *   2. 수신 0건 — 무한 루프 안전장치. 플래그도 total도 없는 서버에서 이게
+   *      없으면 바닥에 닿을 때마다 영원히 빈 응답을 요청한다
+   *   3. total을 서버가 실제로 준 경우 loaded >= total
+   *   4. 받은 건수가 요청한 pageSize보다 적으면 마지막 (관례적 추론)
+   * 어느 것도 성립하지 않으면 "더 있음".
+   */
+  function resolveLastPage(ctx) {
+    const c = ctx || {};
+    if (typeof c.explicit === 'boolean') return c.explicit;
+    const received = c.receivedCount || 0;
+    if (received === 0) return true;
+    if (typeof c.total === 'number' && c.total >= 0 && (c.loaded || 0) >= c.total) return true;
+    if (typeof c.pageSize === 'number' && c.pageSize > 0 && received < c.pageSize) return true;
+    return false;
+  }
+
+  /**
+   * 페이지 크기 선택지 목록 — 오름차순 · 중복 제거 · **현재 값 포함 보장**.
+   *
+   * 현재 크기가 목록에 없으면 select의 value가 어디에도 안 걸려 selectedIndex가
+   * -1이 되고 빈 칸이 보인다(paginationPageSize: 25 + 기본 목록 [10,20,50,100]).
+   * 페이저와 무한 스크롤 상태 바가 이 함수를 공유한다.
+   */
+  function pageSizeSelectOptions(list, current) {
+    const out = [];
+    (list || []).forEach(v => {
+      const n = Number(v);
+      if (!isFinite(n) || n <= 0 || out.indexOf(n) !== -1) return;
+      out.push(n);
+    });
+    const cur = Number(current);
+    if (isFinite(cur) && cur > 0 && out.indexOf(cur) === -1) out.push(cur);
+    return out.sort((a, b) => a - b);
+  }
+
+  /**
+   * 하단 상태 바에 무엇을 쓸지 — { kind, key, params }.
+   * kind: 'loading' | 'end' | 'more'. key는 로케일 키, params는 {token} 치환값.
+   * DOM 없이 결정되도록 분리(테스트 가능).
+   */
+  function resolveInfiniteStatus(state) {
+    const s = state || {};
+    const loaded = s.loaded || 0;
+    const hasTotal = typeof s.total === 'number' && s.total >= 0;
+    if (s.loading) return { kind: 'loading', key: 'loadingMore', params: {} };
+    if (!s.hasMore) return { kind: 'end', key: 'noMoreRows', params: { loaded, total: hasTotal ? s.total : loaded } };
+    if (hasTotal) return { kind: 'more', key: 'rowsLoadedOfTotal', params: { loaded, total: s.total } };
+    return { kind: 'more', key: 'rowsLoaded', params: { loaded } };
+  }
+
+  /**
    * editableIndicator: 이 컬럼 헤더에 편집 아이콘을 표시할지.
    * "지금 실제로 편집할 수 있는가"를 기준으로 한다 — 그리드가 잠겨 있으면
    * (editable: false / setEditable(false)) 컬럼 설정과 무관하게 표시하지 않는다.
@@ -478,6 +644,44 @@
    */
   function shouldShowEditableIcon(col, gridEditable, indicatorOn) {
     return !!(indicatorOn && gridEditable && col && col.editable);
+  }
+
+  /**
+   * 필수값 판정의 "빈 값" 정의.
+   * 0과 false는 유효한 입력이므로 빈 값이 아니다 — 숫자 0이나 체크 해제를
+   * 미입력으로 오해하면 정상 값의 저장을 막아버린다.
+   * 공백만 있는 문자열과 빈 배열(multiselect)은 빈 값으로 본다.
+   */
+  function isBlankValue(value) {
+    if (value === null || value === undefined) return true;
+    if (typeof value === 'string') return value.trim() === '';
+    if (Array.isArray(value)) return value.length === 0;
+    return false;
+  }
+
+  /** required 위반 여부 — 컬럼이 required가 아니면 값과 무관하게 false. */
+  function isRequiredViolated(col, value) {
+    return !!(col && col.required) && isBlankValue(value);
+  }
+
+  /**
+   * 필수 표시를 지금 보여줄지.
+   * 기준은 shouldShowEditableIcon과 동일한 "지금 실제로 편집할 수 있는가" —
+   * 고칠 수 없는 자리에 "필수"라고 적어도 사용자가 할 수 있는 일이 없다.
+   * 그리드를 잠그면(setEditable(false)) 표시가 사라진다.
+   */
+  function shouldShowRequired(col, gridEditable) {
+    return !!(gridEditable && col && col.required && col.editable);
+  }
+
+  /**
+   * 셀 코너 마커를 그릴지 — "필수인데 비어 있다"일 때만.
+   * required는 컬럼 전체가 같은 정적 성질이라 모든 셀에 그리면 정보량이 0이다.
+   * 그래서 마커는 조치가 필요한 곳만 가리킨다(dirty 마커가 "상태"를 가리키는 것과
+   * 같은 역할). 그리드 헤더에는 표식을 두지 않는다 — `*`는 팝업 폼 라벨에만.
+   */
+  function shouldMarkRequiredCell(col, value, gridEditable) {
+    return shouldShowRequired(col, gridEditable) && isBlankValue(value);
   }
 
   /** column.format / DataGrid.format() 진입점 — '#'나 '0'이 있으면 숫자, 아니면 날짜 패턴. */
@@ -724,11 +928,47 @@
     return !!value;
   }
 
-  /** multiselect 값 정규화: 배열 그대로, null/undefined → [], 단일 값 → [값]. */
+  /** 다중 값 저장 표현의 구분자. 옵션으로 열지 않는다 — 표현이 늘면 왕복 규칙이 흔들린다. */
+  const MULTI_SEPARATOR = ',';
+
+  /**
+   * multiselect 값 정규화 → 항상 배열.
+   * 배열은 그대로, 콤마 구분 문자열은 분해(항목 trim, 빈 항목 제거),
+   * null/undefined/빈 문자열은 [], 그 외 단일 값은 [값].
+   * 렌더러·에디터·변경감지가 전부 이 함수를 거치므로, 두 표현을 여기서 한 번만 흡수한다.
+   * 한계: 옵션 값 자체에 콤마가 들어 있으면 분해된다(콤마 저장 표현의 본질적 제약).
+   */
   function normalizeMultiValue(value) {
     if (Array.isArray(value)) return value;
     if (value === null || value === undefined) return [];
+    if (typeof value === 'string') {
+      return value.split(MULTI_SEPARATOR).map(s => s.trim()).filter(s => s !== '');
+    }
     return [value];
+  }
+
+  /**
+   * 편집 결과(배열)를 저장 표현으로 되돌린다.
+   * **원본이 쓰던 표현을 유지한다** — 배열이면 배열, 그 외(문자열·null·미정의)면
+   * 콤마 문자열. 편집 한 번으로 컬럼의 값 타입이 바뀌면 서버 스키마와 어긋나므로
+   * 타입 보존이 기본이고, 추론할 원본이 없을 때의 기본값이 문자열이다.
+   */
+  function denormalizeMultiValue(values, original) {
+    const list = normalizeMultiValue(values);
+    if (Array.isArray(original)) return list.slice();
+    return list.join(MULTI_SEPARATOR);
+  }
+
+  /**
+   * 편집 전후 값의 동등 판정. 다중 값은 **표현이 아니라 내용**으로 비교한다 —
+   * `['a','b']` · `'a,b'` · `'a, b'`는 모두 같은 값이다. 표현 차이(공백·타입)만으로
+   * 변경으로 잡히면 열었다 그냥 닫아도 저장이 일어난다.
+   */
+  function sameEditValue(newValue, oldValue, multi) {
+    if (multi || Array.isArray(newValue) || Array.isArray(oldValue)) {
+      return shallowArrayEquals(normalizeMultiValue(newValue), normalizeMultiValue(oldValue));
+    }
+    return editValueEquals(newValue, oldValue);
   }
 
   /** 두 배열의 얕은 동등성 (길이·순서 포함 엄격 비교). 배열이 아니면 false. */
@@ -789,11 +1029,35 @@
   }
 
   /**
-   * 그룹/전체 요약용 집계. func: 'sum'|'avg'|'min'|'max'|'count'
-   * count는 모든 행을 세고, 나머지는 숫자로 해석 가능한 값만 집계한다.
+   * 그룹/전체 요약용 집계.
+   * func: 'sum'|'avg'|'min'|'max'|'count' 또는 커스텀 함수 `(values, ctx) => any`.
+   *   - values: 그 컬럼의 원본 값 배열(null/빈 값 포함 — 거르는 건 소비자 몫)
+   *   - ctx: { rows, field, colDef, parent } — parent는 트리 요약에서만 부모 행,
+   *     그룹/전체합계에서는 null(그 자리에 행 객체가 없다)
+   *   - 반환 null/undefined = "표시하지 않음"(내장 집계의 규약과 동일)
+   * count는 모든 행을 세고, 나머지 내장 집계는 숫자로 해석 가능한 값만 집계한다.
    * 집계할 숫자가 하나도 없으면 null.
+   *
+   * opts는 내부 전용(소비자에게 넘어가지 않는다): { colDef, parent, failures }.
+   * 소비자 함수의 예외는 집계 하나를 null로 만들고 failures에 모아 호출자가 로깅한다 —
+   * 순수 함수가 콘솔을 오염시키지 않게(validatePopupValues와 같은 규약).
    */
-  function aggregateValues(rows, field, func) {
+  function aggregateValues(rows, field, func, opts) {
+    if (typeof func === 'function') {
+      const ctx = {
+        rows,
+        field,
+        colDef: (opts && opts.colDef) || null,
+        parent: (opts && opts.parent) !== undefined ? opts.parent : null,
+      };
+      let out;
+      try { out = func(rows.map(r => r[field]), ctx); }
+      catch (e) {
+        if (opts && opts.failures) opts.failures.push({ field, error: e });
+        return null; /* 집계 하나가 죽어도 그리드는 계속 그린다 */
+      }
+      return out === undefined ? null : out;
+    }
     if (func === 'count') return rows.length;
     let sum = 0, min = Infinity, max = -Infinity, n = 0;
     for (let i = 0; i < rows.length; i++) {
@@ -823,7 +1087,7 @@
    *   집계(agg)는 항상 전체 자식 기준으로 계산된다.
    * 그룹 항목: { __group, field, value, path, level, leafCount, expanded, agg }
    */
-  function buildGroupView(rows, groupFields, isExpanded, aggColumns) {
+  function buildGroupView(rows, groupFields, isExpanded, aggColumns, failures) {
     if (!groupFields || groupFields.length === 0) return rows.slice();
     aggColumns = aggColumns || [];
     const items = [];
@@ -843,7 +1107,9 @@
         const expanded = !!isExpanded(path);
         const agg = {};
         aggColumns.forEach(c => {
-          agg[c.field] = aggregateValues(children, c.field, c.aggFunc);
+          /* 그룹 행에는 부모 "행"이 없다 — parent는 null (합성 그룹 항목뿐) */
+          agg[c.field] = aggregateValues(children, c.field, c.aggFunc,
+            { colDef: c, parent: null, failures });
         });
         items.push({
           __group: true,
@@ -1138,12 +1404,24 @@
   /**
    * 원격 응답 해석 기본값: 배열이면 그대로, 아니면 { rows, total }를 기대한다.
    * 항상 { rows: [], total: n } 형태로 정규화한다.
+   *
+   * hasTotal은 "총건수를 서버가 실제로 준 것인지"다. total이 없으면 rows.length로
+   * 채우는데 그 값을 기지의 총건수로 믿으면 무한 스크롤이 첫 페이지에서 곧바로
+   * loaded >= total이 되어 항상 마지막 페이지가 된다 — 채운 값과 받은 값을 구분한다.
+   * last는 마지막 페이지 플래그(없으면 null).
    */
   function parseDataSourceResponse(json) {
-    if (Array.isArray(json)) return { rows: json, total: json.length };
+    if (Array.isArray(json)) {
+      return { rows: json, total: json.length, hasTotal: false, last: null };
+    }
     const rows = json && Array.isArray(json.rows) ? json.rows : [];
-    const total = json && typeof json.total === 'number' ? json.total : rows.length;
-    return { rows, total };
+    const hasTotal = !!(json && typeof json.total === 'number');
+    return {
+      rows,
+      total: hasTotal ? json.total : rows.length,
+      hasTotal,
+      last: readLastPageFlag(json),
+    };
   }
 
   /**
@@ -1438,7 +1716,7 @@
    * aggColumns: [{ field, aggFunc }]. 반환: getId(부모 행) → { field: 집계값 }.
    * 한 번의 post-order 순회로 리프 목록을 전파한다.
    */
-  function computeTreeSummary(roots, getId, aggColumns) {
+  function computeTreeSummary(roots, getId, aggColumns, failures) {
     const out = {};
     const walk = node => {
       if (node.children.length === 0) return [node.row];
@@ -1448,7 +1726,10 @@
       });
       const agg = {};
       aggColumns.forEach(c => {
-        agg[c.field] = aggregateValues(leaves, c.field, c.aggFunc);
+        /* 트리에서만 parent가 채워진다 — 커스텀 aggFunc가 "이름 (자식 수)" 같은
+         * 부모 기준 표시를 만들 수 있어야 하기 때문 */
+        agg[c.field] = aggregateValues(leaves, c.field, c.aggFunc,
+          { colDef: c, parent: node.row, failures });
       });
       out[getId(node.row)] = agg;
       return leaves;
@@ -1761,6 +2042,7 @@
     hide: false,
     pinned: null,
     align: 'left',
+    required: false,
   };
 
   function normalizeColumns(columnDefs, defaultColDef) {
@@ -1780,10 +2062,12 @@
       }
       const alignExplicit = ('align' in def) || (defaultColDef && 'align' in defaultColDef);
       if (col.dataType === 'number' && !alignExplicit) col.align = 'right';
-      /* editor를 선언했다는 것 자체가 편집 의도 — editable 생략 시 true로.
+      /* editor나 required를 선언했다는 것 자체가 편집 의도 — editable 생략 시 true로.
+       * required는 편집 경로에서만 의미가 있어서, 여기서 올려주지 않으면
+       * `required: true`만 쓴 컬럼이 조용히 아무 일도 하지 않는다.
        * 명시적 editable(false 포함)은 그대로 존중한다. */
       const editableExplicit = ('editable' in def) || (defaultColDef && 'editable' in defaultColDef);
-      if (!editableExplicit && col.editor) col.editable = true;
+      if (!editableExplicit && (col.editor || col.required)) col.editable = true;
       /* 선언적 format — valueFormatter가 없을 때만 합성 (CSV·집계·자동 폭에도 일괄 적용) */
       if (col.format && !col.valueFormatter) {
         col.valueFormatter = (pattern => v => formatValue(v, pattern))(col.format);
@@ -1822,7 +2106,7 @@
   /* ---- popupEditor (행 단위 폼 편집) ---- */
 
   /** `column.popupEditor`가 팝업 안에서만 덮어쓸 수 있는 컬럼 속성. */
-  const POPUP_COLUMN_OVERRIDES = ['editor', 'editorOptions', 'editorSearch', 'validator'];
+  const POPUP_COLUMN_OVERRIDES = ['editor', 'editorOptions', 'editorSearch', 'validator', 'required'];
 
   /**
    * popupEditor 옵션(true 또는 부분 설정 객체)을 완전한 설정으로 정규화한다.
@@ -1868,6 +2152,7 @@
         title: typeof b.title === 'string' ? b.title : null,
         disabled: b.disabled,
         onClick: typeof b.onClick === 'function' ? b.onClick : null,
+        onLoad: typeof b.onLoad === 'function' ? b.onLoad : null,
       });
     });
     return out;
@@ -1945,28 +2230,35 @@
       if (f.readonly) return;
       const oldValue = original ? original[f.field] : undefined;
       const newValue = values ? values[f.field] : undefined;
-      const same = Array.isArray(newValue) || Array.isArray(oldValue)
-        ? shallowArrayEquals(normalizeMultiValue(newValue), normalizeMultiValue(oldValue))
-        : editValueEquals(newValue, oldValue);
-      if (!same) changes[f.field] = { oldValue, newValue };
+      const multi = (f.editCol || f.col || {}).editor === 'multiselect';
+      if (!sameEditValue(newValue, oldValue, multi)) changes[f.field] = { oldValue, newValue };
     });
     return changes;
   }
 
   /**
-   * 모든 필드의 validator를 돌려 `{ errors, failures }`를 반환한다.
+   * 모든 필드의 required + validator를 돌려 `{ errors, failures }`를 반환한다.
+   * required가 먼저다 — "값이 있어야 한다"는 validator보다 앞선 기본 규칙이고,
+   * 빈 값을 validator에 넘기면 소비자마다 빈 값 처리를 중복 작성해야 한다.
    * validator 자체가 던진 예외는 편집을 막지 않고(인라인과 동일 규약) `failures`로
    * 올려보내 호출자가 로깅한다 — 순수 함수가 콘솔을 오염시키지 않게.
+   * readonly 필드는 건너뛴다 — 고칠 수 없는 값으로 저장을 막으면 갇힌다.
    */
-  function validatePopupValues(fields, values, row) {
+  function validatePopupValues(fields, values, row, localeText) {
+    const t = localeText || LOCALE_EN;
     const errors = {};
     const failures = [];
     (fields || []).forEach(f => {
       if (f.readonly) return;
-      const validator = (f.editCol || f.col || {}).validator;
-      if (typeof validator !== 'function') return;
+      const col = f.editCol || f.col || {};
+      const value = values ? values[f.field] : undefined;
+      if (isRequiredViolated(col, value)) {
+        errors[f.field] = interpolate(t.requiredValue, { column: f.label || col.headerName || f.field });
+        return; /* 빈 값을 validator에 다시 넘기지 않는다 */
+      }
+      if (typeof col.validator !== 'function') return;
       let result;
-      try { result = validator(values ? values[f.field] : undefined, row); }
+      try { result = col.validator(value, row); }
       catch (e) { failures.push({ field: f.field, error: e }); return; }
       const message = validationMessage(result);
       if (message) errors[f.field] = message;
@@ -2212,6 +2504,40 @@
       this._pageSizeOptions = options.paginationPageSizeOptions || [10, 20, 50, 100];
       this._currentPage = 0;
 
+      /* 무한 스크롤 — 페이저 UI와 배타지만 요청 조립에는 페이징이 필요하다 */
+      const infinite = resolveInfiniteScroll(options);
+      infinite.warnings.forEach(key => {
+        if (key === 'noDataSource') {
+          console.warn(
+            '[DataGrid] infiniteScroll은 dataSource가 필요합니다 — 자동 조회할 대상이 없어 무시합니다.'
+          );
+        } else if (key === 'clientPageMode') {
+          console.warn(
+            "[DataGrid] infiniteScroll인데 pageMode: 'client'입니다 — 요청에 page/pageSize가 실리지 않아 " +
+              '같은 페이지를 반복해 누적할 수 있습니다. dataSource.request로 직접 페이징 파라미터를 만드는 경우가 아니라면 pageMode를 생략하세요.'
+          );
+        } else if (key === 'autoHeight') {
+          console.warn(
+            "[DataGrid] infiniteScroll인데 domLayout: 'autoHeight'입니다 — 바디가 내용만큼 자라 스크롤이 " +
+              '생기지 않으므로 마지막 페이지까지 연달아 불러옵니다.'
+          );
+        }
+      });
+      this._infinite = infinite.enabled;
+      this._infiniteThreshold = infinite.threshold;
+      this._infinitePageSizeSelector = infinite.enabled && infinite.pageSizeSelector;
+      this._infiniteTextEl = null;
+      this._infiniteSizeSelEl = null;
+      this._infiniteSizeLabelEl = null;
+      if (this._infinite) {
+        if (infinite.pageSize) this._pageSize = infinite.pageSize;
+        this._pagination = true; /* 요청에 page/pageSize를 싣기 위함 — 페이저 UI는 그리지 않는다 */
+      }
+      this._hasMore = true; /* 아직 더 받을 게 있는가 */
+      this._loadingMore = false; /* 추가 로드 진행 중 (전면 오버레이 없이) */
+      this._loadedOnce = false; /* 이 소스에서 0페이지를 한 번이라도 받았는가 (이어받기의 전제) */
+      this._infiniteStatusEl = null;
+
       /* tree data — pagination/groupBy와 배타 (ParamQuery도 페이징 비호환 명시) */
       this._treeData = options.treeData || null;
       this._treeExpanded = {}; /* rowId -> bool */
@@ -2225,6 +2551,10 @@
       this._treeLoading = {}; /* rowId -> true (fetchChildren 진행 중) */
       this._treeLoaded = {}; /* rowId -> true (fetchChildren 완료 — 리프 확정 포함) */
       if (this._treeData) {
+        if (this._infinite) {
+          console.error('[DataGrid] treeData는 infiniteScroll과 함께 쓸 수 없습니다 — infiniteScroll을 끕니다.');
+          this._infinite = false;
+        }
         if (this._pagination) {
           console.error('[DataGrid] treeData는 pagination과 함께 쓸 수 없습니다 — pagination을 끕니다.');
           this._pagination = false;
@@ -2267,6 +2597,7 @@
         );
       });
       this._serverTotal = 0;
+      this._serverTotalKnown = false; /* 총건수를 서버가 실제로 준 것인지 (무한 스크롤 종료 판정용) */
       this._loadSeq = 0;
 
       this._pasteCount = 0; /* paste 이벤트/클립보드 API 폴백의 이중 실행 방지용 */
@@ -2275,7 +2606,8 @@
       this._bindEvents();
 
       this.setRowData(options.rowData || []);
-      if (options.dataSource) this.reloadData();
+      /* autoLoad: false면 그리드가 먼저 서버를 부르지 않는다 (rowData를 줬으면 그게 그대로 보인다) */
+      if (shouldAutoLoad(options.dataSource)) this.reloadData();
 
       /* gridReady: 생성자 반환 후 핸들러가 등록될 시간을 주기 위해 비동기로 1회 발생 */
       setTimeout(() => {
@@ -2383,7 +2715,24 @@
       this._overlayEl = el('div', 'dg-overlay', root);
       this._overlayEl.hidden = true;
 
-      if (this._pagination) {
+      /* 무한 스크롤은 페이저 대신 하단 상태 바를 쓴다 (둘은 배타).
+       * 안쪽 요소는 여기서 한 번만 만들고 이후에는 값만 갱신한다 — 매번 innerHTML을
+       * 다시 쓰면 백그라운드 추가 로드가 끝날 때 열려 있던 크기 드롭다운이 닫힌다. */
+      if (this._infinite) {
+        const bar = el('div', 'dg-infinite-status', root);
+        bar.setAttribute('role', 'status');
+        bar.setAttribute('aria-live', 'polite');
+        this._infiniteStatusEl = bar;
+        if (this._infinitePageSizeSelector) {
+          const wrap = el('div', 'dg-infinite-page-size', bar);
+          this._infiniteSizeLabelEl = el('span', null, wrap);
+          const sel = el('select', null, wrap);
+          sel.addEventListener('change', () => { this.setPageSize(Number(sel.value)); });
+          this._infiniteSizeSelEl = sel;
+          this._infiniteSizeKey = null; /* 지금 그려둔 옵션 목록의 지문 */
+        }
+        this._infiniteTextEl = el('span', 'dg-infinite-text', bar);
+      } else if (this._pagination) {
         this._pagingEl = el('div', 'dg-paging-panel', root);
       }
 
@@ -2440,6 +2789,7 @@
         } else {
           this._renderVisibleRows();
         }
+        this._maybeLoadMore(); /* 바닥 근처면 다음 페이지 (infiniteScroll일 때만) */
       });
 
       this._canvasEl.addEventListener('click', e => { this._onCellClick(e); });
@@ -2582,11 +2932,15 @@
       if (this._groupBy.length > 0) {
         const toggled = this._groupToggled;
         const defaultExpanded = this._groupDefaultExpanded;
-        display = buildGroupView(rows, this._groupBy, path => toggled[path] !== undefined ? toggled[path] : defaultExpanded, this._aggColumns);
+        const aggFailures = [];
+        display = buildGroupView(rows, this._groupBy, path => toggled[path] !== undefined ? toggled[path] : defaultExpanded, this._aggColumns, aggFailures);
+        this._logAggFailures(aggFailures);
       }
       this._displayRows = display;
 
-      if (this._pagination) {
+      /* 무한 스크롤은 페이지 개념을 화면에서 지운다 — 쌓인 전체가 곧 한 화면이다.
+       * _pagination은 요청 조립용으로만 켜져 있으므로 여기서는 페이징하지 않는다. */
+      if (this._pagination && !this._infinite) {
         if (this._pageMode === 'server') {
           /* 서버 페이징: 현재 rows가 곧 한 페이지. 총계는 서버 응답 기준 */
           const total = this._serverTotal;
@@ -2764,11 +3118,14 @@
       /* treeData.summary: 부모 행에 자손 리프 집계 표시 (필터 반영된 트리 기준) */
       this._treeSummary = null;
       if (td.summary && this._aggColumns.length > 0) {
+        const treeAggFailures = [];
         this._treeSummary = computeTreeSummary(
           roots,
           r => this._rowId(r),
-          this._aggColumns
+          this._aggColumns,
+          treeAggFailures
         );
+        this._logAggFailures(treeAggFailures);
       }
 
       this._viewRows = nodes.map(n => n.row);
@@ -2826,6 +3183,7 @@
       this._renderPinnedTop();
       this._renderGrandTotal();
       this._renderPaging();
+      this._renderInfiniteStatus();
       this._updateOverlay();
       this._emitter.emit('viewRendered', {
         displayedRowCount: this._viewRows.length,
@@ -3487,6 +3845,18 @@
           cell.classList.add('dg-cell-dirty');
           cell.title = `Original: ${dirtyFields[col.field]}`;
         }
+        /* 필수인데 비어 있는 셀 — dirty와 동시에 뜰 수 있어서 CSS에서 반대쪽
+         * 모서리를 쓴다(왼쪽 위 = 수정됨 / 오른쪽 위 = 필수 미입력). */
+        if (shouldShowRequired(col, this._editable)) {
+          cell.setAttribute('aria-required', 'true');
+          if (isBlankValue(row[col.field])) {
+            cell.classList.add('dg-cell-required');
+            cell.setAttribute('aria-invalid', 'true');
+            if (!cell.title) {
+              cell.title = this._t('requiredValue', { column: col.headerName || col.field || '' });
+            }
+          }
+        }
         if (rangeRect && cIdx >= rangeRect.c1 && cIdx <= rangeRect.c2) {
           cell.classList.add('dg-cell-range');
         }
@@ -3696,9 +4066,26 @@
       return rowEl;
     }
 
+    /**
+     * 커스텀 aggFunc의 예외를 컬럼당 한 번만 로깅한다 — 부모 노드가 100개면
+     * 같은 오류가 100번 찍혀 콘솔이 쓸모없어진다.
+     */
+    _logAggFailures(failures) {
+      if (!failures || !failures.length) return;
+      const seen = {};
+      failures.forEach(f => {
+        if (seen[f.field]) return;
+        seen[f.field] = 1;
+        console.error(`[DataGrid] aggFunc failed for "${f.field}":`, f.error);
+      });
+    }
+
     _formatAggValue(col, value) {
       if (value === null || value === undefined) return '';
-      if (col.valueFormatter && col.aggFunc !== 'count') {
+      /* 커스텀 aggFunc의 결과에는 valueFormatter를 걸지 않는다 — 함수가 이미 출력을
+       * 결정했는데 숫자 포매터가 다시 씹으면 "project (5)" 같은 반환이 망가진다.
+       * 내장 집계(문자열)에만 적용하고, count는 종전대로 제외. */
+      if (col.valueFormatter && typeof col.aggFunc === 'string' && col.aggFunc !== 'count') {
         try { return String(col.valueFormatter(value, null)); }
         catch (e) { /* 집계 행에는 row가 없으므로 실패 시 원시 값으로 폴백 */ }
       }
@@ -4100,6 +4487,28 @@
       return this._hasCheckboxColumn();
     }
 
+    /**
+     * 커밋 직전 값 검사 — required를 먼저 보고, 통과하면 column.validator.
+     * 오류 메시지 또는 null(통과)을 반환한다.
+     * 인라인 편집 · 채우기 드래그 · 붙여넣기/updateRows가 이 하나를 공유하므로
+     * required 규칙이 어느 경로로 들어와도 같게 적용된다.
+     * validator 자체 예외는 편집을 막지 않는다(기존 규약) — 소비자 코드의 버그로
+     * 저장이 잠기면 더 나쁘다.
+     */
+    _validateCellValue(col, value, row) {
+      if (isRequiredViolated(col, value)) {
+        return this._t('requiredValue', { column: col.headerName || col.field || '' });
+      }
+      if (typeof col.validator !== 'function') return null;
+      let result;
+      try { result = col.validator(value, row); }
+      catch (e) {
+        console.error(`[DataGrid] validator failed for "${col.field}":`, e);
+        return null;
+      }
+      return validationMessage(result);
+    }
+
     /** checkboxSelection 컬럼이 있는가. 있으면 선택 진입점을 체크박스 셀로 한정한다. */
     _hasCheckboxColumn() {
       return this._columns.some(c => c.checkboxSelection);
@@ -4261,7 +4670,12 @@
           if (col.align === 'center') cell.classList.add('dg-align-center');
           cell.classList.add('dg-cell-agg');
           const holder = el('span', 'dg-cell-value', cell);
-          holder.textContent = this._formatAggValue(col, aggregateValues(rows, col.field, col.aggFunc));
+          /* 전체 합계 행도 부모 "행"이 없다 — parent는 null */
+          const gtFailures = [];
+          const gtValue = aggregateValues(rows, col.field, col.aggFunc,
+            { colDef: col, parent: null, failures: gtFailures });
+          this._logAggFailures(gtFailures);
+          holder.textContent = this._formatAggValue(col, gtValue);
         }
       });
       this._footerEl.scrollLeft = this._bodyEl.scrollLeft;
@@ -4492,12 +4906,7 @@
           const value = seq[i];
           const oldValue = trow[col.field];
           if (value === oldValue) continue;
-          if (col.validator) {
-            let result;
-            try { result = col.validator(value, trow); }
-            catch (e) { result = true; }
-            if (validationMessage(result)) continue;
-          }
+          if (this._validateCellValue(col, value, trow)) continue;
           const evt = { data: trow, colDef: col, oldValue, newValue: value, cancel: false };
           this._emitter.emit('beforeCellSave', evt);
           if (evt.cancel) continue;
@@ -5062,7 +5471,9 @@
           panel.querySelectorAll('input').forEach(cb => {
             if (cb.checked) out.push(cb.__dgValue);
           });
-          return out;
+          /* 원본이 콤마 문자열이면 문자열로 되돌려 커밋한다 — 편집 한 번에
+           * 컬럼의 값 타입이 바뀌지 않게 (value는 편집 진입 시의 원본) */
+          return denormalizeMultiValue(out, value);
         };
         invalidEl = cellEl;
       } else if (editorType === 'select' && col.editorSearch) {
@@ -5375,23 +5786,16 @@
             const n = Number(newValue);
             newValue = newValue === '' || isNaN(n) ? value : n;
           }
-          /* 배열 값(multiselect)은 참조가 아니라 내용으로 변경 여부를 판정.
-           * 원본이 null/단일 값이어도 배열로 정규화해 비교한다 (열었다 그냥
-           * 닫았을 때 null → [] 스퓨리어스 커밋 방지). */
+          /* 다중 값은 참조나 표현이 아니라 **내용**으로 변경 여부를 판정한다.
+           * 양쪽을 배열로 정규화하므로 배열/콤마 문자열 어느 표현이어도,
+           * 원본이 null/단일 값이어도 같게 비교된다 (열었다 그냥 닫았을 때의
+           * null → '' 스퓨리어스 커밋 방지). */
           const changed = editorType === 'multiselect'
-            ? !shallowArrayEquals(newValue, normalizeMultiValue(value))
+            ? !shallowArrayEquals(normalizeMultiValue(newValue), normalizeMultiValue(value))
             : !editValueEquals(newValue, value);
           if (changed) {
-            if (col.validator) {
-              let result;
-              try { result = col.validator(newValue, row); }
-              catch (e) {
-                console.error(`[DataGrid] validator failed for "${col.field}":`, e);
-                result = true; /* validator 자체 오류는 편집을 막지 않는다 */
-              }
-              const message = validationMessage(result);
-              if (message) { markInvalid(message); return false; }
-            }
+            const message = this._validateCellValue(col, newValue, row);
+            if (message) { markInvalid(message); return false; }
             const evt = { data: row, colDef: col, oldValue: value, newValue, cancel: false };
             this._emitter.emit('beforeCellSave', evt);
             if (evt.cancel) { markInvalid(); return false; }
@@ -5419,6 +5823,14 @@
           cellEl.classList.toggle('dg-cell-dirty', dirtyNow);
           if (dirtyNow) cellEl.title = `Original: ${orig[col.field]}`;
           else cellEl.removeAttribute('title');
+        }
+        /* 필수 마커도 같은 이유로 제자리 갱신 — 값을 채우면 사라지고 지우면 나타난다.
+         * (required는 빈 값 커밋을 막지만, 원래 비어 있던 셀은 그대로 남는다) */
+        if (col.required) {
+          const mark = shouldMarkRequiredCell(col, row[col.field], this._editable);
+          cellEl.classList.toggle('dg-cell-required', mark);
+          if (mark) cellEl.setAttribute('aria-invalid', 'true');
+          else cellEl.removeAttribute('aria-invalid');
         }
         /* 같은 이유로 내장 상태 컬럼(statusColumn) 셀도 제자리 갱신 —
          * 편집으로 updated 상태가 생기거나(원복 시) 사라질 수 있다 */
@@ -5602,6 +6014,11 @@
       };
 
       this._buildPopupDom();
+      /* 폼이 다 만들어진 뒤, 포커스와 이벤트보다 먼저 — onLoad가 필드를 숨기거나
+       * 값을 바꿀 수 있으니 초기 포커스는 그 결과를 보고 정해야 하고,
+       * popupEditStarted 리스너도 초기화가 끝난 상태를 봐야 한다. */
+      this._popupFireButtonLoad();
+      if (!this._popup) return false; /* onLoad가 닫았으면 열린 적 없는 것으로 본다 */
       this._popupFocus(field);
       this._emitter.emit('popupEditStarted', { data: row, field: field || null });
       return true;
@@ -5724,6 +6141,15 @@
 
       const labelEl = el('label', 'dg-popup-label', fieldEl);
       labelEl.textContent = f.label + (f.readonly ? this._t('popupReadonlySuffix') : '');
+      /* 폼에서도 필수는 라벨에 표시한다 — 그리드 헤더와 같은 규약.
+       * readonly 필드는 검증에서도 건너뛰므로 표식을 달지 않는다. */
+      if (!f.readonly && (f.editCol || f.col || {}).required) {
+        fieldEl.classList.add('dg-popup-required');
+        const star = el('span', 'dg-required-star', labelEl);
+        star.textContent = '*';
+        star.setAttribute('title', this._t('requiredIndicatorLabel'));
+        star.setAttribute('aria-hidden', 'true');
+      }
 
       const controlEl = el('div', 'dg-popup-control', fieldEl);
       const inputWrap = el('div', 'dg-popup-input', controlEl);
@@ -5741,6 +6167,9 @@
         });
         if (widget) {
           p.widgets[f.field] = widget;
+          if ((f.editCol || f.col || {}).required && widget.input) {
+            widget.input.setAttribute('aria-required', 'true');
+          }
           /* 세로로 긴 목록형 위젯은 라벨을 가운데 정렬하면 목록 한가운데에 뜬다 */
           if (widget.editorType === 'multiselect' || widget.editorType === 'radio') {
             fieldEl.classList.add('dg-popup-field-tall');
@@ -5823,12 +6252,33 @@
         if (b.builtin === 'cancel') { this._popupCancel(); return; }
         if (b.builtin === 'close') { this._popupTeardown(false); return; }
         if (!b.onClick) return;
-        try { b.onClick(this._popupContext(f)); }
+        try { b.onClick(this._popupContext(f, btn)); }
         catch (e) { console.error(`[DataGrid] popup button "${b.key}" onClick failed:`, e); }
         if (this._popup) this._popupSyncButtons();
       });
       const p = this._popup;
       (p._buttons || (p._buttons = [])).push({ def: b, el: btn, field: f });
+    }
+
+    /**
+     * 버튼들의 onLoad를 한 번 호출한다 — 폼이 완전히 만들어진 뒤 DOM 순서대로.
+     * 빌드 도중에 부르면 뒤 필드가 아직 없어서 "다른 필드를 만지는" 초기화가
+     * 조용히 실패한다. onLoad 안에서 close/cancel/save로 팝업이 사라질 수 있으므로
+     * 목록을 미리 복사하고 매 반복마다 생존을 확인한다.
+     */
+    _popupFireButtonLoad() {
+      const p = this._popup;
+      if (!p || !p._buttons) return;
+      const list = p._buttons.slice();
+      for (const { def, el: btn, field } of list) {
+        if (!def.onLoad) continue;
+        if (this._popup !== p || p.closed) return; /* onLoad가 팝업을 닫았다 */
+        try { def.onLoad(this._popupContext(field, btn)); }
+        catch (e) { console.error(`[DataGrid] popup button "${def.key}" onLoad failed:`, e); }
+      }
+      /* onLoad가 값을 바꿨을 수 있으니 disabled를 다시 평가한다.
+       * disabled 옵션이 있는 버튼은 그 결과가 onLoad의 수동 지정을 덮는다. */
+      if (this._popup === p && !p.closed) this._popupSyncButtons();
     }
 
     /** disabled가 함수인 버튼들을 현재 상태로 다시 평가한다. */
@@ -5839,7 +6289,7 @@
         if (def.disabled === undefined) return;
         let off = def.disabled;
         if (typeof def.disabled === 'function') {
-          try { off = def.disabled(this._popupContext(field)); }
+          try { off = def.disabled(this._popupContext(field, btn)); }
           catch (e) {
             console.error(`[DataGrid] popup button "${def.key}" disabled failed:`, e);
             off = false;
@@ -5879,10 +6329,7 @@
         newValue = newValue === '' || isNaN(n) ? p.original[f.field] : n;
       }
       const oldValue = p.values[f.field];
-      const same = Array.isArray(newValue) || Array.isArray(oldValue)
-        ? shallowArrayEquals(normalizeMultiValue(newValue), normalizeMultiValue(oldValue))
-        : editValueEquals(newValue, oldValue);
-      if (same) return;
+      if (sameEditValue(newValue, oldValue, w.editorType === 'multiselect')) return;
 
       p.values[f.field] = newValue;
       this._popupValidateField(f);
@@ -5934,7 +6381,7 @@
     _popupValidateField(f) {
       const p = this._popup;
       if (!p) return true;
-      const { errors, failures } = validatePopupValues([f], p.values, p.row);
+      const { errors, failures } = validatePopupValues([f], p.values, p.row, this._localeText);
       failures.forEach(({ field, error }) => {
         console.error(`[DataGrid] validator failed for "${field}":`, error);
       });
@@ -5945,7 +6392,7 @@
 
     _popupValidateAll() {
       const p = this._popup;
-      const { errors, failures } = validatePopupValues(p.fields, p.values, p.row);
+      const { errors, failures } = validatePopupValues(p.fields, p.values, p.row, this._localeText);
       failures.forEach(({ field, error }) => {
         console.error(`[DataGrid] validator failed for "${field}":`, error);
       });
@@ -6157,7 +6604,7 @@
     }
 
     /** 버튼·before/after 콜백에 넘기는 컨텍스트. */
-    _popupContext(f) {
+    _popupContext(f, btnEl) {
       const p = this._popup;
       if (!p) return null;
       return {
@@ -6166,6 +6613,7 @@
         colDef: f ? f.col : null,
         field: f ? f.field : null,
         fieldEl: f && p.fieldEls[f.field] ? p.fieldEls[f.field].fieldEl : null,
+        buttonEl: btnEl || null, /* 버튼 콜백에서만 채워진다 (onLoad/onClick/disabled) */
         get value() { return p.values[f ? f.field : null]; },
         get values() { return Object.assign({}, p.values); },
         getValue: name => p.values[name],
@@ -6276,15 +6724,7 @@
           }
           const oldValue = row[col.field];
           if (editValueEquals(value, oldValue)) return;
-          if (col.validator) {
-            let result;
-            try { result = col.validator(value, row); }
-            catch (e) {
-              console.error(`[DataGrid] validator failed for "${col.field}":`, e);
-              result = true;
-            }
-            if (validationMessage(result)) return;
-          }
+          if (this._validateCellValue(col, value, row)) return;
           const evt = { data: row, colDef: col, oldValue, newValue: value, cancel: false };
           this._emitter.emit('beforeCellSave', evt);
           if (evt.cancel) return;
@@ -6435,7 +6875,8 @@
       const sizeLabel = el('span', null, sizeWrap);
       sizeLabel.textContent = this._t('pageSizeLabel');
       const sizeSel = el('select', null, sizeWrap);
-      this._pageSizeOptions.forEach(s => {
+      /* 현재 크기가 목록에 없으면 select가 빈 칸이 되므로 끼워 넣는다 */
+      pageSizeSelectOptions(this._pageSizeOptions, this._pageSize).forEach(s => {
         const opt = el('option', null, sizeSel);
         opt.value = s;
         opt.textContent = s;
@@ -6479,6 +6920,12 @@
 
     setPage(page) {
       if (!this._pagination) return;
+      if (this._infinite) {
+        /* 무한 스크롤에는 "지금 몇 페이지"가 없다 — 쌓인 전체가 한 화면이다.
+         * 임의 페이지로 뛰면 누적이 통째로 버려지므로 조용히 하지 않고 알린다. */
+        console.warn('[DataGrid] infiniteScroll에서는 setPage()를 쓸 수 없습니다 — 처음부터 다시 받으려면 reloadData()를 쓰세요.');
+        return;
+      }
       this._currentPage = page;
       this._focusedCell = null;
       this.refresh();
@@ -6487,6 +6934,10 @@
       if (this._pageMode === 'server') this._fetchData(); /* 방금 이동한 페이지를 요청해야 한다 */
     }
 
+    /**
+     * 페이지 크기 변경. 무한 스크롤에서는 "한 번에 받을 행 수"가 되며,
+     * 쌓인 것을 버리고 새 크기로 0페이지부터 다시 받는다(_fetchData가 리셋).
+     */
     setPageSize(size) {
       if (!this._pagination) return;
       const firstVisible = this._pageInfo ? this._pageInfo.start : 0;
@@ -6495,6 +6946,101 @@
       this.refresh();
       this._emitter.emit('paginationChanged', { page: this._currentPage, pageSize: this._pageSize });
       if (this._pageMode === 'server') this._fetchData(); /* 위에서 계산한 페이지를 유지 */
+    }
+
+    /* ---- infinite scroll ---- */
+
+    /**
+     * 하단 상태 바 갱신 — "불러오는 중 / N건 불러옴 / 마지막 페이지" + 페이지 크기 선택.
+     * 높이는 상태와 무관하게 고정이라 로드가 끝나도 그리드가 흔들리지 않는다.
+     *
+     * 요소를 새로 만들지 않고 값만 바꾼다 — 추가 로드가 끝날 때마다 DOM을 갈아끼우면
+     * 열어둔 크기 드롭다운이 그 자리에서 닫힌다 (함정 8).
+     */
+    _renderInfiniteStatus() {
+      const box = this._infiniteStatusEl;
+      if (!box) return;
+      const status = resolveInfiniteStatus({
+        loading: this._loading || this._loadingMore,
+        hasMore: this._hasMore,
+        loaded: this._rows.length,
+        total: this._serverTotalKnown ? this._serverTotal : null,
+      });
+      box.className = `dg-infinite-status dg-infinite-${status.kind}`;
+      if (this._infiniteTextEl) {
+        this._infiniteTextEl.innerHTML =
+          (status.kind === 'loading' ? '<span class="dg-spinner"></span>' : '') +
+          `<span>${escapeHtml(this._t(status.key, status.params))}</span>`;
+      }
+      this._syncInfiniteSizeSelect();
+    }
+
+    /** 크기 선택 select의 라벨·옵션·현재 값을 맞춘다 (목록이 그대로면 옵션은 건드리지 않음). */
+    _syncInfiniteSizeSelect() {
+      const sel = this._infiniteSizeSelEl;
+      if (!sel) return;
+      const label = this._t('pageSizeLabel');
+      if (this._infiniteSizeLabelEl.textContent !== label) {
+        this._infiniteSizeLabelEl.textContent = label;
+        sel.setAttribute('aria-label', label);
+      }
+      const sizes = pageSizeSelectOptions(this._pageSizeOptions, this._pageSize);
+      const key = sizes.join(',');
+      if (this._infiniteSizeKey !== key) {
+        this._infiniteSizeKey = key;
+        sel.innerHTML = '';
+        sizes.forEach(s => {
+          const opt = el('option', null, sel);
+          opt.value = s;
+          opt.textContent = s;
+        });
+      }
+      if (Number(sel.value) !== this._pageSize) sel.value = this._pageSize;
+      /* 로드 중 크기를 바꾸면 방금 시작한 요청과 새 크기가 엇갈린다 */
+      sel.disabled = !!(this._loading || this._loadingMore);
+    }
+
+    /**
+     * 바닥 근처면 다음 페이지를 자동 조회한다. 호출자는 스크롤 핸들러와
+     * 응답 처리 끝(첫 페이지가 뷰포트를 못 채운 경우 이어 받기).
+     * 요청을 시작했으면 true.
+     */
+    _maybeLoadMore() {
+      if (!this._infinite || this._destroyed) return false;
+      /* 이어받기는 "0페이지가 이미 있다"를 전제로 다음 페이지를 요청한다. 첫 조회가
+       * 아직 없으면(autoLoad: false, 또는 첫 조회 실패) 그 전제가 깨져서 page 1부터
+       * 받아 0페이지가 통째로 비는 구멍이 생긴다 (BUG-013). */
+      if (!this._loadedOnce) return false;
+      const body = this._bodyEl;
+      const go = shouldLoadMore({
+        enabled: true,
+        hasMore: this._hasMore,
+        loading: this._loading || this._loadingMore,
+        threshold: this._infiniteThreshold,
+        scrollTop: body.scrollTop,
+        clientHeight: body.clientHeight,
+        scrollHeight: body.scrollHeight,
+      });
+      if (!go) return false;
+      this._fetchData({ append: true });
+      return true;
+    }
+
+    /**
+     * 다음 페이지를 수동으로 불러온다 (스크롤 없이 "더 보기" 버튼 등).
+     * 요청을 시작했으면 true — 이미 마지막이거나 로드 중이면 false.
+     */
+    loadMore() {
+      if (!this._infinite || !this._hasMore || this._loading || this._loadingMore) return false;
+      /* 아직 아무것도 안 받았으면(autoLoad: false) "다음 페이지"는 0페이지다 —
+       * append로 보내면 0페이지를 건너뛴다 (BUG-013) */
+      this._fetchData(this._loadedOnce ? { append: true } : undefined);
+      return true;
+    }
+
+    /** 아직 더 받을 페이지가 있는가 (무한 스크롤이 아니면 항상 false). */
+    hasMoreRows() {
+      return !!(this._infinite && this._hasMore);
     }
 
     /* ---- overlays ---- */
@@ -6516,11 +7062,13 @@
         '<div class="dg-overlay-panel"><span class="dg-spinner"></span>' +
         `${escapeHtml(this._t('loading'))}</div>`;
       this._overlayEl.hidden = false;
+      this._renderInfiniteStatus(); /* 상태 바도 로딩 상태를 따라간다 */
     }
 
     hideLoadingOverlay() {
       this._loading = false;
       this._updateOverlay();
+      this._renderInfiniteStatus();
     }
 
     /* ---- remote data source ---- */
@@ -6547,9 +7095,18 @@
      * 현재 상태(페이지·정렬·필터)가 요청 파라미터로 전달되고, 응답이 도착하면
      * 행을 교체하고 refresh한다. 경합은 마지막 요청만 반영한다.
      */
-    _fetchData() {
+    _fetchData(fetchOpts) {
       const ds = this.options.dataSource;
       if (!ds || !ds.url || typeof fetch === 'undefined') return;
+      /* append = 무한 스크롤의 다음 페이지 이어받기. append가 아니면 "처음부터 다시"이므로
+       * 무한 스크롤 상태(페이지·더 있음)를 요청 조립 전에 되돌린다 — 정렬/필터가 바뀌면
+       * 서버가 전체를 다시 정렬/필터하므로 쌓아둔 것을 들고 있을 수 없다. */
+      const append = !!(fetchOpts && fetchOpts.append) && this._infinite;
+      const prevPage = this._currentPage;
+      if (this._infinite) {
+        if (append) this._currentPage += 1;
+        else { this._currentPage = 0; this._hasMore = true; }
+      }
       const req = buildDataSourceRequest(ds, {
         pagination: this._pagination,
         page: this._currentPage,
@@ -6573,7 +7130,10 @@
         for (const hk in req.headers) { headers[hk] = req.headers[hk]; hasHeaders = true; }
       }
       if (hasHeaders) opts.headers = headers;
-      this.showLoadingOverlay();
+      /* 추가 로드는 전면 오버레이를 띄우지 않는다 — 보고 있던 행이 매번 가려지면
+       * 무한 스크롤이 아니라 페이지 이동처럼 느껴진다. 하단 상태 바가 대신 알린다. */
+      if (append) { this._loadingMore = true; this._renderInfiniteStatus(); }
+      else this.showLoadingOverlay();
       const seq = ++this._loadSeq;
       fetch(req.url, opts)
         .then(r => {
@@ -6592,22 +7152,82 @@
           } else {
             parsed = parseDataSourceResponse(json);
           }
+          const newRows = (parsed.rows || []).slice();
           this._serverTotal = parsed.total;
-          this._rows = (parsed.rows || []).slice();
-          this._selection = {};
-          this._focusedCell = null;
-          this._lastClickedViewIndex = -1;
-          this._resetTracking();
-          this._undoStack = [];
-          this._redoStack = [];
-          this.hideLoadingOverlay();
+          /* "서버가 준 총건수"와 "없어서 rows.length로 채운 값"을 구분한다 —
+           * 후자를 기지의 총계로 믿으면 무한 스크롤이 첫 페이지에서 끝나버린다.
+           * 소비자 parse는 hasTotal을 모르므로 total이 숫자인지로 판단한다. */
+          this._serverTotalKnown = parsed.hasTotal !== undefined
+            ? !!parsed.hasTotal
+            : typeof parsed.total === 'number';
+          if (append) {
+            this._rows = this._rows.concat(newRows); /* 누적 — 선택·추적·히스토리는 유지 */
+          } else {
+            this._loadedOnce = true; /* 이제 0페이지가 있다 — 이어받기의 전제가 성립 */
+            this._rows = newRows;
+            this._selection = {};
+            this._focusedCell = null;
+            this._lastClickedViewIndex = -1;
+            this._resetTracking();
+            this._undoStack = [];
+            this._redoStack = [];
+          }
+
+          let reachedLast = false;
+          if (this._infinite) {
+            /* 플래그는 parse 반환값 → 원본 응답 순으로 찾는다. parse가 { rows, total }만
+             * 만들어도 원본 json의 last/hasMore를 살릴 수 있게. */
+            let explicit = readLastPageFlag(parsed);
+            if (explicit === null) explicit = readLastPageFlag(json);
+            const last = resolveLastPage({
+              explicit,
+              receivedCount: newRows.length,
+              pageSize: this._pageSize,
+              loaded: this._rows.length,
+              total: this._serverTotalKnown ? this._serverTotal : null,
+            });
+            reachedLast = this._hasMore && last;
+            this._hasMore = !last;
+          }
+
+          if (append) {
+            this._loadingMore = false;
+          } else {
+            this.hideLoadingOverlay();
+            /* 무한 스크롤의 비-append 조회는 "처음부터 다시"다 — 쌓인 걸 버렸는데
+             * 스크롤 위치만 남으면 새 목록의 한복판에서 시작하게 된다.
+             * (refresh 전에 옮겨야 렌더 창이 새 위치로 계산된다) */
+            if (this._infinite) this._bodyEl.scrollTop = 0;
+          }
           this.refresh(); /* 페이지는 유지 — 서버 페이징 이동 후 리셋되면 안 된다 */
           this._emitDataChanged();
+          if (this._infinite) {
+            if (append) {
+              this._emitter.emit('rowsAppended', {
+                rows: newRows,
+                page: this._currentPage,
+                loaded: this._rows.length,
+                hasMore: this._hasMore,
+              });
+            }
+            /* 마지막 도달은 전이에서 한 번만 */
+            if (reachedLast) {
+              this._emitter.emit('lastPageReached', {
+                loaded: this._rows.length,
+                total: this._serverTotalKnown ? this._serverTotal : null,
+              });
+            }
+            /* 첫 페이지가 뷰포트를 못 채웠으면 이어 받는다 (스크롤이 안 생겨
+             * scroll 이벤트가 영영 오지 않는 경우) */
+            this._maybeLoadMore();
+          }
         })
         .catch(err => {
           if (this._destroyed || seq !== this._loadSeq) return;
           console.error('[DataGrid] dataSource load failed:', err);
-          this.hideLoadingOverlay();
+          /* 실패한 페이지는 되돌린다 — 그대로 두면 다음 시도가 그 페이지를 건너뛴다 */
+          if (append) { this._currentPage = prevPage; this._loadingMore = false; this._renderInfiniteStatus(); }
+          else this.hideLoadingOverlay();
           this._emitter.emit('dataLoadError', { error: err });
         });
     }
@@ -6616,10 +7236,14 @@
      * 원격 데이터 소스를 런타임에 교체하고 1페이지부터 다시 불러온다.
      * 조회 조건(파라미터)만 바뀌는 경우라면 dataSource.params를 함수로 두고
      * reloadData()를 호출하는 쪽이 가볍다.
+     *
+     * 새 소스가 autoLoad: false면 교체만 하고 조회하지 않는다 — "이 소스는 그리드가
+     * 스스로 부르지 않는다"는 규칙이 생성 시점에만 적용되면 반쪽짜리가 된다.
      */
     setDataSource(dataSource) {
       this.options.dataSource = dataSource;
-      this.reloadData(); /* reloadData가 1페이지로 되돌린다 */
+      this._loadedOnce = false; /* 새 소스 — 지금 들고 있는 행은 이 소스의 0페이지가 아니다 */
+      if (shouldAutoLoad(dataSource)) this.reloadData(); /* reloadData가 1페이지로 되돌린다 */
     }
 
     /* ---- data API ---- */
@@ -7252,7 +7876,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.17.0';
+  DataGrid.version = '2.24.0';
 
   /**
    * 내장 로케일. `localeText: DataGrid.locales.ko`처럼 통째로 쓰거나,
@@ -7278,9 +7902,20 @@
     editValueEquals,
     defaultEditorType,
     shouldShowEditableIcon,
+    isBlankValue,
+    isRequiredViolated,
+    shouldShowRequired,
+    shouldMarkRequiredCell,
     resolveDomLayout,
     resolveDataModes,
     shouldResetPageOnReload,
+    shouldAutoLoad,
+    resolveInfiniteScroll,
+    pageSizeSelectOptions,
+    shouldLoadMore,
+    readLastPageFlag,
+    resolveLastPage,
+    resolveInfiniteStatus,
     formatNumber,
     formatDate,
     formatValue,
@@ -7296,6 +7931,8 @@
     lookupOptionLabels,
     isCheckedValue,
     normalizeMultiValue,
+    denormalizeMultiValue,
+    sameEditValue,
     shallowArrayEquals,
     buildTsv,
     parseTsv,

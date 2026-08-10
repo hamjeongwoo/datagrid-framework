@@ -147,7 +147,57 @@ class DemoHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/employees-v3":
             self._serve_employees_v3(parse_qs(parsed.query))
             return
+        if parsed.path == "/api/employees-infinite":
+            self._serve_employees_infinite(parse_qs(parsed.query))
+            return
         super().do_GET()
+
+    def _serve_employees_infinite(self, query):
+        """무한 스크롤 시연용 (server.js와 동일) — 총건수를 주지 않고
+        마지막 페이지 플래그(last)만 준다. total 없이 종료를 알 수 있는지가 요점."""
+        rows = list(_EMPLOYEES)
+
+        quick = (query.get("quickFilter") or [None])[0]
+        if quick:
+            needle = quick.lower()
+            rows = [r for r in rows if any(needle in str(v).lower() for v in r.values())]
+
+        sort = (query.get("sort") or [None])[0]
+        if sort:
+            try:
+                model = json.loads(sort)
+                for spec in reversed(model):  # 안정 정렬이므로 뒤 기준부터
+                    field, desc = spec.get("field"), spec.get("dir") == "desc"
+                    rows.sort(key=lambda r: (r.get(field) is None, r.get(field)), reverse=desc)
+            except (ValueError, TypeError):
+                pass  # 잘못된 sort 파라미터는 무시
+
+        count = len(rows)
+        try:
+            page = int((query.get("page") or ["0"])[0])
+        except (TypeError, ValueError):
+            page = 0
+        try:
+            page_size = int((query.get("pageSize") or ["20"])[0])
+        except (TypeError, ValueError):
+            page_size = 20
+        if page_size <= 0:
+            page_size = 20
+        start = page * page_size
+        chunk = rows[start:start + page_size]
+
+        time.sleep(0.26)  # 추가 로드가 눈에 보이도록 조금 더 긴 지연
+        # total 없음 — 클라이언트는 last 플래그로만 끝을 안다 (Spring Data Page와 같은 이름)
+        body = json.dumps({
+            "rows": chunk,
+            "last": start + len(chunk) >= count,
+            "page": page,
+        }).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def _serve_employees(self, query):
         rows = list(_EMPLOYEES)

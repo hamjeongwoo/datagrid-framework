@@ -106,6 +106,8 @@
       <div class="dg-row" style="background:var(--dg-row-hover-color)"><div class="dg-cell" style="width:200px">Hovered row</div><div class="dg-cell" style="width:200px">Cell</div><div class="dg-cell" style="width:180px">Cell</div></div>
       <div class="dg-row dg-row-selected"><div class="dg-cell" style="width:200px">Selected row</div><div class="dg-cell dg-cell-focused" style="width:200px">Focused cell</div><div class="dg-cell" style="width:180px">Cell</div></div>
       <div class="dg-row"><div class="dg-cell" style="width:200px">Change tracking</div><div class="dg-cell dg-cell-dirty" style="width:200px" title="Original: 52000">Dirty (modified) cell</div><div class="dg-cell" style="width:180px">Cell</div></div>
+      <div class="dg-row"><div class="dg-cell" style="width:200px">Required (column.required)</div><div class="dg-cell dg-cell-required" style="width:200px" title="City is required" aria-required="true" aria-invalid="true">Empty required cell</div><div class="dg-cell" style="width:180px">Cell</div></div>
+      <div class="dg-row"><div class="dg-cell" style="width:200px">Required + dirty</div><div class="dg-cell dg-cell-dirty dg-cell-required" style="width:200px" title="Original: Seoul">둘이 동시에 — 왼쪽 위 수정됨 / 오른쪽 위 필수</div><div class="dg-cell" style="width:180px">Cell</div></div>
       <div class="dg-row dg-row-added"><div class="dg-cell" style="width:200px">Added row (trackChanges)</div><div class="dg-cell" style="width:200px">Cell</div><div class="dg-cell" style="width:180px">Cell</div></div>
       <div class="dg-row dg-row-deleted"><div class="dg-cell dg-align-center" style="width:90px"><span class="dg-tag dg-tag-red">Deleted</span></div><div class="dg-cell" style="width:200px">Soft-deleted row (softDelete)</div><div class="dg-cell" style="width:290px">삭제 표시 — 편집 차단, restoreRows()로 복원</div></div>
       <div class="dg-row"><div class="dg-cell dg-align-center" style="width:90px"><span class="dg-tag dg-tag-green">New</span></div><div class="dg-cell" style="width:200px">Status column (statusColumn)</div><div class="dg-cell dg-align-center" style="width:290px"><span class="dg-tag dg-tag-yellow">Updated</span></div></div>
@@ -314,6 +316,48 @@
         <button class="dg-paging-btn" type="button">›</button>
         <button class="dg-paging-btn" type="button">»</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Infinite scroll status bar -->
+  <h2 class="section">Infinite Scroll Status Bar</h2>
+  <p class="section-desc">
+    <code class="inline">infiniteScroll</code>의 하단 상태 바. 세 상태 모두 <strong>높이가 같아서</strong>
+    로드가 끝나거나 마지막에 닿아도 그리드가 흔들리지 않습니다.
+    마지막 상태만 배경·글자색·굵기로 강조합니다.
+    왼쪽은 한 번에 받을 행 수를 바꾸는 선택 UI(페이저가 없으므로 그 자리를 대신합니다)이며
+    로드 중에는 비활성됩니다.
+  </p>
+  <div class="dg-root specimen">
+    <div class="dg-infinite-status dg-infinite-more">
+      <div class="dg-infinite-page-size">
+        <span>Page size:</span>
+        <select><option>10</option><option selected>25</option><option>50</option></select>
+      </div>
+      <span class="dg-infinite-text"><span>50 rows loaded</span></span>
+    </div>
+  </div>
+  <div class="dg-root specimen" style="margin-top:12px">
+    <div class="dg-infinite-status dg-infinite-more">
+      <span class="dg-infinite-text"><span>50 of 500 rows loaded</span></span>
+    </div>
+  </div>
+  <div class="dg-root specimen" style="margin-top:12px">
+    <div class="dg-infinite-status dg-infinite-loading">
+      <div class="dg-infinite-page-size">
+        <span>Page size:</span>
+        <select disabled><option selected>25</option></select>
+      </div>
+      <span class="dg-infinite-text"><span class="dg-spinner"></span><span>Loading more…</span></span>
+    </div>
+  </div>
+  <div class="dg-root specimen" style="margin-top:12px">
+    <div class="dg-infinite-status dg-infinite-end">
+      <div class="dg-infinite-page-size">
+        <span>Page size:</span>
+        <select><option selected>25</option></select>
+      </div>
+      <span class="dg-infinite-text"><span>All 500 rows loaded</span></span>
     </div>
   </div>
 

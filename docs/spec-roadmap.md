@@ -55,10 +55,11 @@
 | [x] | `groupModel > showSummary · grandSummary`, `column > summary`, `summaryData`, util `aggregate` | `column.aggFunc: 'sum'\|'avg'\|'min'\|'max'\|'count'` (그룹 헤더 행 집계) + `grandTotal: true` 전체 요약 행 — v1.1.0 | **P1** (그룹핑과 함께) |
 | [x] | `collapse() / expand() / toggle()` (그룹 전체) | `expandAllGroups()` / `collapseAllGroups()` — v1.1.0 | **P1** (그룹핑과 함께) |
 | [x] | `group` / `beforeGroupExpand` / `toggle` 이벤트 | `groupChanged` / `groupToggled` — v1.1.0 | **P1** (그룹핑과 함께) |
-| [x] | **`dataModel`** (원격 데이터: `url · method · postData · getData · location:'remote'`, remote 정렬/필터/페이징) | `dataSource: { url, method, params, parse }` + `sortMode/filterMode/pageMode: 'client'\|'server'`(v2.13.0부터 sort/filter는 미지정 시 `pageMode` 상속) + `reloadData()` + `dataLoadError` — 데모 서버 `/api/employees` 포함 — v1.2.0 | **P2** |
+| [x] | **`dataModel`** (원격 데이터: `url · method · postData · getData · location:'remote'`, remote 정렬/필터/페이징) | `dataSource: { url, method, params, parse, autoLoad }` + `sortMode/filterMode/pageMode: 'client'\|'server'`(v2.13.0부터 sort/filter는 미지정 시 `pageMode` 상속) + `reloadData()` + `dataLoadError` — `autoLoad: false`로 최초 자동 조회 보류(v2.24.0) — 데모 서버 `/api/employees` 포함 — v1.2.0 | **P2** |
 | [x] | `detailModel` + `rowExpand/rowCollapse` (마스터-디테일 행) | `rowDetail: { renderer, height }` + `expandRow()/collapseRow()/toggleRowDetail()/isRowExpanded()` + `rowExpanded`/`rowCollapsed` — 가변 높이 가상화(computeRowTops) — v1.2.0 | **P2** |
 | [x] | `column > formula` (계산 컬럼) | `valueGetter(row)` — 파생 값을 row[field]에 기록(정렬·필터·내보내기 공유) — v1.2.0 | **P2** |
 | [x] | `mergeCells` | `mergeCells: ['field'...]` — 표시 순서 기준 연속 동일 값 세로 병합 (그룹/디테일에서 단절) — v2.0.0 | P3 |
+| [x] | (없음 — 자체 개선. ParamQuery는 원격 페이징만 있고 무한 스크롤은 없음) | **`infiniteScroll: true \| { threshold, pageSize }`** — 바닥 근처에서 다음 페이지를 자동 조회해 **누적**(교체 아님). 서버가 마지막 페이지 플래그(`last`/`hasMore`/`hasNext`)를 주면 그것으로, 없으면 total·수신 건수로 종료 판정. 하단 상태 바로 "불러오는 중 / 마지막 페이지" 표시 + 크기 선택 UI(v2.23.0) + `loadMore()`/`hasMoreRows()` + `rowsAppended`/`lastPageReached` — v2.22.0 | **P2** (사용자 요청) |
 
 ### 2.2 편집 · 검증 · 변경 추적
 
@@ -179,6 +180,107 @@
 ### v2.1 — "TreeGrid" (§6 T1~T4)
 - treeData 코어(계층 표시·펼침/접힘·계층 정렬/필터), 체크박스 캐스케이드, 부모 요약, 지연 로딩
 
+### v2.24 — dataSource.autoLoad (사용자 요청)
+- 요청: "최초에 조회를 할 건지 말 건지 옵션. 기본은 true." 검색 조건을 받은 뒤 조회하는 화면에서 생성 직후의 조건 없는 전체 조회가 낭비였다.
+- **위치를 `dataSource` 안으로.** dataSource 없이는 의미가 없는 옵션이고, `request`/`parse`/`headers`/`paramsFormat`이 이미 거기 모여 있다. 최상위 옵션을 늘리지 않는다.
+- **끄는 것은 "자동"뿐이라는 규칙 하나로 정리한다.** `reloadData()`·`loadMore()` 같은 명시적 호출은 그대로 동작하고, 한 번 조회한 뒤에는 정렬·필터의 자동 재조회도 평소대로다. `autoLoad`는 데이터 소스를 비활성화하는 스위치가 아니다.
+- `setDataSource()`도 새 소스가 `autoLoad: false`면 교체만 하고 조회하지 않는다 — "이 소스는 그리드가 스스로 부르지 않는다"가 생성 시점에만 적용되면 반쪽이 된다. 기존 동작 변경이지만 `autoLoad`를 적은 소스에만 해당한다.
+- 순수 함수 `shouldAutoLoad(dataSource)` — 끄는 건 정확히 `false`일 때만(`0`·`'false'`·`null`은 미지정 취급). `_test` 노출.
+- **조합 검증에서 [BUG-013](bug-reports/2026-08-09-013-infinite-append-skips-first-page.md)이 나왔다** — 무한 스크롤 + `autoLoad: false`에서 스크롤만으로 `page=1`부터 받아 0페이지가 통째로 비었다. `_loadedOnce` 가드로 수정. 같은 구멍이 **첫 조회 실패 경로로는 v2.22부터 열려 있었다.**
+- 데모: features.html `#auto-load` — 부서명 입력 + 조회 버튼, 요청 횟수를 상태 줄에 노출해 "아직 요청 없음"이 눈에 보이게.
+
+### v2.23 — 무한 스크롤의 페이지 크기 변경 UI (사용자 요청)
+- 요청: "페이지 사이즈를 초기에 셋팅만 하고 바꿀 UI가 없다." 맞는 지적이고, **페이저를 없앤 대가**였다 — 크기 선택은 원래 페이저 패널에만 있었는데 무한 스크롤이 그 패널을 통째로 대체했다. 기능을 대체할 때 그 안에 딸려 있던 조작까지 같이 사라지지 않았는지 확인해야 했다.
+- 상태 바 왼쪽에 크기 선택을 둔다(`infiniteScroll.pageSizeSelector`, 기본 표시 · `false`로 opt-out). **선택지는 `paginationPageSizeOptions`를 그대로 재사용** — 같은 개념에 옵션 이름을 둘로 늘리지 않는다.
+- `setPageSize()`는 이미 무한 스크롤에서 올바르게 동작했다(`_fetchData`의 비-append 경로가 페이지·hasMore·스크롤을 되돌린다). 새로 만든 건 그 메서드를 부르는 UI뿐이다.
+- **상태 바를 매번 `innerHTML`로 갈아끼우던 걸 "한 번 만들고 값만 갱신"으로 바꿨다.** 백그라운드 추가 로드가 끝날 때마다 DOM이 교체되면 **열어둔 크기 드롭다운이 그 자리에서 닫힌다**(함정 8과 같은 실패 모드). select 요소의 동일성이 유지되는지를 검증 항목으로 뒀다.
+- 로드 중에는 select를 비활성한다 — 방금 시작한 요청과 새 크기가 엇갈리는 창을 없앤다. (함정 9의 "표시 전용에 disabled 금지"와는 반대 경우다. 이건 진짜 조작 요소이고 클릭 경로를 가로막는 자리도 아니다.)
+- 곁다리 수정: 순수 함수 `pageSizeSelectOptions(list, current)` — 현재 크기가 선택지에 없으면 `select.value`가 어디에도 안 걸려 **빈 칸**이 된다(`paginationPageSize: 25` + 기본 목록 `[10,20,50,100]`). 정렬된 자리에 끼워 넣는다. **기존 페이저에도 있던 잠복 버그**라 두 곳이 이 함수를 공유한다.
+
+### v2.22 — 무한 스크롤 infiniteScroll (사용자 요청)
+
+요청: "바닥에 닿으면 자동 조회 + 서버가 마지막 페이지 구분값을 주면 UX적으로 알 수 있게".
+
+**설계 결정**
+
+- `infiniteScroll: true | { threshold: 200, pageSize }` — `dataSource` 전용. `dataSource`가 없으면 `console.warn` 후 비활성(클라이언트 전량 데이터에는 "자동 조회"할 대상이 없다).
+- **페이저 UI와 배타.** 무한 스크롤이 켜지면 `pagination` 패널을 그리지 않는다 — 같은 화면에서 "페이지 이동"과 "누적 스크롤"은 서로의 상태를 뭉갠다(3페이지를 보다 누적하면 그 "3페이지"가 무슨 의미인지 정의되지 않는다). 다만 **요청 조립에는 페이징이 필요하므로** 내부적으로 `_pagination = true` + `pageMode: 'server'`를 세운다. 함정 13에 따라 `sortMode`/`filterMode`는 그대로 `pageMode`를 상속한다.
+- **교체가 아니라 누적.** `_fetchData({ append: true })` 경로를 새로 만든다. 기존 `_fetchData()`(교체)는 그대로 두고 append 분기만 추가 — 함정 18("공개 정책 경로와 내부 무정책 경로를 가른다")의 연장선.
+- **정렬·필터가 바뀌면 누적을 버린다.** 지금 정렬 변경은 페이지를 유지하는데, 무한 스크롤에서는 "지금까지 쌓은 200행"의 정렬만 바뀌는 게 아니라 서버가 전체를 다시 정렬하므로 **0페이지부터 다시 쌓아야** 한다. 필터는 이미 `_currentPage = 0`을 세우고 있어 누적 초기화만 얹으면 된다.
+
+**마지막 페이지 판정 (핵심)**
+
+순수 함수 `resolveLastPage({ explicit, receivedCount, pageSize, loaded, total })` — 우선순위대로:
+
+1. **명시 플래그**(`explicit`) — 서버가 준 값이 있으면 무조건 그것. 다른 신호로 덮지 않는다.
+2. **수신 0건** — 무한 루프 안전장치. 이게 없으면 "플래그 없음 + total 없음 + 매번 0건"에서 스크롤할 때마다 영원히 요청한다.
+3. **`total` 기지 + `loaded >= total`**.
+4. **`receivedCount < pageSize`** — 관례적 추론.
+5. 그 외 = 더 있음.
+
+플래그 추출도 순수 함수로 분리한다 — `readLastPageFlag(obj) => true | false | null`:
+`last` · `lastPage` · `isLast`(그대로) / `hasMore` · `hasNext`(반전). **Spring Data `Page`의 `last`를 그대로 먹는 게 1순위 목표**(가장 흔한 서버 형태). 응답 본문과 `dataSource.parse` 반환값 **양쪽**에서 찾는다 — parse가 `{ rows, total }`만 만들어도 원본 json의 플래그를 살릴 수 있게.
+
+`parseDataSourceResponse`는 `hasTotal`(총건수를 서버가 실제로 준 것인지)을 함께 반환한다. 지금은 `total`이 없으면 `rows.length`로 채우는데, 그 값을 "기지의 총건수"로 믿으면 **첫 페이지에서 곧바로 `loaded >= total`이 되어 항상 마지막 페이지**가 된다. 규칙 3이 성립하려면 "없어서 채운 값"과 "서버가 준 값"을 구분해야 한다.
+
+**UX (마지막 페이지 알리기)**
+
+- 바디 아래 상태 바 `.dg-infinite-status` — **높이 고정**(상태가 바뀌어도 그리드가 흔들리지 않게). 세 상태: 로딩 중(스피너 + `loadingMore`) / 더 있음(`rowsLoaded`·`rowsLoadedOfTotal`) / 마지막(`noMoreRows`).
+- 평상시에도 누적 건수를 보여주므로 자리를 고정으로 차지할 값을 한다. "몇 건까지 쌓였나"는 무한 스크롤에서 사용자가 가장 자주 잃는 정보다.
+- 로케일 키 4개 추가: `loadingMore` · `noMoreRows` · `rowsLoaded`(`{loaded}`) · `rowsLoadedOfTotal`(`{loaded}`/`{total}`).
+- 상태 문자열 결정도 순수 함수 `resolveInfiniteStatus({ loading, hasMore, loaded, total })` → `{ kind, key, params }` (DOM 없이 테스트).
+- 전면 로딩 오버레이는 **첫 조회에만** 띄운다. 추가 로드마다 오버레이가 덮이면 보고 있던 행이 가려져 무한 스크롤이 아니라 페이지 이동처럼 느껴진다.
+
+**임계값과 되먹임**
+
+- `shouldLoadMore({ scrollTop, clientHeight, scrollHeight, threshold, loading, hasMore, enabled })` 순수 함수. `threshold` 기본 200px.
+- **첫 페이지가 뷰포트를 못 채우는 경우**(행 20개 + 높이 900px)를 반드시 처리한다 — 스크롤이 생기지 않아 scroll 이벤트가 영영 안 오고, 사용자는 "더 있는데 멈춘" 그리드를 본다. append 직후 같은 판정을 다시 돌려 뷰포트가 찰 때까지 이어 받는다(`scrollHeight <= clientHeight`면 바닥 조건이 참이므로 같은 함수로 커버된다).
+- 함정 6: 프리뷰 팬이 숨겨져 있으면 scroll 이벤트가 발화하지 않는다 → 검증은 `dispatchEvent(new Event('scroll'))` + 순수 함수 단위 테스트 병행.
+
+**API**
+
+- `loadMore() => boolean` — 수동 트리거(요청을 시작했으면 true). 스크롤이 없는 레이아웃·"더 보기" 버튼용 탈출구.
+- `hasMoreRows() => boolean`.
+- 이벤트 `rowsAppended` `{ rows, page, loaded, hasMore }` / `lastPageReached` `{ loaded, total }` — 마지막 도달은 **한 번만** 발화(플래그가 false로 넘어가는 전이에서).
+
+### v2.21 — multiselect 값이 콤마 문자열도 지원 (사용자 제보)
+- 제보: 컬럼 값이 배열이 아니라 콤마 구분 문자열이면 `DataGrid.renderers.multiselect`가 매핑을 못 한다. 확인 결과 `'SEL,TYO'`가 label/value 매핑에서 **코드 그대로 칩 하나**가 됐다.
+- 원인은 `normalizeMultiValue`가 배열이 아닌 값을 **통째로 한 항목으로 감싸는** 것 하나뿐이었다. 콤마를 분해하는 코드가 프레임워크 어디에도 없었다.
+- **렌더링보다 편집이 더 위험했다.** 같은 함수를 multiselect 에디터도 쓰므로, 콤마 문자열 컬럼은 편집 진입 시 **아무것도 체크되지 않고**(기존 선택이 화면에서 사라짐) 커밋하면 값 타입이 배열로 바뀌었다. 제보는 표시 문제였지만 실제 손상은 편집 쪽에 있었다.
+- 읽기: `normalizeMultiValue`가 문자열을 `,`로 분해(항목 trim, 빈 항목 제거)한다. **통로가 하나뿐이라 렌더러·에디터 초기 체크·변경 판정이 동시에 해결됐다.** 빈 문자열은 `['']`가 아니라 `[]`(선택 없음) — `required`의 빈 값 판정과도 일치한다.
+- 쓰기: `denormalizeMultiValue(values, original)` — **원본이 쓰던 표현을 유지**한다(배열→배열, 그 외→콤마 문자열). 편집 한 번에 컬럼의 값 타입이 바뀌면 서버 스키마와 어긋나기 때문. 추론할 원본이 없으면(`null`/미정의) 콤마 문자열이 기본.
+- 변경 판정은 `sameEditValue(new, old, multi)`로 모았다. 다중 값은 **표현이 아니라 내용**으로 비교한다 — `'a, b'`와 `'a,b'`와 `['a','b']`가 모두 같은 값이어야 열었다 그냥 닫았을 때 공백 차이만으로 저장이 일어나지 않는다. 인라인·팝업 폼 세 군데가 이 하나를 공유한다.
+- **구분자와 저장 형식을 옵션으로 열지 않았다**(사용자 결정). 표현을 늘리면 "읽을 때 두 표현 → 쓸 때 어느 표현"의 왕복 규칙이 조합마다 갈라진다. 대신 원본 타입 보존이라는 단일 규칙으로 정한다. 대가는 문서에 명시: **옵션 값 자체에 콤마가 들어 있으면 분해되므로 그런 값은 배열로 저장해야 한다.**
+- 순수 함수 `denormalizeMultiValue` · `sameEditValue` 추가, `_test` 노출.
+
+### v2.20 — aggFunc 커스텀 함수 (사용자 요청)
+- 배경: 트리에서 "부모 이름 옆에 자손 수"(`project (5)`)를 표시하려 했더니, `valueFormatter`로는 원본 `children.length`밖에 못 세서 **필터를 따라가지 않았다**(Size 합계는 줄어드는데 이름 옆 숫자는 그대로 — 같은 행의 두 숫자가 서로 다른 말을 함). 집계 파이프라인은 이미 필터 후 행으로 재계산되므로, 그 자리에 함수를 꽂는 게 정답이었다.
+- `aggFunc: (values, ctx) => any`. `values`는 원본 값 배열(거르기는 소비자 몫), `ctx = { rows, field, colDef, parent }`.
+- **`parent`는 트리 요약에서만 채운다.** 그룹 행·전체합계에는 부모 "행" 객체가 없다(합성 그룹 항목뿐) — 없는 걸 있는 척하지 않고 `null`로 둔다. 세 컨텍스트 중 하나에서만 채워지는 게 고르지 않지만, 이 API의 주 동기(부모 기준 표시)가 트리에만 있다.
+- 집계는 이미 순수 함수 `aggregateValues(rows, field, func)` **한 곳**으로 모여 있어서 함수 분기 한 번이 세 소비처(groupBy·treeData.summary·grandTotal)에 동시에 적용됐다. 설계가 미리 모아둔 덕을 본 사례.
+- **`_formatAggValue`의 `valueFormatter` 가드를 `typeof col.aggFunc === 'string'`으로 좁혔다.** 함수 결과에 숫자 포매터가 다시 걸리면 `"project (5)"` 같은 반환이 망가진다 — 함정 12("소비자 반환 구조의 자유도를 넓힐 때는 그 값이 흘러가는 경로도 함께 넓혔는지 확인")가 그대로 적용된 자리.
+- 반환 `null`/`undefined` = "표시하지 않음"(내장 집계와 같은 규약). `0`·빈 문자열은 유효한 결과로 유지.
+- 예외는 그 집계만 `null`로 만들고 `failures` 배열로 올려보내 호출자가 로깅 — 순수 함수가 콘솔을 오염시키지 않게(`validatePopupValues`와 같은 규약). 로깅은 **컬럼당 1회로 접는다**: 부모 노드가 100개면 같은 오류가 100번 찍혀 콘솔이 쓸모없어진다.
+- 문자열 집계는 5개 그대로. `'first'`/`'join'` 같은 걸 내장으로 늘리지 않는다 — 함수로 할 수 있는 일을 두 가지 방법으로 만들지 않는다는 기존 원칙.
+- 문서화한 함정 둘: ① 요약 셀은 그 컬럼의 **원래 값을 대체**하므로 트리 컬럼에 달면 이름이 사라진다(→ `ctx.parent`에서 되살려 붙일 것). ② `groupBy` 그룹 행은 "`aggFunc` 없는 첫 컬럼"을 라벨 자리로 쓰므로 첫 컬럼에 달면 그룹 라벨이 밀린다.
+
+### v2.19 — 필수 컬럼 column.required (사용자 요청)
+- 요청: "컬럼 자체가 필수값인 경우 편집 모드일 때 셀에 마킹" — 스샷은 `trackChanges`의 dirty 마커(왼쪽 위 주황 4px 삼각형)였다.
+- **첫 결정: 같은 시각 언어를 재사용하지 않는다.** dirty와 required는 한 셀에 동시에 뜰 수 있어서, 자리·색이 같으면 구분이 불가능해진다. dirty = 왼쪽 위 `--dg-dirty-color`, required = 오른쪽 위 `--dg-required-color`로 분리.
+- **둘째 결정: 셀 마커는 비어 있는 셀에만.** required는 컬럼 전체가 같은 *정적 성질*이므로 모든 셀에 그리면 정보량이 0이다(다 같은 표시). 마커는 조치가 필요한 곳만 가리킨다.
+  - 처음엔 "정적 성질은 헤더가, 상태는 셀이"로 나눠 헤더에 `*`를 달았다(`editableIndicator`의 선례). **v2.19.1에서 사용자 요청으로 헤더 표식을 제거** — 그리드 표시는 셀 마커 하나로 단순화했다. `*`는 팝업 폼 라벨에만 남는다(폼은 입력 화면이라 관례가 다르다). 대가는 명시적이다: **모든 셀이 채워져 있으면 그 컬럼이 필수라는 사실이 화면에 드러나지 않는다** — 값을 지우거나 빈 행을 추가해야 알게 된다.
+- **셋째 결정: 표시만 하지 않고 검증까지 연결한다.** 마커만 그리고 빈 값 저장이 통과되면 마커가 거짓말이 된다. `_validateCellValue(col, value, row)` 하나로 모아 인라인 편집·채우기 드래그·붙여넣기/`updateRows`가 공유하고, 팝업은 `validatePopupValues(fields, values, row, localeText)`가 담당. **required가 `validator`보다 먼저**이고 빈 값이면 `validator`를 호출하지 않는다 — 안 그러면 소비자마다 빈 값 처리를 중복 작성한다.
+- 빈 값 정의(`isBlankValue`): null/undefined/빈 문자열/공백만 있는 문자열/빈 배열. **`0`과 `false`는 유효한 값** — 숫자 0이나 체크 해제를 미입력으로 취급하면 정상 값의 저장을 막는다(BUG-004의 "브라우저가 주는 값을 그대로 믿지 말고 도메인에서 의도를 도출" 계열).
+- `required: true`는 `editor` 선언과 같이 **편집 의도로 해석**해 `editable`을 올려준다. 안 올려주면 `required`만 쓴 컬럼이 조용히 아무 일도 하지 않는다(명시적 `editable: false`는 존중).
+- 표시 조건은 `shouldShowRequired(col, gridEditable)` = 그리드 활성 + 컬럼 editable. **잠그면 헤더 표식과 셀 마커가 함께 사라진다** — 고칠 수 없는 자리의 "필수"는 할 일이 없다.
+- `popupEditor.required`로 폼 전용 오버라이드(`validator`와 같은 층위). 폼에서도 라벨에 `*` + 입력에 `aria-required`.
+- localeText 추가 키: `requiredValue`(`{column}` 토큰) · `requiredIndicatorLabel`.
+- 순수 함수 `isBlankValue` · `isRequiredViolated` · `shouldShowRequired` · `shouldMarkRequiredCell` — `_test` 노출.
+
+**구현하며 알게 된 것 (문서에 반영)**
+- **에디터 타입마다 빈 값 정규화가 다르다.** `number`(그리고 `date`) 에디터는 빈 입력을 `newValue = value`로 **되돌리므로**(datagrid.js의 기존 정규화) `changed`가 false가 되어 검증 자체를 타지 않는다. 즉 숫자 컬럼에서는 인라인으로 required를 위반할 수 없다 — 데이터는 안전하지만 "required는 어디서나 막는다"고 쓰면 과장이 된다. 데모의 인라인 차단 시연은 텍스트 컬럼으로 옮겼다.
+- **`pasteTsv('')`는 `if (!text)` 가드에서 곧바로 0을 반환**해 required 검증을 거치지 않는다. 처음 데모가 이걸 "required가 거부했다"고 표시했는데, **비필수 컬럼에 같은 값을 붙여넣는 대조군**을 돌려보니 그쪽도 0이었다 → 문구가 거짓이었다. 공백 문자열(truthy)로 바꾸고 대조군에서 반영됨을 확인해 원인이 required임을 입증했다. *거부를 검증할 때는 "거부되지 않아야 하는 대조군"이 반드시 필요하다.*
+
 ### v2.16 — 팝업 에디터 popupEditor (사용자 요청)
 행 단위 폼 편집. 기존 인라인 셀 편집을 **대체하지 않고 추가 옵션으로** 얹는다.
 
@@ -205,11 +307,13 @@ popupEditor: {
 **검증** — `column.validator`를 필드 변경 시 + Save 시 실행. 실패하면 라벨을 `--dg-invalid-color`로 바꾸고 필드 아래 메시지, **Save 차단**. Save 시 변경 필드마다 `beforeCellSave`를 발사하고 하나라도 `e.cancel`이면 Save 전체 중단.
 
 **컬럼 단위 커스터마이즈 `column.popupEditor`** — 팝업 안에서만 적용되는 오버레이 레이어. 그리드 셀 표시는 건드리지 않는다.
-`hide` · `label` · `hint` · `readonly` · `order` · `span` / 오버라이드 `editor`·`editorOptions`·`editorSearch`·`validator`·`placeholder` / 커스텀 `buttons[]`(입력 오른쪽) · `before(ctx)` · `after(ctx)`(HTML 문자열 또는 Element).
+`hide` · `label` · `hint` · `readonly` · `order` · `span` / 오버라이드 `editor`·`editorOptions`·`editorSearch`·`validator`·`required`(v2.19)·`placeholder` / 커스텀 `buttons[]`(입력 오른쪽) · `before(ctx)` · `after(ctx)`(HTML 문자열 또는 Element).
 셀은 좁아서 `select`, 폼은 넓어서 `searchselect` 같은 **맥락별 에디터 교체**가 주 용도.
 입력 자체를 대체하는 `render(ctx)`는 **넣지 않는다** — `editor: { init, getValue, destroy }` 커스텀 에디터가 팝업에서도 동일하게 동작하므로 같은 일을 하는 두 번째 방법을 만들지 않는다. `before`/`after`는 값을 갖지 않는 표시 전용.
 
-**버튼** — `buttons` 배열. 문자열 `'save'`/`'cancel'`은 내장, 객체는 `{ key, text, variant: 'primary'|'default'|'danger', disabled: bool|(ctx)=>bool, onClick(ctx) }`. 배열 순서가 곧 배치 순서라 기본 버튼을 빼거나 앞뒤에 끼울 수 있다. `ctx` = `{ grid, data, colDef?, value?, values, getValue, setValue, isValid, reset, save, cancel, close, fieldEl? }`.
+**버튼** — `buttons` 배열. 문자열 `'save'`/`'cancel'`은 내장, 객체는 `{ key, text, variant: 'primary'|'default'|'danger', disabled: bool|(ctx)=>bool, onClick(ctx), onLoad(ctx) }`. 배열 순서가 곧 배치 순서라 기본 버튼을 빼거나 앞뒤에 끼울 수 있다. `ctx` = `{ grid, data, colDef?, value?, values, getValue, setValue, isValid, reset, save, cancel, close, fieldEl?, buttonEl? }`.
+
+`onLoad`(v2.18) — 폼이 **완전히 만들어진 직후 한 번**, DOM 순서(필드 버튼 → 푸터 버튼)로 호출. 행 값을 보고 버튼 문구·잠금을 정하거나 필드·값을 초기화하는 자리다. 설계 요점 세 가지: ① **빌드 도중이 아니라 완료 후** 호출해야 "뒤 필드를 만지는" 초기화가 성립한다(빌드 중 호출이면 아직 없는 필드를 조용히 놓친다). ② **포커스·`popupEditStarted`보다 먼저** 호출해 초기 포커스가 초기화 결과를 보고 정해지고, 리스너가 완성된 상태를 보게 한다. ③ `onLoad` 안에서 `close()/cancel()/save()`로 팝업이 사라질 수 있으므로 목록을 복사해 돌면서 매 반복 생존을 확인하고, 닫혔으면 `openEditPopup`은 `false`를 반환한다(열린 적 없는 것으로 취급). `disabled`를 선언한 버튼은 이후 재평가가 `onLoad`의 수동 지정을 덮는다 — 로드 시점 1회 잠금은 `ctx.buttonEl.disabled`만 쓴다. 내장 버튼은 동작이 고정이라 콜백을 받지 않는다.
 
 **이벤트** — `beforePopupEdit`(취소 가능) / `popupEditStarted` / `popupFieldChanged` / `beforePopupSave`(취소 가능, `e.values` 가공) / `popupEditStopped`(`{ committed, changes }`).
 

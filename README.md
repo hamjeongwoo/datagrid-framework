@@ -44,7 +44,7 @@ python demo/server.py
 | 페이지 | 내용 |
 |---|---|
 | `index.html` | **Template** — 10,000행 실전 예제 (툴바 · 퀵 필터 · 선택 · 편집 · CSV · 다크 모드) |
-| `examples/features.html` | **Features** — 기능별 데모 59개 (정렬 · 필터 · 그룹핑/집계 · 선택 · 인라인 편집 · **팝업 폼 편집** · 트리 · 원격 데이터/CRUD 스테이징 · 클립보드 · 상태 저장 · Excel/CSV · 10만 행 가상화 · 컬럼 가상화 · 다국어) |
+| `examples/features.html` | **Features** — 기능별 데모 64개 (정렬 · 필터 · 그룹핑/집계 · 선택 · 인라인 편집 · **팝업 폼 편집** · 트리 · 원격 데이터/CRUD 스테이징 · 클립보드 · 상태 저장 · Excel/CSV · 10만 행 가상화 · 컬럼 가상화 · 다국어) |
 | `examples/components.html` | **Components** — 디자인 시스템 갤러리 (토큰 · 헤더/행 상태 · 체크박스 · 태그 · 필터 메뉴 · 페이지네이션 바) |
 
 ## 그리드 옵션
@@ -58,6 +58,7 @@ python demo/server.py
 | `pagination` | boolean | 페이지네이션 사용 |
 | `paginationPageSize` | number | 페이지 크기 (기본 20) |
 | `paginationPageSizeOptions` | array | 페이지 크기 선택지 |
+| `infiniteScroll` | boolean \| object | 무한 스크롤 `{ threshold, pageSize, pageSizeSelector }` — 바닥 근처에서 다음 페이지를 자동 조회해 **이어 붙임**(교체 아님). `dataSource` 필요, 페이저 UI·`treeData`와 배타. 켜면 `pageMode`가 `'server'`로 올라감. 끝 판정은 서버 플래그(`last`/`lastPage`/`isLast`/`hasMore`/`hasNext`) → `total` → 수신 건수 순. 하단 상태 바가 진행/마지막을 표시하고 **크기 선택 UI**를 제공(선택지는 `paginationPageSizeOptions`, `pageSizeSelector: false`로 끔) (`loadMore()` / `hasMoreRows()`, `rowsAppended` / `lastPageReached`) |
 | `zebra` | boolean | 홀수 행 배경 |
 | `theme` | `'light'` \| `'dark'` | 초기 테마 |
 | `localeText` | object | 그리드가 그리는 UI 문자열(필터 메뉴·페이지네이션·오버레이·요약·aria-label) 교체. 내장 `DataGrid.locales.ko` / `.en`, 지정한 키만 덮어쓰고 나머지는 영어. `{from}`·`{total}`·`{column}`·`{count}` 토큰 치환, `setOptions`로 런타임 전환 |
@@ -74,7 +75,7 @@ python demo/server.py
 | `getRowClass(row, index)` | function | 행별 CSS 클래스 |
 | `editable` | boolean | 그리드 전체 편집 잠금 (`false`면 컬럼 설정 무시, `setEditable`로 전환) |
 | `editOnSingleClick` / `enterMovesDown` / `tabMovesRight` | boolean | 클릭 한 번 편집 / Enter·Tab 연속 편집 |
-| `popupEditor` | boolean 또는 object | 행 전체를 폼에서 편집 — `{ position: 'center'\|'left'\|'right', width, columns, title, trigger, fields, instantUpdate, closeOnBackdrop, buttons }`. 폼 필드는 컬럼 정의(`editor`/`editorOptions`/`validator`)를 그대로 재사용, 편집 불가 컬럼은 읽기 전용 표시. 컬럼별 커스터마이즈는 `column.popupEditor` |
+| `popupEditor` | boolean 또는 object | 행 전체를 폼에서 편집 — `{ position: 'center'\|'left'\|'right', width, columns, title, trigger, fields, instantUpdate, closeOnBackdrop, buttons }`. 폼 필드는 컬럼 정의(`editor`/`editorOptions`/`validator`)를 그대로 재사용, 편집 불가 컬럼은 읽기 전용 표시. `buttons` 항목은 `{ key, text, variant, title, disabled, onClick(ctx), onLoad(ctx) }` — `onLoad`는 폼이 만들어진 직후 한 번 호출되어 버튼·필드·값을 초기화하는 자리. 컬럼별 커스터마이즈는 `column.popupEditor` |
 | `trackChanges` | boolean | 변경 추적 — dirty 셀 표시 + `getChanges`/`commitChanges`/`rollbackChanges` (`softDelete`/`statusColumn`이 자동 활성화) |
 | `softDelete` | boolean | CRUD 스테이징 삭제 — 서버(기준선) 행은 삭제 표시(취소선, 편집 차단, `restoreRows`로 복원), 신규 행은 로우 제거. `commitChanges`가 표시 행을 물리 제거 |
 | `statusColumn` | boolean 또는 object | 변경 상태(신규/수정/삭제) 태그 컬럼 자동 표시 — `{ headerName, width, labels, colors }` 부분 지정 가능 |
@@ -88,7 +89,7 @@ python demo/server.py
 | `domLayout` | `'normal'` \| `'fill'` \| `'autoHeight'` | 높이 결정 방식. `'normal'`(기본) = `height: 100%`(컨테이너 높이가 확정일 때), `'fill'` = 컨테이너를 정확히 채움(데이터 양과 무관 — `flex: 1` 영역용), `'autoHeight'` = 내용 높이만큼 늘어남(세로 가상화 없음) |
 | `showHeader` | boolean | `false`면 헤더 영역 숨김 |
 | `columnGroups` | array | 2단 컬럼 그룹 헤더 `[{ headerName, children }]` |
-| `dataSource` | object | 원격 데이터 `{ url, method, params, request, parse, headers, paramsFormat, paramsSerializer }` — `request(state)`로 요청 파라미터를 서버 스펙에 맞춤, `parse(json)`으로 응답 변환, `headers`로 인증, `paramsFormat`으로 중첩 표기 선택(`'dot'` 기본 → `page.selectPage=1` Spring·ASP.NET / `'bracket'` → `page[selectPage]=1` qs·PHP·Rails), `paramsSerializer(params)`로 쿼리스트링 생성 자체를 대체 (`reloadData()` 재요청, `setDataSource()` 교체) |
+| `dataSource` | object | 원격 데이터 `{ url, method, params, autoLoad, request, parse, headers, paramsFormat, paramsSerializer }` — `autoLoad: false`면 **생성 시 자동 조회를 하지 않음**(기본 true — 검색 조건을 받은 뒤 `reloadData()`로 시작, 명시적 호출과 첫 조회 이후의 자동 재조회는 그대로), `request(state)`로 요청 파라미터를 서버 스펙에 맞춤, `parse(json)`으로 응답 변환, `headers`로 인증, `paramsFormat`으로 중첩 표기 선택(`'dot'` 기본 → `page.selectPage=1` Spring·ASP.NET / `'bracket'` → `page[selectPage]=1` qs·PHP·Rails), `paramsSerializer(params)`로 쿼리스트링 생성 자체를 대체 (`reloadData()` 재요청, `setDataSource()` 교체) |
 | `rowDetail` | object | 마스터-디테일 `{ renderer(row), height }` (`expandRow`/`collapseRow`/`toggleRowDetail`) |
 | `treeData` | object | 계층 데이터 트리 표시 `{ treeField, indent, defaultExpandLevel, childrenField \| parentIdField+idField, cascade, checkboxDisabled(row), summary, fetchChildren(row), hasChildren(row) }` — `checkboxSelection` 컬럼과 함께 쓰면 3상태 캐스케이드 선택. `pagination`/`groupBy`와 배타 |
 | `title` / `toolbar` | string / element | 그리드 타이틀 바 / 소비자 DOM 툴바 슬롯 |
@@ -105,14 +106,15 @@ python demo/server.py
 | `comparator(a, b, rowA, rowB)` | 커스텀 정렬 |
 | `dataType` | `'string'` \| `'number'` \| `'date'` \| `'bool'` — 정렬 비교·필터 종류·정렬 방향·기본 에디터 자동 결정 |
 | `format` | `'$#,##0.00'` \| `'yyyy-MM-dd'` 선언적 포맷 (`DataGrid.format()` 유틸과 동일 패턴) |
-| `aggFunc` | `'sum'` \| `'avg'` \| `'min'` \| `'max'` \| `'count'` — 그룹/전체 요약 집계 |
+| `aggFunc` | `'sum'` \| `'avg'` \| `'min'` \| `'max'` \| `'count'` 또는 커스텀 함수 `(values, ctx) => any` — 그룹 행 · 전체 요약 · 트리 부모 노드에 같은 규칙으로 적용. `ctx = { rows, field, colDef, parent }`이고 `parent`는 트리 요약에서만 부모 행(그룹·전체합계는 `null`). 반환 `null`이면 셀을 비움. 커스텀 결과에는 `valueFormatter`가 적용되지 않는다. 필터 적용 후 행으로 매번 재계산되므로 "이름 (자손 수)" 같은 표시가 필터를 따라간다 |
 | `filter` | `'text'` \| `'number'` \| `'set'` (`true` = text) |
 | `editable` | 더블클릭/Enter로 인라인 편집 — `editor` 선언 시 생략 가능 (명시적 `false`가 우선) |
-| `editor` | `'text'` \| `'number'` \| `'date'` \| `'datetime'` \| `'select'` \| `'multiselect'`(배열 값) \| `'radio'` \| `'checkbox'` 또는 `{ init, getValue, destroy }` 커스텀 객체. 생략 시 `dataType`이 `number`/`date`면 그에 맞는 에디터 |
+| `editor` | `'text'` \| `'number'` \| `'date'` \| `'datetime'` \| `'select'` \| `'multiselect'` \| `'radio'` \| `'checkbox'` 또는 `{ init, getValue, destroy }` 커스텀 객체. 생략 시 `dataType`이 `number`/`date`면 그에 맞는 에디터.<br>`multiselect`의 값은 **배열과 콤마 구분 문자열을 모두** 받는다 — `['js','css']`와 `'js,css'`(항목 공백 허용)가 같은 값이고 표시·편집·변경 판정이 동일하다. 커밋은 **그 행이 원래 쓰던 표현을 유지**하며(배열→배열, 문자열→콤마 문자열), 원본이 `null`/빈 값이면 콤마 문자열이 기본. 구분자는 `,` 고정이라 옵션 값에 콤마가 들어가면 배열로 저장해야 한다 |
 | `editorOptions` | select/multiselect/radio 선택지 — `['a', 'b']` 또는 `[{ label: '한국', value: 'kr' }]` (label 표시, value 저장·타입 보존). checkbox는 `{ checked: 'Y', unchecked: 'N' }` 매핑. date/datetime은 `{ min, max, step, valueType }` |
 | `editorSearch` | select를 검색 패널로 — `true`(정적 목록 로컬 필터) 또는 `{ fetch(query) => Promise<options>, debounce, minLength, placeholder }` (lazy 검색) |
 | `validator(value, row)` | `true` 또는 오류 메시지 반환 — 거부 시 커밋 차단 + 빨간 표시 |
-| `popupEditor` | 팝업 폼 안에서만 적용되는 컬럼 오버레이 — `false`(폼에서 제외) 또는 `{ label, hint, hide, readonly, order, span, editor, editorOptions, editorSearch, validator, buttons, before(ctx), after(ctx) }`. `hide`/`readonly`는 컬럼의 `hide`/`editable`을 덮어쓰므로 "그리드엔 숨기고 폼에서만 편집"도 가능. 그리드 셀 표시는 그대로 |
+| `required` | 필수 컬럼 — 표시 + 검증을 함께 켠다. 그리드 표시는 **비어 있는 셀**에만 붙는 오른쪽 위 모서리 마커 하나(`trackChanges`의 왼쪽 위 주황 마커와 자리·색 분리). 헤더에는 표식을 두지 않고, `*`는 팝업 폼 라벨에만. 빈 값 커밋은 인라인·팝업·붙여넣기·`updateRows`에서 모두 거부(`localeText.requiredValue`). `0`·`false`는 유효한 값. `editor`와 같이 편집 의도로 해석되어 `editable` 생략 시 true. 그리드를 잠그면 표시도 사라짐. `validator`보다 먼저 검사 |
+| `popupEditor` | 팝업 폼 안에서만 적용되는 컬럼 오버레이 — `false`(폼에서 제외) 또는 `{ label, hint, hide, readonly, order, span, editor, editorOptions, editorSearch, validator, required, buttons, before(ctx), after(ctx) }`. `hide`/`readonly`는 컬럼의 `hide`/`editable`을 덮어쓰므로 "그리드엔 숨기고 폼에서만 편집"도 가능. 필드 버튼도 `onLoad(ctx)`를 지원하며 푸터 버튼보다 먼저 호출됨. 그리드 셀 표시는 그대로 |
 | `suppressCopy` | 클립보드 복사에서 제외 (CSV에는 영향 없음) |
 | `exportFormatter(value, row)` | CSV/Excel 내보내기 전용 포맷 (화면과 분리) |
 | `wrapText` | 셀 줄바꿈 (`autoRowHeight`와 함께 행 높이 자동) |
@@ -139,7 +141,7 @@ cellRenderer: DataGrid.renderers.progress()   // 0–100 진행 바
 cellRenderer: DataGrid.renderers.select()     // 저장된 value를 editorOptions의 label로 표시
 cellRenderer: DataGrid.renderers.radio()      // select와 동일 (radio 에디터 짝꿍)
 cellRenderer: DataGrid.renderers.searchselect() // select와 동일 + lazy 검색으로 고른 값도 label로 (editorSearch 짝꿍)
-cellRenderer: DataGrid.renderers.multiselect() // 값 배열을 label 칩 목록으로
+cellRenderer: DataGrid.renderers.multiselect() // 다중 값을 label 칩 목록으로 (배열·콤마 문자열 모두)
 cellRenderer: DataGrid.renderers.checkbox()   // 값을 체크박스 모양으로 (표시 전용, Y/N·0/1 매핑 지원)
 ```
 
@@ -161,6 +163,7 @@ cellRenderer: DataGrid.renderers.checkbox()   // 값을 체크박스 모양으�
 `showLoadingOverlay()` / `hideLoadingOverlay()` ·
 `setTheme('light'|'dark')` · `refresh()` · `refreshCell(row, field)` / `refreshRow(row)` / `refreshColumn(colId)` ·
 `setOptions(patch)` · `expandRow(row)` / `collapseRow(row)` / `toggleRowDetail(row)` · `reloadData({ keepPage? })`(1페이지로 리셋 후 재조회 — 보던 페이지를 지키려면 `{ keepPage: true }`) / `setDataSource(ds)` ·
+`loadMore()` / `hasMoreRows()` (infiniteScroll — 수동 이어받기 · 남은 페이지 확인) ·
 `toggleNode(row, expanded?)` / `expandNode(row)` / `collapseNode(row)` / `isNodeExpanded(row)` / `expandAllNodes(level?)` / `collapseAllNodes()` ·
 `setPinnedTopRows(rows)` · `setEnabled(bool)` / `isEnabled()` · `once(event, fn)` · `destroy()`
 
@@ -192,6 +195,8 @@ grid.setOptions({
 grid.on('selectionChanged', function (e) { e.selectedRows });
 grid.on('cellValueChanged', function (e) { e.data, e.colDef, e.oldValue, e.newValue });
 grid.on('rowValueChanged', function (e) { e.data, e.changes /* 행 단위 변경 묶음 */ });
+grid.on('rowsAppended', function (e) { e.rows /* 이번에 받은 행 */, e.page, e.loaded, e.hasMore });
+grid.on('lastPageReached', function (e) { e.loaded, e.total /* 서버가 안 주면 null */ });
 grid.on('sortChanged' | 'filterChanged' | 'paginationChanged' | 'groupChanged' |
         'groupToggled' | 'editingStarted' | 'editingStopped' | 'rowClicked' |
         'rowDoubleClicked' | 'cellClicked' | 'cellDoubleClicked' | 'columnResized' |
@@ -228,6 +233,14 @@ var grid = new DataGrid(el, {
     title: function (row) { return row.name + ' 편집'; },
     buttons: [
       { key: 'reset', text: '초기화', onClick: function (ctx) { ctx.reset(); } },
+      { key: 'approve', text: '승인',
+        // 폼이 완전히 만들어진 직후 한 번 — 버튼·필드·값을 초기화하는 자리
+        onLoad: function (ctx) {
+          var done = ctx.data.status === 'Active';
+          ctx.buttonEl.disabled = done;
+          ctx.buttonEl.textContent = done ? '승인 완료' : '승인';
+        },
+        onClick: function (ctx) { ctx.setValue('status', 'Active'); } },
       'save', 'cancel',                    // 배열 순서가 곧 배치 순서
     ],
   },
@@ -236,6 +249,10 @@ var grid = new DataGrid(el, {
 
 행을 더블클릭하면 폼이 열립니다(`trigger: 'none'`이면 `openEditPopup()`으로만).
 기본은 Save에서 변경된 필드만 일괄 커밋하고, `instantUpdate: true`면 즉시 반영 + Cancel이 연 시점으로 롤백합니다.
+
+버튼 콜백의 `ctx`는 `{ grid, data, colDef, field, fieldEl, buttonEl, value, values, getValue, setValue, isValid, reset, save, cancel, close }`입니다.
+`onLoad`는 폼이 다 만들어진 뒤 **DOM 순서**(필드 버튼 → 푸터 버튼)로 한 번씩 호출되므로 그 시점에 모든 필드가 이미 존재합니다 — 다른 필드의 값도 초기화할 수 있습니다.
+`disabled`를 함께 선언하면 그 결과가 `onLoad`의 수동 지정을 덮으니, 로드 시점에만 잠글 때는 `ctx.buttonEl.disabled`만 쓰세요.
 
 ## 테마 커스터마이징
 
