@@ -73,7 +73,7 @@ python demo/server.py
 | `grandTotal` | boolean | 하단 전체 요약 행 (`aggFunc` 컬럼 집계) |
 | `rowNumbers` | boolean | 왼쪽 고정 행 번호 컬럼 |
 | `getRowClass(row, index)` | function | 행별 CSS 클래스 |
-| `editable` | boolean | 그리드 전체 편집 잠금 (`false`면 컬럼 설정 무시, `setEditable`로 전환) |
+| `editable` | boolean | 그리드 전체 편집 잠금 (`false`면 컬럼 설정 무시, `setEditable`로 전환). 일부 행/셀만 잠그려면 `setRowEnabled` / `setCellEnabled` |
 | `editOnSingleClick` / `enterMovesDown` / `tabMovesRight` | boolean | 클릭 한 번 편집 / Enter·Tab 연속 편집 |
 | `popupEditor` | boolean 또는 object | 행 전체를 폼에서 편집 — `{ position: 'center'\|'left'\|'right', width, columns, title, trigger, fields, instantUpdate, closeOnBackdrop, buttons }`. 폼 필드는 컬럼 정의(`editor`/`editorOptions`/`validator`)를 그대로 재사용, 편집 불가 컬럼은 읽기 전용 표시. `buttons` 항목은 `{ key, text, variant, title, disabled, onClick(ctx), onLoad(ctx) }` — `onLoad`는 폼이 만들어진 직후 한 번 호출되어 버튼·필드·값을 초기화하는 자리. 컬럼별 커스터마이즈는 `column.popupEditor` |
 | `trackChanges` | boolean | 변경 추적 — dirty 셀 표시 + `getChanges`/`commitChanges`/`rollbackChanges` (`softDelete`/`statusColumn`이 자동 활성화) |
@@ -150,6 +150,7 @@ cellRenderer: DataGrid.renderers.checkbox()   // 값을 체크박스 모양으�
 `setRowData(rows)` · `getRowData()` · `addRow(row, index?)` / `addRows(rows, index?)` (index 0 = 맨 앞 삽입) · `updateRow(row, changes)` ·
 `removeRows(rows)` / `removeSelectedRows()` / `restoreRows(rows)` / `getRowStatus(row)` · `getSelectedRows()` · `selectAll()` / `deselectAll()` · `getCellRange()` / `clearCellRange()` · `findNext(text)` ·
 `startEdit(row, field)` / `stopEdit(commit)` / `isEditing()` · `setEditable(bool)` / `isEditable()` ·
+`setRowEnabled(row|rows, bool)` / `setCellEnabled(row|rows, field|fields, bool)` / `isRowEnabled(row)` / `isCellEnabled(row, field)` / `resetEnabled()` (행·셀 단위 잠금 — 행은 편집+선택, 셀은 편집 계열만) ·
 `openEditPopup(row, field?)` / `closeEditPopup(commit?)` / `isPopupEditing()` / `getPopupValues()` ·
 `copy()` / `pasteTsv(text)` (Ctrl+C/V 엑셀 호환 TSV) ·
 `getChanges()` / `isDirty()` / `commitChanges()` / `rollbackChanges()` · `undo()` / `redo()` / `canUndo()` / `canRedo()` ·

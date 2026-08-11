@@ -4203,6 +4203,92 @@
     </script>
   </div>
 
+  <!-- ======================================================== 행/셀 잠금 -->
+  <h2 class="section" id="row-cell-locking">Row / Cell Locking (setRowEnabled · setCellEnabled)</h2>
+  <p class="section-desc">
+    <code class="inline">setRowEnabled(row, false)</code>는 <strong>행</strong>을,
+    <code class="inline">setCellEnabled(row, field, false)</code>는 <strong>셀</strong>을 잠급니다.
+    행 잠금은 편집(인라인·붙여넣기·채우기·팝업 폼)과 <strong>선택까지</strong> 막고 흐리게 표시하며,
+    셀 잠금은 편집 계열만 막습니다. 잠금 상태는 그리드가 들고 있으므로 호출 한 번이면
+    다시 그리기까지 끝나고, <code class="inline">setRowData()</code>로 데이터를 갈아끼우면 함께 초기화됩니다.
+    조회는 <code class="inline">isRowEnabled(row)</code> / <code class="inline">isCellEnabled(row, field)</code>,
+    일괄 해제는 <code class="inline">resetEnabled()</code>입니다.
+  </p>
+  <div class="example-card">
+    <div class="example-html">
+      <div class="toolbar">
+        <button class="tb-btn" id="lockRows" type="button">선택 행 잠그기</button>
+        <button class="tb-btn" id="unlockRows" type="button">Inactive 행 풀기</button>
+        <button class="tb-btn" id="lockSalary" type="button">선택 행의 급여 셀만 잠그기</button>
+        <button class="tb-btn" id="lockReset" type="button">전체 해제</button>
+      </div>
+      <div id="gridLocking" class="grid-wrap-md"></div>
+      <div class="status-line" id="lockStatus">
+        Name·Salary·City는 더블클릭으로 편집됩니다. 잠긴 행은 편집도 선택도 되지 않습니다.
+      </div>
+    </div>
+    <script type="text/x-example">
+      var lockStatus = document.getElementById('lockStatus');
+      var lockRows = DemoData.makeEmployees(40, 11);   // 시드 고정
+
+      var grid = new DataGrid(document.getElementById('gridLocking'), {
+        rowData: lockRows,
+        rowSelection: 'multiple',
+        editableIndicator: true,
+        columnDefs: [
+          { colId: 'sel', checkboxSelection: true, headerCheckboxSelection: true, width: 44 },
+          { field: 'name', headerName: 'Name', editable: true, width: 150 },
+          { field: 'department', headerName: 'Department', width: 130 },
+          { field: 'status', headerName: 'Status', width: 110 },
+          { field: 'salary', headerName: 'Salary', editable: true, editor: 'number',
+            format: '#,##0', align: 'right', width: 110 },
+          { field: 'city', headerName: 'City', editable: true, width: 120 },
+        ],
+      });
+
+      // 데이터에서 파생되는 규칙 — 퇴사자(Inactive)는 처음부터 잠근 채로 시작한다.
+      // 배열을 그대로 넘기므로 다시 그리기는 한 번만 일어난다.
+      grid.setRowEnabled(lockRows.filter(function (r) { return r.status === 'Inactive'; }), false);
+
+      function lockReport(msg) {
+        var lockedRows = lockRows.filter(function (r) { return !grid.isRowEnabled(r); });
+        var lockedSalary = lockRows.filter(function (r) {
+          return grid.isRowEnabled(r) && !grid.isCellEnabled(r, 'salary');
+        });
+        lockStatus.textContent = msg +
+          ' — 잠긴 행 ' + lockedRows.length + '개, 급여 셀만 잠긴 행 ' + lockedSalary.length + '개';
+      }
+      lockReport('Inactive 직원을 잠근 상태로 시작');
+
+      document.getElementById('lockRows').addEventListener('click', function () {
+        var sel = grid.getSelectedRows();
+        if (!sel.length) { lockStatus.textContent = '먼저 행을 선택하세요.'; return; }
+        grid.setRowEnabled(sel, false);
+        // 잠근 행은 선택에서 빠진다 — UI로 해제할 수단이 없어 남겨두면 갇히기 때문
+        lockReport(sel.length + '개 행 잠금 (선택 해제됨)');
+      });
+
+      document.getElementById('unlockRows').addEventListener('click', function () {
+        var inactive = lockRows.filter(function (r) { return r.status === 'Inactive'; });
+        grid.setRowEnabled(inactive, true);
+        lockReport('Inactive 행 ' + inactive.length + '개 해제');
+      });
+
+      document.getElementById('lockSalary').addEventListener('click', function () {
+        var sel = grid.getSelectedRows();
+        if (!sel.length) { lockStatus.textContent = '먼저 행을 선택하세요.'; return; }
+        // 셀 잠금은 선택을 건드리지 않는다 — 편집 계열만 막는다
+        grid.setCellEnabled(sel, 'salary', false);
+        lockReport(sel.length + '개 행의 Salary 셀 잠금 (선택은 유지)');
+      });
+
+      document.getElementById('lockReset').addEventListener('click', function () {
+        grid.resetEnabled();
+        lockReport('전체 해제');
+      });
+    </script>
+  </div>
+
 </div>
 
 <script src="../dist/datagrid.js"></script>

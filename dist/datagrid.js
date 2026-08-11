@@ -687,9 +687,12 @@
    * 기준은 shouldShowEditableIcon과 동일한 "지금 실제로 편집할 수 있는가" —
    * 고칠 수 없는 자리에 "필수"라고 적어도 사용자가 할 수 있는 일이 없다.
    * 그리드를 잠그면(setEditable(false)) 표시가 사라진다.
+   *
+   * `editableHere`는 컬럼보다 넓은 범위의 잠금을 모두 반영한 값이다 — 헤더에서는
+   * 그리드 잠금만, 셀에서는 행/셀 잠금까지 포함해서 넘긴다.
    */
-  function shouldShowRequired(col, gridEditable) {
-    return !!(gridEditable && col && col.required && col.editable);
+  function shouldShowRequired(col, editableHere) {
+    return !!(editableHere && col && col.required && col.editable);
   }
 
   /**
@@ -698,8 +701,96 @@
    * 그래서 마커는 조치가 필요한 곳만 가리킨다(dirty 마커가 "상태"를 가리키는 것과
    * 같은 역할). 그리드 헤더에는 표식을 두지 않는다 — `*`는 팝업 폼 라벨에만.
    */
-  function shouldMarkRequiredCell(col, value, gridEditable) {
-    return shouldShowRequired(col, gridEditable) && isBlankValue(value);
+  function shouldMarkRequiredCell(col, value, editableHere) {
+    return shouldShowRequired(col, editableHere) && isBlankValue(value);
+  }
+
+  /* ---- 행/셀 잠금 (setRowEnabled · setCellEnabled) ----
+   *
+   * 잠금 상태는 "잠긴 것만" 담는 sparse 맵이다. 기본이 활성이므로 행이 10,000개여도
+   * 잠근 3개만 들고 있으면 된다.
+   *   { rows: { <rowId>: true }, cells: { <rowId>: { <field>: true } } }
+   *
+   * 맵을 그 자리에서 고치지 않고 새 맵을 반환하는 이유는 두 가지다 — 테스트가
+   * "입력 → 출력"으로 단순해지고, 잠금이 바뀌었는지를 참조 비교로 알 수 있다.
+   */
+
+  function emptyLockMap() {
+    return { rows: Object.create(null), cells: Object.create(null) };
+  }
+
+  function cloneLockMap(locks) {
+    const src = locks || emptyLockMap();
+    const out = emptyLockMap();
+    for (const id in src.rows) out.rows[id] = true;
+    for (const id in src.cells) {
+      const fields = Object.create(null);
+      let any = false;
+      for (const f in src.cells[id]) { fields[f] = true; any = true; }
+      if (any) out.cells[id] = fields;
+    }
+    return out;
+  }
+
+  /** 행 전체가 잠겼는가. */
+  function isRowLocked(locks, rowId) {
+    return !!(locks && locks.rows && locks.rows[rowId]);
+  }
+
+  /**
+   * 이 셀이 잠겼는가.
+   * 행 잠금은 그 행의 모든 셀을 덮는다 — 더 넓은 범위가 이긴다. 그래서 행을 잠근 뒤
+   * 셀 하나만 `setCellEnabled(row, field, true)`로 되살릴 수는 없다(문서에 명시).
+   */
+  function isCellLocked(locks, rowId, field) {
+    if (isRowLocked(locks, rowId)) return true;
+    const byRow = locks && locks.cells ? locks.cells[rowId] : null;
+    return !!(byRow && byRow[field]);
+  }
+
+  /** 행 잠금을 일괄 설정한 새 맵. 배열을 받는 이유는 N번 복사를 피하기 위함. */
+  function setRowLocks(locks, rowIds, locked) {
+    const out = cloneLockMap(locks);
+    (rowIds || []).forEach(id => {
+      if (id === undefined || id === null) return;
+      if (locked) out.rows[id] = true;
+      else delete out.rows[id];
+    });
+    return out;
+  }
+
+  /** 셀 잠금을 일괄 설정한 새 맵. 마지막 필드를 풀면 행 항목 자체를 지운다(찌꺼기 방지). */
+  function setCellLocks(locks, rowIds, fields, locked) {
+    const out = cloneLockMap(locks);
+    (rowIds || []).forEach(id => {
+      if (id === undefined || id === null) return;
+      (fields || []).forEach(field => {
+        if (field === undefined || field === null) return;
+        if (locked) {
+          if (!out.cells[id]) out.cells[id] = Object.create(null);
+          out.cells[id][field] = true;
+        } else if (out.cells[id]) {
+          delete out.cells[id][field];
+          let any = false;
+          for (const f in out.cells[id]) { any = true; break; }
+          if (!any) delete out.cells[id];
+        }
+      });
+    });
+    return out;
+  }
+
+  /**
+   * 이 셀을 지금 편집할 수 있는가 — **모든 편집 진입점이 공유하는 단 하나의 판정**.
+   * 더블클릭·단일클릭·키보드 Enter·startEdit()·인접 셀 이동·붙여넣기·채우기·팝업 폼이
+   * 전부 이 함수를 거친다. 한 곳만 막으면 나머지로 새어 나가기 때문이다.
+   *
+   * 넓은 범위부터: 그리드 잠금(setEditable) → 행 잠금 → 셀 잠금 → 컬럼 editable.
+   */
+  function isCellEditableNow(locks, rowId, col, gridEditable) {
+    if (!gridEditable) return false;
+    if (!col || !col.editable || col.field === undefined) return false;
+    return !isCellLocked(locks, rowId, col.field);
   }
 
   /** column.format / DataGrid.format() 진입점 — '#'나 '0'이 있으면 숫자, 아니면 날짜 패턴. */
@@ -2355,8 +2446,10 @@
    * 순서 규칙: 기본은 컬럼 순서(`config.fields`를 주면 그 순서), 그 위에
    * `popupEditor.order`를 지정한 필드만 그 값으로 끌어올린다(안정 정렬).
    */
-  function buildPopupFields(columns, config, gridEditable) {
+  function buildPopupFields(columns, config, gridEditable, lockedFields) {
     const explicit = config && config.fields;
+    const locked = Object.create(null);
+    (lockedFields || []).forEach(f => { locked[f] = true; });
     const out = [];
     (columns || []).forEach(col => {
       if (!col || col.field === undefined || col.field === null) return;
@@ -2378,9 +2471,10 @@
       });
       if (hasOver) editCol = Object.assign({}, col, over);
 
-      /* 그리드 잠금(setEditable(false))은 절대적 — popupEditor.readonly: false로도 못 푼다 */
+      /* 그리드 잠금(setEditable(false))과 셀 잠금(setCellEnabled(row, field, false))은
+       * 절대적 — popupEditor.readonly: false로도 못 푼다. 컬럼보다 넓은 범위이기 때문. */
       let readonly;
-      if (!gridEditable) readonly = true;
+      if (!gridEditable || locked[col.field]) readonly = true;
       else if (cfg.readonly !== undefined) readonly = !!cfg.readonly;
       else readonly = !col.editable;
 
@@ -2653,6 +2747,10 @@
       this._columns = this._buildColumns();
       this._colWidths = {};
       this._editable = options.editable !== false;
+      /* 행/셀 잠금 — 생성자 옵션이 아니라 setRowEnabled/setCellEnabled로만 바뀐다.
+       * 잠금은 보통 서버 권한이나 워크플로 상태에서 오므로 데이터가 바뀌면
+       * 기준이 사라진다 — setRowData가 _selection과 같은 줄에서 비운다. */
+      this._locks = emptyLockMap();
 
       /* data state */
       this._rows = [];
@@ -3074,6 +3172,33 @@
         return id;
       }
       return this._rows.indexOf(row);
+    }
+
+    /* ---- 행/셀 잠금 판정 (내부) ---- */
+
+    /** 이 행이 setRowEnabled(row, false)로 잠겼는가. */
+    _isRowLocked(row) {
+      return !!row && isRowLocked(this._locks, this._rowId(row));
+    }
+
+    /**
+     * 이 셀을 지금 편집할 수 있는가. 편집으로 값이 바뀌는 모든 경로가 이걸 부른다 —
+     * 인라인 진입 4곳(더블클릭·단일클릭·Enter·startEdit) + 인접 셀 이동 + 붙여넣기 +
+     * 채우기. 팝업 폼은 행 단위로 openEditPopup이, 필드 단위로 buildPopupFields가 본다.
+     */
+    _canEditCell(row, col) {
+      if (!row || row.__group || row.__detail) return false;
+      if (this._isRowDeleted(row)) return false; /* softDelete 삭제 표시 행 */
+      return isCellEditableNow(this._locks, this._rowId(row), col, this._editable);
+    }
+
+    /** 이 행에서 셀 단위로 잠긴 필드 목록 (팝업 폼의 readonly 판정용). */
+    _lockedFieldsOf(row) {
+      const byRow = row ? this._locks.cells[this._rowId(row)] : null;
+      if (!byRow) return [];
+      const out = [];
+      for (const f in byRow) out.push(f);
+      return out;
     }
 
     /* ---- view pipeline ---- */
@@ -4000,6 +4125,10 @@
       const globalIndex = (this._pageInfo ? this._pageInfo.start : 0) + ordinal;
       if (globalIndex % 2 === 1) rowEl.classList.add('dg-row-odd');
       if (this._selection[id]) rowEl.classList.add('dg-row-selected');
+      /* 행/셀 잠금 — id로 한 번만 읽어 셀 루프에서 재사용한다 */
+      const rowLocked = isRowLocked(this._locks, id);
+      const lockedCells = this._locks.cells[id] || null;
+      if (rowLocked) rowEl.classList.add('dg-row-disabled');
       if (this.options.getRowClass) {
         try {
           const rowCls = this.options.getRowClass(row, globalIndex);
@@ -4046,14 +4175,22 @@
         if (col.pinned === 'left') cell.classList.add('dg-pinned-left');
         if (col.pinned === 'right') cell.classList.add('dg-pinned-right');
         if (col.wrapText) cell.classList.add('dg-cell-wrap');
-        if (col.editable && this._editable) cell.classList.add('dg-cell-editable');
+        const cellEditable = this._canEditCell(row, col);
+        if (cellEditable) cell.classList.add('dg-cell-editable');
+        /* 컬럼은 편집 가능한데 이 셀만 잠긴 경우에만 표식을 단다.
+         * 행 잠금은 행 표시가 이미 알려주므로 셀마다 겹쳐 그리면 정보량이 0이다. */
+        else if (col.editable && this._editable && !rowLocked &&
+                 lockedCells && lockedCells[col.field]) {
+          cell.classList.add('dg-cell-disabled');
+          cell.setAttribute('aria-readonly', 'true');
+        }
         if (dirtyFields && col.field !== undefined && (col.field in dirtyFields)) {
           cell.classList.add('dg-cell-dirty');
           cell.title = `Original: ${dirtyFields[col.field]}`;
         }
         /* 필수인데 비어 있는 셀 — dirty와 동시에 뜰 수 있어서 CSS에서 반대쪽
          * 모서리를 쓴다(왼쪽 위 = 수정됨 / 오른쪽 위 = 필수 미입력). */
-        if (shouldShowRequired(col, this._editable)) {
+        if (shouldShowRequired(col, cellEditable)) {
           cell.setAttribute('aria-required', 'true');
           if (isBlankValue(row[col.field])) {
             cell.classList.add('dg-cell-required');
@@ -4136,12 +4273,15 @@
             cb.indeterminate = tState === 'indeterminate';
             cb.disabled = this._treeCheckOpts().isDisabled(row);
             cb.setAttribute('aria-label', this._t('selectSubtree'));
+            if (rowLocked) cb.setAttribute('aria-disabled', 'true');
             cb.addEventListener('click', e => { e.stopPropagation(); });
             cb.addEventListener('change', () => {
               this._treeCheckToggle(row, cb.checked);
             });
           } else {
             cb.checked = !!this._selection[id];
+            /* 잠긴 행은 체크박스도 비활성 — 여백 클릭 폴백도 함께 죽는다(5247 주석 참조) */
+            cb.disabled = rowLocked;
             cb.setAttribute('aria-label', this._t('selectRow'));
             cb.addEventListener('click', e => { e.stopPropagation(); });
             cb.addEventListener('change', () => {
@@ -4724,7 +4864,10 @@
       const td = this._treeData;
       return {
         cascade: td.cascade !== false, /* 기본 켜짐 */
-        isDisabled(row) {
+        isDisabled: row => {
+          /* 행 잠금은 트리 전용 checkboxDisabled보다 넓은 범위 — 둘 중 하나면 비활성.
+           * checkboxDisabled를 흡수하지 않고 겹치는 이유는 기존 설정을 안 깨기 위함. */
+          if (this._isRowLocked(row)) return true;
           if (!td.checkboxDisabled) return false;
           try {
             return !!td.checkboxDisabled(row);
@@ -4908,6 +5051,7 @@
     _setRowSelected(row, selected, emit) {
       const mode = this.options.rowSelection;
       if (!mode) return;
+      if (this._isRowLocked(row)) return; /* 잠긴 행은 선택 대상이 아니다 */
       const id = this._rowId(row);
       const next = {};
       if (mode !== 'single') {
@@ -4967,7 +5111,9 @@
           });
         } else {
           count = this.getSelectedRows().length;
-          total = this._viewRows.length;
+          /* 잠긴 행은 selectAll의 대상이 아니므로 분모에서도 뺀다 — 안 빼면
+           * 전부 선택해도 count < total이라 헤더가 indeterminate에 갇힌다. */
+          total = this._viewRows.filter(r => !this._isRowLocked(r)).length;
         }
         this._headerSelectAllEl.checked = count > 0 && count >= total && total > 0;
         this._headerSelectAllEl.indeterminate = count > 0 && count < total;
@@ -4984,11 +5130,19 @@
       return out;
     }
 
+    /**
+     * 표시 중인 행을 모두 선택한다. **잠긴 행은 제외** — "선택 가능한 것 전부"라는
+     * 뜻이기 때문. 반대로 deselectAll()은 잠긴 행도 함께 푼다(해제 경로가 막히면
+     * 사용자가 그 상태에 갇힌다 — 트리 3상태 헤더와 같은 규칙).
+     */
     selectAll() {
       if (this.options.rowSelection !== 'multiple') return;
       const next = {};
       for (const k in this._selection) next[k] = this._selection[k];
-      this._viewRows.forEach(row => { next[this._rowId(row)] = row; });
+      this._viewRows.forEach(row => {
+        if (this._isRowLocked(row)) return;
+        next[this._rowId(row)] = row;
+      });
       this._commitSelection(next);
     }
 
@@ -5108,7 +5262,9 @@
           const tr = target.dir === 1 ? target.from + i : target.to - i;
           const trow = this._pageRows[tr];
           if (!trow || trow.__group || trow.__detail) continue;
-          if (this._isRowDeleted(trow)) continue; /* softDelete 삭제 표시 행은 채우기 제외 */
+          /* 잠금은 행/셀 단위라 컬럼 루프 밖에서 한 번 볼 수 없다 — 대상 행마다 판정.
+           * softDelete 삭제 표시 행 제외도 여기에 함께 들어 있다. */
+          if (!this._canEditCell(trow, col)) continue;
           const value = seq[i];
           const oldValue = trow[col.field];
           if (value === oldValue) continue;
@@ -5249,7 +5405,8 @@
       }
 
       const mode = this.options.rowSelection;
-      if (mode && !this._cellSelection && !onCheckbox && !cbCell && !this._hasCheckboxColumn()) {
+      if (mode && !this._cellSelection && !onCheckbox && !cbCell && !this._hasCheckboxColumn() &&
+          !this._isRowLocked(hit.row)) {
         const id = this._rowId(hit.row);
         if (mode === 'multiple' && e.shiftKey && this._lastClickedViewIndex !== -1) {
           const from = Math.min(this._lastClickedViewIndex, hit.r);
@@ -5260,7 +5417,7 @@
           }
           for (let i = from; i <= to; i++) {
             const row = this._pageRows[i];
-            if (row && !row.__group) next[this._rowId(row)] = row;
+            if (row && !row.__group && !this._isRowLocked(row)) next[this._rowId(row)] = row;
           }
           this._commitSelection(next);
         } else if (mode === 'multiple' && (e.ctrlKey || e.metaKey)) {
@@ -5281,7 +5438,7 @@
       /* editOnSingleClick: 클릭 한 번으로 편집 시작 (체크박스 클릭 제외) */
       if (this.options.editOnSingleClick && !e.target.closest('.dg-checkbox')) {
         if (this._popupTriggerActive()) this._openPopupFromCell(hit);
-        else if (hit.col && hit.col.editable && this._editable) this._startEdit(hit);
+        else if (this._canEditCell(hit.row, hit.col)) this._startEdit(hit);
       }
     }
 
@@ -5313,7 +5470,7 @@
       });
       this._emitter.emit('rowDoubleClicked', { data: hit.row, rowIndex: hit.r });
       if (this._popupTriggerActive()) { this._openPopupFromCell(hit); return; }
-      if (hit.col && hit.col.editable && this._editable) this._startEdit(hit);
+      if (this._canEditCell(hit.row, hit.col)) this._startEdit(hit);
     }
 
     _setFocusedCell(r, c) {
@@ -5420,7 +5577,7 @@
           const col = this._visibleColumns()[c];
           if (this._popupTriggerActive()) {
             this._openPopupFromCell({ row, col, r, c });
-          } else if (col && col.editable && this._editable && row) {
+          } else if (this._canEditCell(row, col)) {
             const rowEl = this._renderedRows[r];
             const cellEl = rowEl && rowEl.querySelector(`[data-col-index="${c}"]`);
             if (cellEl) this._startEdit({ cellEl, r, c, row, col });
@@ -6193,7 +6350,7 @@
         /* 필수 마커도 같은 이유로 제자리 갱신 — 값을 채우면 사라지고 지우면 나타난다.
          * (required는 빈 값 커밋을 막지만, 원래 비어 있던 셀은 그대로 남는다) */
         if (col.required) {
-          const mark = shouldMarkRequiredCell(col, row[col.field], this._editable);
+          const mark = shouldMarkRequiredCell(col, row[col.field], this._canEditCell(row, col));
           cellEl.classList.toggle('dg-cell-required', mark);
           if (mark) cellEl.setAttribute('aria-invalid', 'true');
           else cellEl.removeAttribute('aria-invalid');
@@ -6271,7 +6428,7 @@
         const row = this._pageRows[nr];
         if (!row || row.__group || row.__detail) continue;
         const col = cols[nc];
-        if (!col || !col.editable || !this._editable || col.field === undefined) {
+        if (!this._canEditCell(row, col)) {
           if (dc !== 0) continue;
           continue; /* 세로 이동: 같은 컬럼이 계속 편집 불가면 다음 행에서 재시도 */
         }
@@ -6297,8 +6454,7 @@
      *  편집 불가 컬럼·미표시 행이면 false를 반환한다. */
     startEdit(row, field) {
       const col = this._visibleColumns().find(c => c.field === field);
-      if (!col || !col.editable || !this._editable || !row) return false;
-      if (this._isRowDeleted(row)) return false; /* softDelete 삭제 표시 행은 편집 불가 */
+      if (!this._canEditCell(row, col)) return false; /* 그리드·행·셀 잠금 + softDelete */
 
       const displayIndex = this._displayRows.indexOf(row);
       if (displayIndex === -1) return false;
@@ -6337,6 +6493,93 @@
 
     isEditable() { return this._editable; }
 
+    /* ---- 행/셀 잠금 (setRowEnabled · setCellEnabled) ----
+     *
+     * 그리드 전체 잠금(setEditable/setEnabled)의 좁은 범위 판. 상태는 그리드가 들고
+     * 있고 소비자는 "무엇을 잠글지"만 말한다 — 잠금 집합을 바깥에서 관리하면
+     * setRowData로 데이터를 갈아끼울 때 조용히 stale해지기 때문이다.
+     * 잠금은 getState()에 들어가지 않는다(권한·워크플로에서 오는 값이라 복원 대상이 아님).
+     */
+
+    /** 행 하나 / 행 배열을 모두 받기 위한 정규화. */
+    _asArray(v) {
+      if (v === undefined || v === null) return [];
+      return Array.isArray(v) ? v : [v];
+    }
+
+    /**
+     * 행을 잠근다/푼다. 잠긴 행은 편집(인라인·붙여넣기·채우기·팝업 폼)과 선택이
+     * 모두 막히고 흐리게 표시된다. 행 하나 또는 행 배열을 받으며, 배열이면
+     * 다시 그리기는 마지막에 한 번만 일어난다.
+     *
+     * 잠글 때 그 행의 선택은 해제된다 — 잠긴 행은 UI로 해제할 수단이 없으므로
+     * 남겨두면 사용자가 뺄 수 없는 선택이 된다(setEnabled(false)가 진행 중인 편집을
+     * 정리하는 것과 같은 이유).
+     */
+    setRowEnabled(rows, enabled) {
+      const list = this._asArray(rows).filter(Boolean);
+      if (!list.length) return;
+      const locking = enabled === false;
+      this._locks = setRowLocks(this._locks, list.map(r => this._rowId(r)), locking);
+      if (locking) this._releaseLockedRows(list);
+      this._afterLockChange(list, locking);
+    }
+
+    /**
+     * 셀을 잠근다/푼다. 행/필드 모두 배열을 받으므로 여러 행 × 여러 필드를 한 번에
+     * 처리할 수 있다. 막는 것은 편집 계열(인라인·붙여넣기·채우기·폼 필드)뿐이고
+     * 선택·포커스는 그대로다 — 셀 범위 선택은 사각형이라 가운데를 뺄 수 없다.
+     */
+    setCellEnabled(rows, fields, enabled) {
+      const list = this._asArray(rows).filter(Boolean);
+      const fieldList = this._asArray(fields);
+      if (!list.length || !fieldList.length) return;
+      const locking = enabled === false;
+      this._locks = setCellLocks(this._locks, list.map(r => this._rowId(r)), fieldList, locking);
+      this._afterLockChange(list, locking);
+    }
+
+    isRowEnabled(row) { return !this._isRowLocked(row); }
+
+    /** 행 잠금은 그 행의 모든 셀을 덮으므로, 행이 잠겼으면 셀도 잠긴 것으로 답한다. */
+    isCellEnabled(row, field) {
+      if (!row) return false;
+      return !isCellLocked(this._locks, this._rowId(row), field);
+    }
+
+    /** 모든 행/셀 잠금을 푼다 (resetState 계열과 같은 성격). */
+    resetEnabled() {
+      this._locks = emptyLockMap();
+      this._afterLockChange(null, false);
+    }
+
+    /** 잠긴 행을 선택에서 걷어낸다. 바뀐 게 없으면 이벤트도 내지 않는다. */
+    _releaseLockedRows(rows) {
+      const next = {};
+      for (const k in this._selection) next[k] = this._selection[k];
+      let changed = false;
+      rows.forEach(r => {
+        const id = this._rowId(r);
+        if (next[id] !== undefined) { delete next[id]; changed = true; }
+      });
+      if (!changed) return;
+      this._selection = next;
+      this._emitSelection(); /* DOM은 뒤따르는 refresh()가 다시 그린다 */
+    }
+
+    /**
+     * 잠금이 바뀐 뒤 정리. refresh()가 인라인 편집은 취소하지만 팝업 폼은
+     * "행이 데이터에서 사라졌을 때"만 닫으므로, 잠근 행의 폼은 여기서 직접 닫는다 —
+     * 안 닫으면 잠근 뒤에도 Save가 값을 써버린다.
+     */
+    _afterLockChange(rows, locking) {
+      const p = this._popup;
+      if (locking && p && p.row && rows && rows.indexOf(p.row) !== -1) {
+        this.closeEditPopup(false);
+      }
+      this.refresh();
+    }
+
     /* ---- popup editor (행 단위 폼 편집) ----
      *
      * 인라인 셀 편집과 위젯 생성(_createEditorWidget)은 공유하지만 라이프사이클은
@@ -6348,6 +6591,7 @@
     openEditPopup(row, field) {
       if (!this._popupConfig || !row || this._destroyed) return false;
       if (!this._editable) return false;
+      if (this._isRowLocked(row)) return false; /* 행 잠금 — 폼 전체가 잠기므로 열지 않는다 */
       if (this._isRowDeleted(row)) return false; /* softDelete 삭제 표시 행 (인라인과 동일) */
       if (this._rows.indexOf(row) === -1) return false;
 
@@ -6359,7 +6603,7 @@
       this.closeEditPopup(false);
 
       const cfg = this._popupConfig;
-      const fields = buildPopupFields(this._columns, cfg, this._editable);
+      const fields = buildPopupFields(this._columns, cfg, this._editable, this._lockedFieldsOf(row));
       if (!fields.length) return false;
 
       /* 원본 스냅샷 — Cancel 롤백(instantUpdate)과 변경 감지의 기준선.
@@ -7078,7 +7322,7 @@
         let rowChanges = null;
         cells.forEach((raw, j) => {
           const col = cols[startC + j];
-          if (!col || !col.editable || col.field === undefined) return;
+          if (!this._canEditCell(row, col)) return; /* 행/셀 잠금은 붙여넣기도 막는다 */
           let value = raw;
           const editorType = col.editor || defaultEditorType(col);
           if (editorType === 'number') {
@@ -7627,6 +7871,7 @@
     setRowData(rows) {
       this._rows = (rows || []).slice();
       this._selection = {};
+      this._locks = emptyLockMap(); /* 잠금은 옛 행을 가리키던 값 — 새 데이터엔 기준이 없다 */
       this._currentPage = 0;
       this._lastClickedViewIndex = -1;
       this._focusedCell = null;
@@ -8252,7 +8497,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.26.0';
+  DataGrid.version = '2.27.0';
 
   /**
    * 내장 로케일. `localeText: DataGrid.locales.ko`처럼 통째로 쓰거나,
@@ -8282,6 +8527,12 @@
     isRequiredViolated,
     shouldShowRequired,
     shouldMarkRequiredCell,
+    emptyLockMap,
+    isRowLocked,
+    isCellLocked,
+    setRowLocks,
+    setCellLocks,
+    isCellEditableNow,
     resolveDomLayout,
     resolveDataModes,
     shouldResetPageOnReload,

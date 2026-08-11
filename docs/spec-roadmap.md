@@ -97,6 +97,7 @@
 | [x] | `column > maxWidth` | `maxWidth` — 리사이즈·flex·autoSize 상한 — v1.1.0 | **P1** (쉬움) |
 | [x] | `editable` (그리드 레벨 on/off) | `editable: false` 옵션 — 컬럼 설정 무시하고 잠금 + `setEditable(bool)` / `isEditable()` — v1.1.0 | **P1** (쉬움) |
 | [x] | (없음 — 자체 개선) 편집 가능 컬럼의 시각적 구분 | `editableIndicator: true` — 편집 가능 컬럼 헤더에 연필 아이콘, 그리드 잠금 시 함께 사라짐 — v2.9.0 | **P2** (사용자 요청) |
+| [x] | (없음 — ParamQuery는 그리드 레벨 `editable`만) 행/셀 단위 잠금 | `setRowEnabled(row\|rows, bool)`(편집+선택 차단) / `setCellEnabled(row\|rows, field\|fields, bool)`(편집 계열만) / `isRowEnabled` / `isCellEnabled` / `resetEnabled` — v2.27.0 | **P2** (사용자 요청) |
 | [x] | `column > nodrag/nodrop` | `column.suppressMove` — 드래그 이동 제외 — v1.2.0 | **P2** |
 | [x] | `rowInit` (행별 클래스/속성) | `getRowClass(row, index) => string` 옵션 — v1.2.0 | **P2** |
 | [x] | `column > halign` (헤더만 다른 정렬) | `column.headerAlign: 'left'\|'center'\|'right'` — v2.0.0 | P3 |
@@ -179,6 +180,20 @@
 
 ### v2.1 — "TreeGrid" (§6 T1~T4)
 - treeData 코어(계층 표시·펼침/접힘·계층 정렬/필터), 체크박스 캐스케이드, 부모 요약, 지연 로딩
+
+### v2.27 — 행/셀 단위 잠금 (사용자 요청)
+- 요청: "그리드 전체를 잠그는 `enable`은 있는데 셀·행 단위는 없지?" → 있는 건 그리드 레벨 두 층(`setEnabled` = 상호작용 전체, `setEditable` = 편집)뿐이었다.
+- **이름 논의에서 범위가 정해졌다.** 처음엔 `column.editable`을 함수로 넓히고 `isRowEditable(row)` 콜백을 두려 했는데, 사용자가 `cellEnabled`/`rowEnabled`를 제안했다. `enabled`는 이 프로젝트에서 이미 "상호작용 전체 잠금"을 뜻하므로 그 이름을 쓰면 **편집만 막아선 이름값을 못 한다** — 그래서 행 잠금에 선택 차단까지 넣었다. 셀은 반대로 범위를 넓힐 수 없다(범위 선택은 사각형이라 가운데 한 칸을 뺄 수 없다) — 셀 잠금은 편집 계열만.
+- **콜백 옵션이 아니라 명령형 API로 간다** (사용자 판단, 동의). 근거 둘: ① 이 프로젝트의 런타임 변경 관례가 이미 명령형이다(`setColumnVisible(colId, visible)`이 가장 가까운 선례 — 컬럼 숨김도 `hidden: fn` 콜백이 아니다). ② "상태를 그리드와 소비자 양쪽에 두게 된다"는 반대 근거는 이미 `_selection`이 같은 구조로 풀려 있었다 — `setRowData()`가 `_selection`을 비우는 그 줄에 잠금도 얹으면 stale 문제가 사라진다.
+- API는 **행 객체**를 받는다(행 id가 아니라). `getRowId`를 안 주면 id가 WeakMap으로 자동 발급돼 **소비자가 그 값을 알 수 없기** 때문. 행·필드 모두 배열을 받아 일괄 처리하며 다시 그리기는 마지막에 한 번.
+- **`getState()`에 넣지 않는다.** 잠금은 서버 권한이나 워크플로에서 오는 값이라, 저장된 상태로 복원하면 권한이 바뀐 뒤에도 옛 잠금이 되살아난다(`_selection`이 상태에 없는 것과 같은 이유).
+- **잠글 때 그 행의 선택은 해제한다.** 잠긴 행은 UI로 선택을 풀 수단이 없어 남겨두면 사용자가 뺄 수 없는 선택이 된다(함정 §7의 갇힘과 같은 계열). 같은 이유로 `selectAll()`은 잠긴 행을 건너뛰지만 `deselectAll()`은 전부 푼다 — **해제 경로는 절대 막지 않는다.** 헤더 체크박스의 분모(`total`)에서도 잠긴 행을 빼야 전부 선택해도 indeterminate에 갇히지 않는다.
+- **판정을 순수 함수 하나로 모았다** — `isCellEditableNow(locks, rowId, col, gridEditable)`. 편집으로 값이 바뀌는 경로가 인라인 4곳(더블클릭·단일클릭·Enter·`startEdit`) + 인접 셀 이동 + 붙여넣기 + 채우기로 흩어져 있어서, 규칙을 한 곳에만 넣으면 나머지로 샌다(함정 §20). 전부 `_canEditCell(row, col)` 경유로 바꿨다. 채우기는 컬럼 루프 밖에서 한 번 볼 수 없어(잠금이 행 단위) **대상 행마다** 판정한다.
+- 잠금 맵은 **잠긴 것만 담는 sparse 구조** — 행이 10,000개여도 잠근 3개만 들고 있으면 된다. 셀 잠금의 마지막 필드를 풀면 행 항목까지 지운다(빈 객체가 쌓이지 않게).
+- **열려 있던 팝업 폼은 닫는다.** `refresh()`는 인라인 편집만 정리하고 팝업은 "행이 사라졌을 때"만 닫으므로, 안 닫으면 잠근 뒤에도 Save가 값을 써버린다.
+- 시각 표시는 `opacity`가 아니라 `background-image: linear-gradient`로 (`dg-row-added`와 같은 이유 — 고정 컬럼의 불투명 배경을 보존해야 하고, `opacity`는 stacking context를 만들어 고정 컬럼의 `z-index`를 행 안에 가둔다). 셀 표식은 **컬럼이 원래 편집 가능한데 이 셀만 잠긴 경우에만** 붙인다 — 행 잠금은 행 표시가 이미 알려주므로 겹치면 정보량이 0이다.
+- 트리의 `treeData.checkboxDisabled`는 **흡수하지 않고 겹친다**(둘 중 하나면 비활성) — 기존 설정을 안 깨기 위해.
+- 데모: features.html `#row-cell-locking`(선택 행 잠금 / 급여 셀만 잠금 / 전체 해제 + Inactive 초기 잠금), index.html 툴바 `Lock selected` / `Unlock all`, components.html 정적 견본 2종.
 
 ### v2.26 — 3단 컬럼 그룹 헤더 (사용자 요청)
 - 요청: "Column Group Headers에 3단도 되나? 4단은 사용성이 낮을 것 같으니 1~3단까지." **상한을 열어두지 않고 2줄(= 헤더 3단)로 못박는다** — 4단부터는 한 칸이 34px씩 얕아져 라벨을 읽을 수 없고, N단을 허용하면 "몇 단까지가 정상인가"를 소비자가 판단해야 한다. 넘치는 중첩은 막지 말고 **바로 위 그룹으로 접고 `console.warn`**(§13의 방침 — 명시한 조합은 존중하되 알린다).

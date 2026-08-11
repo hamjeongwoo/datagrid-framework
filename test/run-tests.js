@@ -2777,5 +2777,93 @@ suite('validatePopupValues', function () {
   assertEq(v(zero, { q: 0 }, row, ko).errors, {}, 'required + 0 → 통과');
 });
 
+/* ---------------- 행/셀 잠금 (setRowEnabled · setCellEnabled) ---------------- */
+suite('잠금 맵 — 행 잠금', function () {
+  var empty = T.emptyLockMap();
+  assertEq(Object.keys(empty.rows), [], '새 맵은 잠긴 행이 없다');
+  assert(T.isRowLocked(empty, 'r1') === false, '기본은 활성');
+  assert(T.isRowLocked(null, 'r1') === false, '맵이 없어도 안전');
+
+  var one = T.setRowLocks(empty, ['r1'], true);
+  assert(T.isRowLocked(one, 'r1') === true, '잠금 반영');
+  assert(T.isRowLocked(one, 'r2') === false, '다른 행은 영향 없음');
+  assert(T.isRowLocked(empty, 'r1') === false, '원본 맵은 그대로 (불변)');
+
+  var many = T.setRowLocks(one, ['r2', 'r3'], true);
+  assertEq(Object.keys(many.rows).sort(), ['r1', 'r2', 'r3'], '배열 일괄 잠금');
+
+  var off = T.setRowLocks(many, ['r1', 'r3'], false);
+  assertEq(Object.keys(off.rows), ['r2'], '해제하면 항목 자체가 사라진다');
+  assertEq(Object.keys(T.setRowLocks(off, ['없는행'], false).rows), ['r2'],
+    '잠기지 않은 행을 해제해도 안전');
+  assertEq(Object.keys(T.setRowLocks(off, [null, undefined], true).rows), ['r2'],
+    'null/undefined id는 무시');
+  assertEq(Object.keys(T.setRowLocks(off, null, true).rows), ['r2'], '인자 생략도 안전');
+});
+
+suite('잠금 맵 — 셀 잠금', function () {
+  var base = T.emptyLockMap();
+  var m = T.setCellLocks(base, ['r1'], ['salary'], true);
+  assert(T.isCellLocked(m, 'r1', 'salary') === true, '셀 잠금 반영');
+  assert(T.isCellLocked(m, 'r1', 'name') === false, '같은 행의 다른 필드는 활성');
+  assert(T.isCellLocked(m, 'r2', 'salary') === false, '다른 행은 활성');
+  assert(T.isRowLocked(m, 'r1') === false, '셀 잠금은 행 잠금이 아니다');
+
+  /* 여러 행 × 여러 필드 */
+  var grid2 = T.setCellLocks(base, ['r1', 'r2'], ['a', 'b'], true);
+  assert(T.isCellLocked(grid2, 'r2', 'b') === true, '행×필드 곱집합으로 잠근다');
+
+  /* 마지막 필드를 풀면 행 항목까지 지운다 — 안 지우면 빈 객체가 쌓인다 */
+  var half = T.setCellLocks(grid2, ['r1'], ['a'], false);
+  assertEq(Object.keys(half.cells).sort(), ['r1', 'r2'], '남은 필드가 있으면 행 항목 유지');
+  var gone = T.setCellLocks(half, ['r1'], ['b'], false);
+  assertEq(Object.keys(gone.cells), ['r2'], '마지막 필드를 풀면 행 항목도 제거');
+
+  /* 행 잠금은 셀 잠금을 덮는다 — 더 넓은 범위가 이긴다 */
+  var rowLocked = T.setRowLocks(base, ['r9'], true);
+  assert(T.isCellLocked(rowLocked, 'r9', '아무필드') === true, '행이 잠기면 모든 셀이 잠긴다');
+  var tryUnlock = T.setCellLocks(rowLocked, ['r9'], ['name'], false);
+  assert(T.isCellLocked(tryUnlock, 'r9', 'name') === true,
+    '행 잠금은 셀 단위 해제로 못 푼다');
+
+  assert(T.isCellLocked(base, 'r1', undefined) === false, 'field 없이 물어도 안전');
+});
+
+suite('isCellEditableNow — 편집 진입점 공통 판정', function () {
+  var f = T.isCellEditableNow;
+  var empty = T.emptyLockMap();
+  var col = { field: 'salary', editable: true };
+
+  assert(f(empty, 'r1', col, true) === true, '아무것도 안 잠기면 편집 가능');
+  assert(f(empty, 'r1', col, false) === false, '그리드 잠금이 가장 넓다');
+  assert(f(empty, 'r1', { field: 'x', editable: false }, true) === false, '컬럼 editable: false');
+  assert(f(empty, 'r1', { editable: true }, true) === false, 'field 없는 컬럼은 편집 대상 아님');
+  assert(f(empty, 'r1', null, true) === false, '컬럼이 없어도 안전');
+
+  assert(f(T.setRowLocks(empty, ['r1'], true), 'r1', col, true) === false, '행 잠금');
+  assert(f(T.setRowLocks(empty, ['r1'], true), 'r2', col, true) === true, '이웃 행은 영향 없음');
+  assert(f(T.setCellLocks(empty, ['r1'], ['salary'], true), 'r1', col, true) === false, '셀 잠금');
+  assert(f(T.setCellLocks(empty, ['r1'], ['other'], true), 'r1', col, true) === true,
+    '다른 필드의 셀 잠금은 이 셀과 무관');
+});
+
+suite('buildPopupFields — 셀 잠금은 폼 필드를 readonly로', function () {
+  var build = T.buildPopupFields;
+  var cols = [
+    { field: 'name', colId: 'name', editable: true },
+    { field: 'salary', colId: 'salary', editable: true, popupEditor: { readonly: false } },
+  ];
+  var cfg = T.resolvePopupEditorConfig(true);
+
+  assertEq(build(cols, cfg, true, []).map(function (x) { return x.readonly; }), [false, false],
+    '잠금이 없으면 그대로');
+  assertEq(build(cols, cfg, true).map(function (x) { return x.readonly; }), [false, false],
+    '인자 생략은 잠금 없음과 같다 (기존 호출 호환)');
+  assertEq(build(cols, cfg, true, ['salary']).map(function (x) { return x.readonly; }), [false, true],
+    '셀 잠금은 popupEditor.readonly: false를 이긴다');
+  assertEq(build(cols, cfg, true, ['name', 'salary']).map(function (x) { return x.readonly; }),
+    [true, true], '여러 필드 잠금');
+});
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed === 0 ? 0 : 1);

@@ -31,8 +31,8 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.26.0',
-  updated: '2026-08-10',
+  version: '2.27.0',
+  updated: '2026-08-11',
 
   sections: [
 
@@ -2809,8 +2809,127 @@ window.ApiDocs = {
           since: '1.1.0',
           description:
             '그리드 전체 편집을 잠그거나 해제합니다(<code>editable</code> 옵션의 런타임 버전). ' +
-            '잠그면 진행 중인 편집도 정리됩니다. 현재 상태는 <code>isEditable()</code>로 확인합니다.',
+            '잠그면 진행 중인 편집도 정리됩니다. 현재 상태는 <code>isEditable()</code>로 확인합니다. ' +
+            '일부 행/셀만 잠그려면 <code>setRowEnabled</code> / <code>setCellEnabled</code>를 쓰세요.',
           example: 'grid.setEditable(false);  // 읽기 전용 모드',
+        },
+        {
+          name: 'setRowEnabled',
+          demo: 'row-cell-locking',
+          group: 'Editing',
+          signature: 'setRowEnabled(row: object | object[], enabled: boolean): void',
+          since: '2.27.0',
+          description:
+            '행을 잠그거나 해제합니다. 행 하나 또는 행 배열을 받으며, 배열이면 ' +
+            '<strong>다시 그리기는 마지막에 한 번만</strong> 일어납니다. ' +
+            '호출하면 그리드가 알아서 다시 그리므로 <code>refresh()</code>를 따로 부를 필요가 없습니다.',
+          props: [
+            { name: 'row', type: 'object | object[]',
+              description: '잠글 행 객체(들). 행 <em>id</em>가 아니라 <strong>행 객체</strong>입니다 — ' +
+                '<code>getRowId</code>를 주지 않으면 id는 내부에서 자동 발급되어 밖에서 알 수 없기 때문입니다.' },
+            { name: 'enabled', type: 'boolean',
+              description: '<code>false</code>면 잠금, <code>true</code>면 해제.' },
+          ],
+          propsTitle: '인자',
+          notes: [
+            {
+              title: '잠긴 행이 막는 것',
+              body: '인라인 편집 · 붙여넣기 · 채우기 핸들 · 팝업 폼 열기 · <strong>행 선택</strong>이 모두 막히고, ' +
+                '행이 흐리게 표시됩니다(<code>.dg-row-disabled</code>). 체크박스는 비활성 상태가 되고 ' +
+                '<code>selectAll()</code>의 대상에서도 빠집니다.',
+            },
+            {
+              title: '잠글 때 그 행의 선택은 해제됩니다',
+              body: '잠긴 행은 UI로 선택을 풀 수단이 없으므로, 선택된 채 남겨두면 사용자가 뺄 수 없는 선택이 됩니다. ' +
+                '<code>setEnabled(false)</code>가 진행 중인 편집을 정리하는 것과 같은 이유입니다. ' +
+                '해제할 것이 있었다면 <code>selectionChanged</code>가 발생합니다.',
+              variant: 'tip',
+            },
+            {
+              title: '열려 있던 팝업 폼은 닫힙니다',
+              body: '그 행의 폼이 열려 있으면 저장하지 않고 닫습니다 — 닫지 않으면 잠근 뒤에도 Save가 값을 써버립니다.',
+              variant: 'warn',
+            },
+            {
+              title: '잠금은 저장되지 않습니다',
+              body: '<code>getState()</code>에 포함되지 않고, <code>setRowData()</code>로 데이터를 갈아끼우면 ' +
+                '함께 초기화됩니다. 잠금은 보통 서버 권한이나 워크플로 상태에서 오는 값이라, ' +
+                '저장된 상태로 복원하면 권한이 바뀐 뒤에도 옛 잠금이 되살아나기 때문입니다.',
+            },
+          ],
+          example:
+            "// 퇴사자 행을 한 번에 잠근다 (다시 그리기는 한 번)\n" +
+            "grid.setRowEnabled(rows.filter(r => r.status === 'Inactive'), false);\n\n" +
+            "// 선택한 행 잠금 — 잠근 행은 선택에서 빠진다\n" +
+            "grid.setRowEnabled(grid.getSelectedRows(), false);",
+        },
+        {
+          name: 'setCellEnabled',
+          demo: 'row-cell-locking',
+          group: 'Editing',
+          signature: 'setCellEnabled(row: object | object[], field: string | string[], enabled: boolean): void',
+          since: '2.27.0',
+          description:
+            '셀을 잠그거나 해제합니다. 행과 필드 모두 배열을 받으므로 ' +
+            '<strong>여러 행 × 여러 필드</strong>를 한 번에 처리할 수 있습니다.',
+          props: [
+            { name: 'row', type: 'object | object[]', description: '대상 행 객체(들).' },
+            { name: 'field', type: 'string | string[]', description: '대상 필드 이름(들).' },
+            { name: 'enabled', type: 'boolean', description: '<code>false</code>면 잠금, <code>true</code>면 해제.' },
+          ],
+          propsTitle: '인자',
+          notes: [
+            {
+              title: '셀 잠금은 편집 계열만 막습니다',
+              body: '인라인 편집 · 붙여넣기 · 채우기 · 팝업 폼 필드(읽기 전용으로 표시)가 막히고, ' +
+                '선택과 포커스는 그대로입니다. 셀 범위 선택은 사각형이라 가운데 한 칸만 빼면 범위가 성립하지 않기 때문입니다. ' +
+                '컬럼이 원래 편집 가능한데 이 셀만 잠긴 경우에만 표식이 붙습니다(<code>.dg-cell-disabled</code>) — ' +
+                '행 잠금은 행 표시가 이미 알려주므로 겹쳐 그리지 않습니다.',
+            },
+            {
+              title: '행 잠금이 셀 잠금보다 넓습니다',
+              body: '행을 잠근 뒤 <code>setCellEnabled(row, field, true)</code>로 셀 하나만 되살릴 수는 없습니다. ' +
+                '넓은 범위가 항상 이깁니다 — <code>setEditable(false)</code>가 컬럼 설정을 이기는 것과 같습니다.',
+              variant: 'warn',
+            },
+            {
+              title: '팝업 폼에서는 <code>popupEditor.readonly: false</code>도 못 풉니다',
+              body: '셀 잠금은 컬럼 단위 설정보다 넓은 범위이므로 폼 필드가 무조건 읽기 전용이 됩니다.',
+            },
+          ],
+          example:
+            "// 결재가 끝난 행의 급여만 잠근다\n" +
+            "var approved = rows.filter(r => r.approved);\n" +
+            "grid.setCellEnabled(approved, ['salary', 'bonus'], false);",
+        },
+        {
+          name: 'isRowEnabled',
+          demo: 'row-cell-locking',
+          group: 'Editing',
+          signature: 'isRowEnabled(row: object): boolean',
+          since: '2.27.0',
+          description: '이 행이 잠겨 있지 않은지 반환합니다.',
+        },
+        {
+          name: 'isCellEnabled',
+          demo: 'row-cell-locking',
+          group: 'Editing',
+          signature: 'isCellEnabled(row: object, field: string): boolean',
+          since: '2.27.0',
+          description:
+            '이 셀이 잠겨 있지 않은지 반환합니다. ' +
+            '행이 잠겨 있으면 셀 잠금 여부와 무관하게 <code>false</code>입니다(행 잠금이 더 넓은 범위). ' +
+            '컬럼의 <code>editable</code>이나 그리드 잠금은 보지 않습니다 — <strong>잠금만</strong> 답합니다.',
+        },
+        {
+          name: 'resetEnabled',
+          demo: 'row-cell-locking',
+          group: 'Editing',
+          signature: 'resetEnabled(): void',
+          since: '2.27.0',
+          description:
+            '모든 행/셀 잠금을 한 번에 풉니다(<code>resetState()</code>와 같은 성격). ' +
+            '그리드 전체 잠금(<code>setEditable</code> / <code>setEnabled</code>)은 건드리지 않습니다.',
         },
 
         /* ---- 클립보드 ---- */
@@ -3336,7 +3455,8 @@ window.ApiDocs = {
           description:
             '그리드 전체 인터랙션을 잠급니다 — 반투명 오버레이가 마우스를 가로막고 키보드 입력도 무시됩니다' +
             '(저장 요청 중 등 일시적 비활성용). 진행 중 편집은 취소되며 <code>isEnabled()</code>로 상태 조회. ' +
-            '편집만 잠그려면 <code>setEditable(false)</code>를 쓰세요.',
+            '편집만 잠그려면 <code>setEditable(false)</code>를, ' +
+            '일부 행/셀만 잠그려면 <code>setRowEnabled</code> / <code>setCellEnabled</code>를 쓰세요.',
         },
       ],
     },
@@ -3906,6 +4026,7 @@ window.ApiDocs = {
         { name: '--dg-wrapper-border-radius', default: '8px', description: '그리드 외곽 모서리.' },
         { name: '--dg-border-radius', default: '4px', description: '버튼·입력·체크박스 모서리.' },
         { name: '--dg-deleted-row-opacity', default: '0.55', description: 'softDelete 삭제 표시 행의 흐림 정도.', since: '2.6.0' },
+        { name: '--dg-locked-background-color', default: 'rgba(24,29,31,.045)', description: '잠긴 행·셀의 덧입히는 배경(<code>setRowEnabled</code> / <code>setCellEnabled</code>).', since: '2.27.0' },
         { name: '--dg-popup-width', default: '420px', description: '팝업 에디터 기본 폭 — 보통은 JS 옵션 <code>popupEditor.width</code>로 설정합니다.', since: '2.16.0' },
         { name: '--dg-popup-backdrop-color', default: 'rgba(24,29,31,.32)', description: '팝업 에디터 뒷배경.', since: '2.16.0' },
         { name: '--dg-popup-shadow', default: '0 12px 40px rgba(24,29,31,.22)', description: '팝업 에디터 그림자.', since: '2.16.0' },
