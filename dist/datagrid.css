@@ -190,18 +190,29 @@
   border-bottom: 1px solid var(--dg-border-color);
 }
 .dg-header-group-cell:last-child { border-right: none; }
-/* 아래 줄로 이어지는 칸 — 가로선을 지워 위아래가 한 칸으로 보이게 한다.
-   라벨은 자기 줄 안에 그대로 둔다: 두 줄 블록의 가운데로 내리려면 칸(34px) 밖으로
-   나가야 하는데, 칸은 overflow: hidden이라 글자가 잘린다. 칸을 키우거나 넘치게
-   두는 방법은 아래 줄이 나중에 그려져 라벨을 덮는 문제(고정 컬럼 배경)로 이어지므로,
-   2단 그룹 라벨과 같은 위치 규칙(자기 줄 세로 가운데)을 유지한다. */
-.dg-header-group-cell.dg-header-group-span { border-bottom: none; }
+/* 아래 줄로 이어지는 칸 — 라벨을 옮기는 대신 칸을 실제로 두 줄 높이로 키운다.
+   (그룹 줄은 최대 2개이므로 이어지는 칸은 언제나 정확히 2줄이다.)
+   그러면 라벨은 칸의 flex 정렬로 자동 세로 중앙이고, overflow: hidden의 기준도
+   68px이라 글자가 잘리지 않는다 — 라벨을 transform으로 내리면 34px 칸 밖으로
+   나가 잘렸다. 아래 줄의 몸통 칸은 불투명 배경 + z-index로 덮는다
+   (본문 mergeCells의 병합 시작 셀과 같은 방식). 아래 경계선은 지우지 않는다 —
+   칸이 커진 만큼 저절로 블록의 바닥(68px)으로 내려간다. */
+.dg-header-group-cell.dg-header-group-span {
+  height: calc(2 * var(--dg-group-header-height));
+  background: var(--dg-header-background-color);
+  position: relative;
+  z-index: 1;
+}
 .dg-header-group-cell.dg-pinned-left,
 .dg-header-group-cell.dg-pinned-right {
   position: sticky;
   z-index: 3;
   background: var(--dg-header-background-color);
 }
+/* 고정 컬럼의 두 줄 칸은 아래 줄의 고정 칸(z-index 3)보다 위여야 덮을 수 있다 —
+   같은 3이면 DOM 순서로 아래 줄이 이긴다. position은 sticky를 유지한다. */
+.dg-header-group-cell.dg-header-group-span.dg-pinned-left,
+.dg-header-group-cell.dg-header-group-span.dg-pinned-right { z-index: 4; }
 .dg-header-group-label {
   overflow: hidden;
   text-overflow: ellipsis;
