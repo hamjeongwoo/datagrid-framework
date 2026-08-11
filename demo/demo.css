@@ -81,6 +81,97 @@ h2.section {
 }
 p.section-desc { color: var(--page-muted); margin: 0 0 14px; max-width: 760px; }
 
+/* ---------------------------------------------------------------------------
+   features.html 사이드바 레이아웃 — api.html의 .docs-* 와 같은 구조.
+   카테고리(h2.cat) > 섹션(h2.section) 두 단계이고, 사이드바 목록은 로드 시
+   DOM에서 만들어진다(섹션을 추가해도 네비게이션을 따로 고칠 필요가 없게).
+--------------------------------------------------------------------------- */
+.features-layout {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 36px;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .features-layout { grid-template-columns: 1fr; }
+  .features-sidebar { position: static !important; max-height: none !important; }
+}
+.features-sidebar {
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding-right: 8px;
+}
+.features-content { min-width: 0; }
+
+.features-search {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  margin-bottom: 14px;
+  font: inherit;
+  color: var(--page-fg);
+  background: var(--page-card);
+  border: 1px solid var(--page-border);
+  border-radius: 8px;
+  outline: none;
+}
+.features-search:focus { border-color: var(--page-accent); }
+
+.feat-nav-cat { margin-bottom: 4px; }
+.feat-nav-cat > a {
+  display: block;
+  padding: 6px 10px;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--page-fg);
+  text-decoration: none;
+  border-radius: 6px;
+}
+.feat-nav-entries { margin: 0 0 6px; }
+.feat-nav-entries a {
+  display: block;
+  padding: 3px 10px 3px 22px;
+  font-size: 12.5px;
+  color: var(--page-muted);
+  text-decoration: none;
+  border-left: 2px solid var(--page-border);
+  margin-left: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.feat-nav-cat > a:hover, .feat-nav-entries a:hover {
+  color: var(--page-accent);
+  background: rgba(33, 150, 243, 0.07);
+}
+.feat-nav-cat > a.active, .feat-nav-entries a.active {
+  color: var(--page-accent);
+  border-left-color: var(--page-accent);
+}
+.feat-nav-cat > a.active { background: rgba(33, 150, 243, 0.1); }
+.feat-nav-hidden { display: none; }
+
+/* 카테고리 제목 — h2.section보다 한 단계 위. 선택자가 태그+클래스라 서로 안 겹친다 */
+h2.cat {
+  font-size: 21px;
+  margin: 52px 0 4px;
+  padding-top: 18px;
+  border-top: 1px solid var(--page-border);
+  scroll-margin-top: 12px;
+}
+.features-content > h2.cat:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
+h2.cat .cat-en {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--page-muted);
+  margin-left: 8px;
+}
+p.cat-desc { color: var(--page-muted); margin: 0 0 6px; max-width: 760px; }
+h2.section { scroll-margin-top: 12px; }
+.features-no-results { color: var(--page-muted); display: none; }
+
 .card {
   background: var(--page-card);
   border: 1px solid var(--page-border);
