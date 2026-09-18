@@ -1264,10 +1264,18 @@
   z-index: 5;
   color: var(--dg-secondary-foreground-color);
   font-size: 13px;
+  /* 오버레이는 **표시 전용**이다 — 클릭을 통과시킨다 (BUG-015).
+     막아버리면 결과 0건일 때 필터를 되돌릴 헤더·필터 메뉴·툴바에 손이 닿지 않아
+     사용자가 그 상태에 갇힌다. 그리드를 진짜 잠그는 건 setEnabled(false)의 몫이고,
+     그쪽은 .dg-root.dg-disabled::after가 따로 담당한다.
+     (표시 전용은 pointer-events로 — BUG-006과 같은 원칙) */
+  pointer-events: none;
 }
 .dg-overlay[hidden] { display: none; }
 
 .dg-overlay-panel {
+  /* 문구 패널만 되살린다 — 텍스트를 드래그해 복사할 수 있어야 한다 */
+  pointer-events: auto;
   display: flex;
   align-items: center;
   gap: 10px;

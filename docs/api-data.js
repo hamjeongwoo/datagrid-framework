@@ -31,8 +31,8 @@
  * ============================================================================= */
 window.ApiDocs = {
   library: 'DataGrid',
-  version: '2.27.0',
-  updated: '2026-08-11',
+  version: '2.27.1',
+  updated: '2026-09-18',
 
   sections: [
 
@@ -3338,6 +3338,15 @@ window.ApiDocs = {
           description:
             '로딩 스피너 오버레이를 표시합니다. <code>hideLoadingOverlay()</code>로 해제합니다. ' +
             '행이 0개면 "No rows to show" 빈 상태가 자동 표시됩니다.',
+          notes: [
+            {
+              title: '오버레이는 조작을 막지 않습니다',
+              body: '오버레이는 <strong>표시 전용</strong>이라 본문 영역에만 뜨고 클릭을 통과시킵니다(v2.27.1). ' +
+                '필터 결과가 0건일 때도 헤더·필터 메뉴·툴바를 그대로 쓸 수 있어야 하기 때문입니다 — ' +
+                '막으면 필터를 되돌릴 수단이 사라져 그 상태에 갇힙니다. ' +
+                '그리드를 실제로 잠그려면 <code>setEnabled(false)</code>를 쓰세요.',
+            },
+          ],
         },
         {
           name: 'setTheme',

@@ -7665,11 +7665,25 @@
 
     /* ---- overlays ---- */
 
+    /**
+     * 오버레이를 **본문 영역에만** 올린다 (BUG-015).
+     * 루트 전체를 덮으면 타이틀·툴바·헤더가 반투명 막 아래로 들어가, 결과가 0건일 때
+     * 컬럼 이름도 안 보이고 그리드가 통째로 비활성처럼 읽힌다. 정작 필터를 되돌릴
+     * 수단(헤더 필터 메뉴·툴바 버튼)이 전부 그 막 아래다.
+     * 높이는 CSS의 inset: 0이 준 bottom: 0을 그대로 쓴다 — top만 내리면 되고,
+     * autoHeight처럼 본문이 짧은 레이아웃에서도 문구가 들어갈 자리가 남는다.
+     */
+    _positionOverlay() {
+      if (!this._overlayEl || !this._bodyEl) return;
+      this._overlayEl.style.top = `${this._bodyEl.offsetTop}px`;
+    }
+
     _updateOverlay() {
       if (this._loading) return; /* keep loading overlay */
       if (this._viewRows.length === 0) {
         this._overlayEl.innerHTML =
           `<div class="dg-overlay-panel">${escapeHtml(this._t('noRowsToShow'))}</div>`;
+        this._positionOverlay();
         this._overlayEl.hidden = false;
       } else {
         this._overlayEl.hidden = true;
@@ -7681,6 +7695,7 @@
       this._overlayEl.innerHTML =
         '<div class="dg-overlay-panel"><span class="dg-spinner"></span>' +
         `${escapeHtml(this._t('loading'))}</div>`;
+      this._positionOverlay();
       this._overlayEl.hidden = false;
       this._renderInfiniteStatus(); /* 상태 바도 로딩 상태를 따라간다 */
     }
@@ -8497,7 +8512,7 @@
   /** 선언적 포맷 유틸 — column.format과 같은 패턴을 어디서나 사용. */
   DataGrid.format = formatValue;
 
-  DataGrid.version = '2.27.0';
+  DataGrid.version = '2.27.1';
 
   /**
    * 내장 로케일. `localeText: DataGrid.locales.ko`처럼 통째로 쓰거나,
